@@ -1,0 +1,74 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.1139388,
+          49.261317
+        ]
+      },
+      "properties": {
+        "fullAddress": "453 W 12th Ave, Vancouver, BC",
+        "score": 83,
+        "matchPrecision": "CIVIC_NUMBER",
+        "precisionPoints": 100,
+        "faults": [
+          {
+            "value": "",
+            "element": "LOCALITY",
+            "fault": "missing",
+            "penalty": 10
+          },
+          {
+            "value": "",
+            "element": "STREET_TYPE",
+            "fault": "missing",
+            "penalty": 6
+          },
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": 453,
+        "civicNumberSuffix": "",
+        "streetName": "12th",
+        "streetType": "Ave",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "W",
+        "isStreetDirectionPrefix": "true",
+        "streetQualifier": "",
+        "localityName": "Vancouver",
+        "streetAddress": "453 W 12th Ave",
+        "localityType": "City",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "high",
+        "locationDescriptor": "parcelPoint",
+        "siteID": "5cd8f57c-4146-477c-af7c-d210cd855c96",
+        "blockID": 2718750,
+        "fullSiteDescriptor": "",
+        "accessNotes": "\"",
+        "siteStatus": "active",
+        "siteRetireDate": "9999-12-31",
+        "changeDate": "2026-07-07",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

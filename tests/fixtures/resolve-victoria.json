@@ -1,0 +1,62 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.3652773,
+          48.4283553
+        ]
+      },
+      "properties": {
+        "fullAddress": "1 Centennial Sq, Victoria, BC",
+        "score": 99,
+        "matchPrecision": "CIVIC_NUMBER",
+        "precisionPoints": 100,
+        "faults": [
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": 1,
+        "civicNumberSuffix": "",
+        "streetName": "Centennial",
+        "streetType": "Sq",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "",
+        "isStreetDirectionPrefix": "false",
+        "streetQualifier": "",
+        "localityName": "Victoria",
+        "streetAddress": "1 Centennial Sq",
+        "localityType": "City",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "high",
+        "locationDescriptor": "parcelPoint",
+        "siteID": "e2e2b4ff-9d6e-440b-a6ff-eafbf1fc86f1",
+        "blockID": 304974,
+        "fullSiteDescriptor": "",
+        "accessNotes": "\"",
+        "siteStatus": "active",
+        "siteRetireDate": "9999-12-31",
+        "changeDate": "2026-07-07",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

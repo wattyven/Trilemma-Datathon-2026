@@ -1,0 +1,83 @@
+/* Phase 1: quiet, functional styling. The design token set arrives in Phase 3. */
+:root {
+  --ink: #1f2a24;
+  --muted: #6b746f;
+  --paper: #fbfaf6;
+  --line: #d9d6cc;
+  --accent: #b5761c;
+  --lot-fill: rgba(232, 163, 61, 0.25);
+  --lot-line: #b5761c;
+  --focus: #1d5fa8;
+  --error: #a23a2a;
+  color-scheme: light;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+main { flex: 1; width: 100%; max-width: 960px; margin: 0 auto; padding: 0 16px 32px; }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.site-header { max-width: 960px; width: 100%; margin: 0 auto; padding: 24px 16px 8px; }
+.wordmark { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+.tagline { margin: 4px 0 0; color: var(--muted); }
+
+.search { margin: 16px 0; }
+.search label { display: block; font-weight: 600; margin-bottom: 6px; }
+.search-row { display: flex; gap: 8px; }
+.combobox { position: relative; flex: 1; }
+.combobox input {
+  width: 100%; padding: 10px 12px; font: inherit; color: inherit;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+.search button, .message button {
+  padding: 10px 16px; font: inherit; font-weight: 600; color: #fff;
+  background: var(--ink); border: 0; border-radius: 6px; cursor: pointer;
+}
+[role='listbox'] {
+  position: absolute; z-index: 10; left: 0; right: 0; top: calc(100% + 4px);
+  margin: 0; padding: 4px 0; list-style: none;
+  background: #fff; border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+[role='option'] { padding: 8px 12px; cursor: pointer; }
+[role='option'][aria-selected='true'], [role='option']:hover { background: #f1eee4; }
+
+.status { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0; padding: 0; list-style: none; color: var(--muted); }
+.status li[data-state='active'] { color: var(--ink); font-weight: 600; }
+.status li[data-state='done']::before { content: '✓ '; }
+.status li[data-state='error'] { color: var(--error); }
+
+.message { margin: 12px 0; padding: 12px 14px; border-left: 4px solid var(--accent); background: #fff; }
+.message button { margin-left: 8px; padding: 6px 12px; }
+
+.lot { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; margin-top: 16px; }
+.lot-canvas-wrap { border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+#lot-canvas { display: block; width: 100%; height: 420px; }
+.lot-info h2 { margin: 0 0 12px; font-size: 1.15rem; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 12px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.notices { margin: 0 0 12px; padding-left: 18px; font-size: 0.95rem; }
+.notices li { margin-bottom: 6px; }
+.notices li[data-notice='approximate-lines'] { color: var(--muted); }
+.switcher { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
+.switcher label { display: block; padding: 4px 0; cursor: pointer; }
+
+.site-footer { max-width: 960px; width: 100%; margin: 0 auto; padding: 16px; font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); }
+.site-footer a { color: inherit; }
+.build { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
+
+@media (max-width: 720px) {
+  .lot { grid-template-columns: 1fr; }
+  #lot-canvas { height: 320px; }
+  .search-row { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

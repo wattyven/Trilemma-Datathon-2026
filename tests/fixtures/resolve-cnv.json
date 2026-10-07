@@ -1,0 +1,62 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.0738703,
+          49.3207216
+        ]
+      },
+      "properties": {
+        "fullAddress": "141 W 14th St, North Vancouver, BC",
+        "score": 99,
+        "matchPrecision": "CIVIC_NUMBER",
+        "precisionPoints": 100,
+        "faults": [
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": 141,
+        "civicNumberSuffix": "",
+        "streetName": "14th",
+        "streetType": "St",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "W",
+        "isStreetDirectionPrefix": "true",
+        "streetQualifier": "",
+        "localityName": "North Vancouver",
+        "streetAddress": "141 W 14th St",
+        "localityType": "City",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "high",
+        "locationDescriptor": "parcelPoint",
+        "siteID": "70974c78-c7e8-448a-9fe1-b66479f398dd",
+        "blockID": 2416379,
+        "fullSiteDescriptor": "",
+        "accessNotes": "\"",
+        "siteStatus": "active",
+        "siteRetireDate": "9999-12-31",
+        "changeDate": "2026-07-07",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -122.7930816,
+          49.2848034
+        ]
+      },
+      "properties": {
+        "fullAddress": "3000 Guildford Way, Coquitlam, BC",
+        "score": 98,
+        "matchPrecision": "BLOCK",
+        "precisionPoints": 99,
+        "faults": [
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": 3000,
+        "civicNumberSuffix": "",
+        "streetName": "Guildford",
+        "streetType": "Way",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "",
+        "isStreetDirectionPrefix": "false",
+        "streetQualifier": "",
+        "localityName": "Coquitlam",
+        "streetAddress": "3000 Guildford Way",
+        "localityType": "City",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "low",
+        "locationDescriptor": "accessPoint",
+        "siteID": "",
+        "blockID": 2415848,
+        "fullSiteDescriptor": "",
+        "accessNotes": "",
+        "siteStatus": "",
+        "siteRetireDate": "",
+        "changeDate": "",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

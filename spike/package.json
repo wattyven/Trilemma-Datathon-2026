@@ -10,7 +10,9 @@
     "cog": "node 04-cog-read.ts",
     "wcs": "node 05-wcs.ts",
     "cors": "bash 06-cors-curl.sh",
-    "browser": "node run-browser.ts"
+    "browser": "node run-browser.ts",
+    "deployed": "node 07-deployed-check.ts",
+    "fixtures": "node 08-capture-fixtures.ts"
   },
   "devDependencies": {
     "@types/proj4": "^2.5.6",
