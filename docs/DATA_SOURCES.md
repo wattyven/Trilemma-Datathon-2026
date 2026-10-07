@@ -339,6 +339,14 @@ EPSG:3005  +proj=aea +lat_0=45 +lon_0=-126 +lat_1=50 +lat_2=58.5 +x_0=1000000 +y
 
 Curl used `Origin: https://wattyven.github.io`. Chromium ran at `http://localhost:5199`. Full output: [`cors-curl.txt`](samples/cors-curl.txt), [`browser-results.json`](samples/browser-results.json).
 
+**Confirmed from the real origin (2026-10-07, Phase 1).** `node spike/07-deployed-check.ts https://wattyven.github.io/VanShade/` ran headless Chromium against the deployed build `200d4a0`. All 9 UI cases passed with **no console errors and no failed requests**:
+- geocoder autocomplete
+- geocoder resolve
+- WFS point query
+- WFS buffer query
+
+So the geocoder and a plain WFS `fetch` work from `https://wattyven.github.io`, and the JSONP fallback wasn't needed. COG and STAC reads from that origin get their check in Phase 2, when the app first makes them; both send `Access-Control-Allow-Origin: *`.
+
 | Endpoint | curl ACAO | Chromium | Notes |
 |---|---|---|---|
 | Geocoder `addresses.json` | reflects origin | ✅ | |
