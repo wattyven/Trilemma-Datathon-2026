@@ -1,9 +1,12 @@
 // Local metric frame centred on a lot: x = metres east, y = metres TRUE north.
-// Equirectangular about the origin; error is ~0.1% at 1 km, which is plenty for a single lot
-// plus its shading buffer. Later phases map the DSM grid into this same frame.
+// A tangent-plane approximation using the GRS80 radii of curvature at the origin (prime vertical
+// N for east–west, meridional M for north–south), so it's conformal to first order: bearings are
+// right to ~0.001° and distances to ~1e-5 across a lot plus its shading buffer. Later phases map
+// the DSM grid into this same frame.
 import { geometryCentroid, mapGeometry, type AreaGeometry, type Position } from './polygon';
 
-const EARTH_RADIUS_M = 6_371_008.8;
+const GRS80_A = 6_378_137;
+const GRS80_E2 = 0.00669438002290;
 const RAD = Math.PI / 180;
 
 export interface LocalFrame {
@@ -13,8 +16,12 @@ export interface LocalFrame {
 }
 
 export function localFrame([lon0, lat0]: Position): LocalFrame {
-  const kx = EARTH_RADIUS_M * RAD * Math.cos(lat0 * RAD);
-  const ky = EARTH_RADIUS_M * RAD;
+  const sin = Math.sin(lat0 * RAD);
+  const w = 1 - GRS80_E2 * sin * sin;
+  const n = GRS80_A / Math.sqrt(w); // prime vertical radius
+  const m = (GRS80_A * (1 - GRS80_E2)) / (w * Math.sqrt(w)); // meridional radius
+  const kx = n * Math.cos(lat0 * RAD) * RAD;
+  const ky = m * RAD;
   return {
     origin: [lon0, lat0],
     toLocal: ([lon, lat]) => [(lon - lon0) * kx, (lat - lat0) * ky],

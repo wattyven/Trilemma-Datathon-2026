@@ -1,6 +1,9 @@
 // Every user-facing string. Written for a gardener, not a GIS analyst.
 import type { ParcelNotice } from './data/parcels';
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+const compass = (azDeg: number) => COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 45) % 8]!;
+
 export const copy = {
   steps: {
     address: 'Finding address',
@@ -26,13 +29,57 @@ export const copy = {
     'approximate-lines': 'Lot lines come from ParcelMap BC. They\'re approximate, not a legal survey.',
     strata: 'This address is part of a strata or townhouse complex, so the outline covers the whole complex.',
     'nearest-lot': "We couldn't pin this address to a lot exactly, so we picked the nearest one. Check the outline looks right.",
-    'large-lot': 'This is a big lot, so sun results will be worked out on a coarser grid.',
   } satisfies Record<ParcelNotice, string>,
   facts: {
     jurisdiction: 'Municipality',
     area: 'Lot area',
     type: 'Lot type',
     plan: 'Plan',
+  },
+  noLidar: "There's no LiDAR elevation data for this lot, so we can't work out its sun. This happens over water and in a few gaps in coverage.",
+  noLidarArea: "There's no LiDAR elevation data around this address yet, so we can't work out its sun.",
+  noCells: 'This lot is too small to work out sun for on a 1 m grid.',
+  tileEdge: "This lot sits right on the edge of the elevation data, which VanShade can't stitch together yet.",
+  elevationDown: "We found the lot but couldn't load elevation data from Natural Resources Canada. Try again in a moment.",
+  sunlightProgress: (pct: number) => `Calculating sunlight (${pct}%)`,
+  analysisNotices: {
+    coarsened: (step: number) => `This is a big lot, so we worked on a ${step} m grid instead of 1 m.`,
+    bufferNodata: (pct: number) =>
+      `About ${pct}% of the area around this lot has no elevation data (often water). We've assumed nothing there blocks the sun.`,
+    dropped: (n: number) => `${n} spot${n === 1 ? '' : 's'} on this lot had no elevation data and ${n === 1 ? 'is' : 'are'} left out.`,
+  },
+  lidarFact: 'LiDAR from',
+  lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
+  legend: {
+    hours: 'Hours of direct sun a day',
+    percent: 'Share of the time in shade',
+    sun: 'Sun',
+    shade: 'Shade',
+    covered: 'Roof or tree overhead',
+    classes: ['Shade (under 3 h)', 'Part sun (3–6 h)', 'Full sun (6+ h)'] as const,
+  },
+  readout: {
+    hours: (h: number) => `${h.toFixed(1)} h of direct sun a day`,
+    sunNow: 'In direct sun',
+    shadeNow: 'In shade',
+    percent: (p: number) => (Number.isNaN(p) ? 'The sun is down for this whole window' : `In shade ${Math.round(p)}% of the time`),
+    covered: 'roof or tree overhead',
+    height: (z: number) => `observer at ${z.toFixed(1)} m`,
+    hint: 'Hover over the lot for details; click a spot for its month-by-month sun.',
+  },
+  summary: {
+    season: (days: number, meanH: number) =>
+      `Averaged over ${days} sample days. Open, flat ground here would get ${meanH.toFixed(1)} h of sun a day.`,
+    day: (daylightH: number) => `${daylightH.toFixed(1)} h between sunrise and sunset.`,
+    moment: (alt: number, az: number) =>
+      alt <= 0 ? 'The sun is below the horizon.' : `The sun is ${Math.round(alt)}° above the horizon, in the ${compass(az)}.`,
+    shade: (sunUpPct: number, days: number) => `Over ${days} sample days, the sun is up for ${Math.round(sunUpPct)}% of this time window.`,
+    recalculating: 'Recalculating…',
+  },
+  inspector: {
+    title: 'Average sun by month',
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,
+    strip: (date: string) => `On ${date}, sunrise to sunset (█ sun · shade):`,
   },
   switcherBest: 'Best match',
   switcherOther: 'Lot',

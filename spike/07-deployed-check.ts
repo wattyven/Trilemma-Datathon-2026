@@ -17,12 +17,15 @@ interface Case {
   via: 'autocomplete' | 'submit';
   expect: { jurisdiction?: string; notice?: string; message?: RegExp };
   screenshot?: boolean;
+  /** Must reach sun results within the 10 s budget. */
+  timed?: boolean;
 }
 
 const cases: Case[] = [
-  { name: 'Vancouver via autocomplete + keyboard', query: '453 W 12', via: 'autocomplete', expect: { jurisdiction: 'City of Vancouver' }, screenshot: true },
+  { name: 'Vancouver via autocomplete + keyboard', query: '453 W 12', via: 'autocomplete', expect: { jurisdiction: 'City of Vancouver' }, screenshot: true, timed: true },
   { name: 'City of North Vancouver', query: '141 W 14th St, North Vancouver', via: 'submit', expect: { jurisdiction: 'City of North Vancouver' } },
-  { name: 'District of North Vancouver', query: '355 W Queens Rd, North Vancouver', via: 'submit', expect: { jurisdiction: 'District of North Vancouver' }, screenshot: true },
+  { name: 'District of North Vancouver', query: '355 W Queens Rd, North Vancouver', via: 'submit', expect: { jurisdiction: 'District of North Vancouver' }, screenshot: true, timed: true },
+  { name: 'Maple Ridge (2023 LiDAR)', query: '11995 Haney Pl, Maple Ridge', via: 'submit', expect: { jurisdiction: 'City of Maple Ridge' }, timed: true },
   { name: 'City of Langley', query: '20399 Douglas Cres, Langley', via: 'submit', expect: { jurisdiction: 'City of Langley' } },
   { name: 'Township of Langley', query: '20338 65 Ave, Langley', via: 'submit', expect: { jurisdiction: 'Township of Langley' } },
   { name: 'BLOCK match → nearest lot', query: '3000 Guildford Way, Coquitlam', via: 'submit', expect: { jurisdiction: 'City of Coquitlam', notice: 'nearest-lot' }, screenshot: true },
@@ -31,11 +34,17 @@ const cases: Case[] = [
   { name: 'Street only', query: 'W 12th Ave, Vancouver', via: 'submit', expect: { message: /not that house number/ } },
 ];
 
+/** Done when sun results are drawn, or a message is showing (errors and out-of-area). */
 async function settle(page: Page) {
   await page.waitForFunction(
-    () => document.querySelector('#lot-canvas')?.getAttribute('data-state') === 'lot' || !(document.querySelector('#message') as HTMLElement).hidden,
+    () => {
+      const state = document.querySelector('#lot-canvas')?.getAttribute('data-state');
+      const msg = !(document.querySelector('#message') as HTMLElement).hidden;
+      const lotShown = !(document.querySelector('#lot') as HTMLElement).hidden;
+      return state === 'result' || (msg && (!lotShown || state !== 'elevation'));
+    },
     null,
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
 }
 
@@ -72,20 +81,40 @@ try {
     await settle(page);
     const ms = Date.now() - t0;
     const state = await page.locator('#lot-canvas').getAttribute('data-state');
-    const facts = state === 'lot' ? await page.locator('#lot-facts').innerText() : '';
-    const notices = state === 'lot' ? await page.locator('#lot-notices li').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.notice)) : [];
+    const lotShown = await page.locator('#lot').isVisible();
+    const facts = lotShown ? await page.locator('#lot-facts').innerText() : '';
+    const notices = lotShown ? await page.locator('#lot-notices li').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.notice)) : [];
     const message = (await page.locator('#message').isVisible()) ? await page.locator('#message').innerText() : '';
-    const heading = state === 'lot' ? await page.locator('#lot-heading').innerText() : '';
+    const heading = lotShown ? await page.locator('#lot-heading').innerText() : '';
+    const summary = lotShown ? await page.locator('#result-summary').innerText() : '';
+    const debug = lotShown ? await page.locator('#debug-facts').evaluate((el) => el.textContent ?? '') : '';
 
     const problems: string[] = [];
     if (c.expect.jurisdiction && !facts.includes(c.expect.jurisdiction)) problems.push(`jurisdiction ≠ ${c.expect.jurisdiction}`);
     if (c.expect.jurisdiction && c.expect.jurisdiction.startsWith('City of North') && facts.includes('District of North')) problems.push('CNV shown as DNV');
     if (c.expect.notice && !notices.includes(c.expect.notice)) problems.push(`missing notice ${c.expect.notice}`);
     if (c.expect.message && !c.expect.message.test(message)) problems.push(`message ≠ ${c.expect.message}`);
+    if (c.expect.jurisdiction && state !== 'result') problems.push(`no sun results (state=${state}, message=${message})`);
+    if (c.timed && ms > 10_000) problems.push(`took ${ms} ms > 10 s`);
     if (problems.length) failures++;
-    results.push({ name: c.name, ok: !problems.length, problems, ms, heading, facts: facts.replace(/\s+/g, ' '), notices, message });
+    results.push({ name: c.name, ok: !problems.length, problems, ms, heading, facts: facts.replace(/\s+/g, ' '), notices, message, summary, debug });
     console.log(`${problems.length ? 'FAIL' : 'PASS'}  ${c.name} (${ms} ms) ${heading} | ${facts.replace(/\s+/g, ' ')} | ${notices.join(',')}${message ? ' | ' + message : ''}${problems.length ? '  ✗ ' + problems.join('; ') : ''}`);
+    if (summary) console.log(`      ${summary}`);
+    if (debug) console.log(`      ${debug.replace(/(Grid|Cells|Window|LiDAR|Timings)/g, ' | $1').trim()}`);
     if (c.screenshot) await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-${c.name.replace(/\W+/g, '-').toLowerCase()}.png`), fullPage: true });
+
+    // After the first lot: winter solstice noon as a Moment, where shadows should point due (true) north.
+    if (c === cases[0] && state === 'result') {
+      const before = await page.locator('#result-summary').innerText();
+      await page.locator('input[name="mode"][value="moment"]').check();
+      await page.locator('input[name="date"]').fill('2026-12-21');
+      await page.locator('input[name="time"]').fill('12:10');
+      await page.locator('input[name="time"]').dispatchEvent('change');
+      await page.waitForFunction((b) => document.querySelector('#result-summary')?.textContent !== b && !/Recalculating/.test(document.querySelector('#result-summary')?.textContent ?? ''), before, { timeout: 30_000 });
+      console.log(`      Moment Dec 21 12:10 → ${await page.locator('#result-summary').innerText()}`);
+      await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-moment-dec21-noon.png`), fullPage: true });
+      await page.locator('input[name="mode"][value="season"]').check();
+    }
   }
 } finally {
   await browser.close();

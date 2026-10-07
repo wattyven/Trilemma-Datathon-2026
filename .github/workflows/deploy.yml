@@ -22,7 +22,7 @@ jobs:
 
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:tz   # identical results under TZ=UTC and TZ=Asia/Tokyo
 
       - run: npm run build
         env:

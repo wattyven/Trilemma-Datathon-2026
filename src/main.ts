@@ -1,12 +1,16 @@
 import './styles.css';
+import { Analysis, errorMessage, type AnalysisElements } from './analysis';
 import { copy } from './copy';
 import { resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
-import { initSearch } from './ui/search';
-import { showSteps, type StepId } from './ui/status';
+import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
+import { defaultState, initControls } from './ui/controls';
+import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
+import { initSearch } from './ui/search';
+import { showSteps, type StepId, type Steps } from './ui/status';
 
 const byId = <T extends HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -21,13 +25,28 @@ const statusList = byId<HTMLOListElement>('status');
 const message = byId<HTMLDivElement>('message');
 const lotEls: LotViewElements = {
   section: byId('lot'),
-  canvas: byId<HTMLCanvasElement>('lot-canvas'),
   heading: byId('lot-heading'),
   facts: byId<HTMLDListElement>('lot-facts'),
   notices: byId<HTMLUListElement>('lot-notices'),
   switcher: byId<HTMLFieldSetElement>('lot-switcher'),
   options: byId('lot-options'),
 };
+const analysisEls: AnalysisElements = {
+  legend: byId('legend'),
+  readout: byId('readout'),
+  summary: byId('result-summary'),
+  inspector: byId('inspector'),
+  debug: byId<HTMLDListElement>('debug-facts'),
+};
+
+const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
+  onHover: (cell) => analysis.hover(cell),
+  onPick: (cell) => void analysis.pick(cell),
+});
+const controls = initControls(byId<HTMLFormElement>('sun-controls'), defaultState(todayInVancouver(), nowMinuteInVancouver()), (_s, kind) =>
+  void analysis.onControls(kind),
+);
+const analysis = new Analysis(lotCanvas, controls, lotEls, analysisEls);
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
 
@@ -56,20 +75,24 @@ function clearMessage() {
   message.replaceChildren();
 }
 
-async function lookup(req: LookupInput) {
+function newRun(): AbortSignal {
   current?.abort();
-  const run = new AbortController();
-  current = run;
-  const { signal } = run;
+  current = new AbortController();
+  return current.signal;
+}
+
+async function lookup(req: LookupInput) {
+  const signal = newRun();
   clearMessage();
   hideLot(lotEls);
+  lotCanvas.clear();
 
   if (req.kind === 'text' && !req.text) {
     showMessage(copy.emptyQuery);
     return;
   }
 
-  const steps = showSteps(statusList, ['address', 'lot']);
+  const steps = showSteps(statusList, ['address', 'lot', 'elevation', 'sunlight']);
   let stage: StepId = 'address';
   try {
     steps.set('address', 'active');
@@ -121,8 +144,7 @@ async function lookup(req: LookupInput) {
       return showMessage(copy.outOfArea(match.fullAddress));
     }
     steps.set('lot', 'done');
-    steps.hide();
-    showLot(match, found, 0);
+    await showLot(match, found, 0, steps, signal);
   } catch (e) {
     if (isAbortError(e)) return;
     console.error(e);
@@ -131,7 +153,8 @@ async function lookup(req: LookupInput) {
   }
 }
 
-function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number) {
+/** Draw the chosen lot, then run elevation and sun for it. */
+async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number, steps: Steps, signal: AbortSignal) {
   const parcel = found.candidates[selected];
   if (!parcel) return;
   renderLot(lotEls, {
@@ -139,8 +162,21 @@ function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number) {
     jurisdiction: displayJurisdiction(parcel, match),
     candidates: found.candidates,
     selected,
-    point: match.lonLat,
     notices: parcelNotices(parcel, found, { approximateGeocode: match.approximate }),
-    onSelect: (i) => showLot(match, found, i),
+    onSelect: (i) => {
+      const s = newRun();
+      clearMessage();
+      void showLot(match, found, i, showSteps(statusList, ['elevation', 'sunlight']), s);
+    },
   });
+  lotCanvas.setOutline({ candidates: found.candidates.map((c) => c.geometry), selected, point: match.lonLat });
+  try {
+    await analysis.start(parcel, match, steps, signal);
+    steps.hide();
+  } catch (e) {
+    if (isAbortError(e)) return;
+    console.error(e);
+    steps.failActive();
+    showMessage(errorMessage(e));
+  }
 }

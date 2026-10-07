@@ -35,6 +35,9 @@ npm run browser    # Vite + Playwright Chromium: every probe under real CORS →
 8. **STAC item footprints overstate coverage**, so they can't be used for vintage. The per-project `extent` GeoJSON is accurate.
 9. **Strata parcels come back as stacked identical polygons**, one per strata lot. Deduplicate them.
 10. **The data is older than you might expect:** 12 of the 14 Metro test points come from 2016 LiDAR.
+11. **SunCalc 2 changed every convention §5.4 assumes** (found in Phase 2, released June 2026; we use 2.1.1). Angles are degrees, azimuth is clockwise from true north, and altitude is apparent (refraction-corrected). `getTimes` takes an optional UTC offset for the civil day.
+12. **STAC `proj:transform` on the HRDEM items is in GDAL geotransform order**, `[originX, res, 0, originY, 0, −res]`, not the STAC `[a…f]` order. The app reads tile geometry from the COG header instead.
+13. **The EPSG:3979 scale factor in Metro Vancouver is about 0.999**, so a 1 m grid pixel is about 1.001 m on the ground. The effect on horizon angles (under 0.05°) is ignored.
 
 ---
 
@@ -266,6 +269,8 @@ Sample: [`stac-mosaic-item.json`](samples/stac-mosaic-item.json).
 - A 441 m window spans at most 2 × 2 tiles, so the worst case is about 4 MiB per raster. Windows wider than 512 m (a buffer over about 230 m on a typical lot) can touch 3 × 3 tiles, about 9 MiB per raster.
 - Budget: elevation fits easily in the 10 s target.
 
+**In the app (Phase 2, local Chromium):** search to drawn sun results took **2.0–4.8 s** on 9 lots. That covers the geocoder, WFS, STAC, DSM and DTM windows (about 2 s) and horizons for up to 7,000 cells (about 0.5 s). The season average then takes about 25 ms. City Hall (22,248 m²) and Maple Ridge (28,099 m²) were coarsened to a 2 m grid.
+
 **Coverage.** Centre pixel at each test point. Δ = DSM − DTM, where positive means a roof or canopy:
 
 | id | DSM | DTM | Δ | Notes |
@@ -323,6 +328,10 @@ https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic?service=WCS&
 - **Speed:** a 440 × 440 m window is 1.0 MB in about 0.7 s, smaller than COG because the server crops.
 - **CORS:** reflects the origin. Verified in Chromium.
 - **Unknowns:** rate limits and SLA aren't published, which is why A stays primary. S3 is the more durable dependency.
+
+### 4.4b Vintage lookup as built (Phase 2)
+
+`spike/09-build-vintage.ts` clipped the extents of the **11** `hrdem-lidar` projects that touch the Metro bbox to that box, then simplified them to about 10 m. The result is `src/elevation/vintage.json` at 18.5 KiB. At runtime the app picks the newest project containing the point, and also runs a STAC search there so it can notice projects published later. Tests confirm City Hall gives Lower Mainland 2016 and Maple Ridge gives FHIMP 2023, matching the Phase 0 pixel check.
 
 ### 4.5 Grid convergence (§5.1)
 

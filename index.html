@@ -41,8 +41,13 @@
       <div id="message" class="message" role="alert" hidden></div>
 
       <section id="lot" class="lot" aria-labelledby="lot-heading" hidden>
-        <div class="lot-canvas-wrap">
-          <canvas id="lot-canvas" role="img" aria-label="Outline of the lot, north at the top"></canvas>
+        <div class="lot-visual">
+          <div class="lot-canvas-wrap">
+            <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
+          </div>
+          <div id="legend" class="legend" hidden></div>
+          <p id="readout" class="readout" aria-live="polite"></p>
+          <pre id="inspector" class="inspector" hidden></pre>
         </div>
         <div class="lot-info">
           <h2 id="lot-heading"></h2>
@@ -52,6 +57,61 @@
             <legend>Not your lot? Other lots here</legend>
             <div id="lot-options"></div>
           </fieldset>
+
+          <form id="sun-controls" class="controls" hidden>
+            <fieldset class="modes">
+              <legend>Show</legend>
+              <label><input type="radio" name="mode" value="season" /> Season</label>
+              <label><input type="radio" name="mode" value="day" /> One day</label>
+              <label><input type="radio" name="mode" value="moment" /> One moment</label>
+              <label><input type="radio" name="mode" value="shade" /> Shade finder</label>
+            </fieldset>
+            <div class="row" data-for="season">
+              <label>Season
+                <select name="preset">
+                  <option value="growing">Growing season (Apr–Sep)</option>
+                  <option value="summer">Summer (Jun–Aug)</option>
+                  <option value="winter">Winter (Dec–Feb)</option>
+                  <option value="year">Whole year</option>
+                  <option value="custom">Custom dates</option>
+                </select>
+              </label>
+              <label>Year <input type="number" name="year" min="2000" max="2100" step="1" /></label>
+            </div>
+            <div class="row" data-for="custom">
+              <label>From <input type="date" name="start" /></label>
+              <label>To <input type="date" name="end" /></label>
+            </div>
+            <div class="row" data-for="day moment">
+              <label>Date <input type="date" name="date" /></label>
+              <label data-for="moment">Time <input type="time" name="time" step="600" /></label>
+            </div>
+            <div class="row" data-for="shade">
+              <label>From <input type="date" name="shadeStart" /></label>
+              <label>To <input type="date" name="shadeEnd" /></label>
+            </div>
+            <div class="row" data-for="shade">
+              <label>Between <input type="time" name="fromTime" step="900" /></label>
+              <label>and <input type="time" name="toTime" step="900" /></label>
+            </div>
+            <div class="row">
+              <label>Measure at
+                <select name="observer">
+                  <option value="bed">Garden bed (0.3 m)</option>
+                  <option value="seated">Seated (1.2 m)</option>
+                  <option value="surface">Rooftop or deck surface</option>
+                </select>
+              </label>
+              <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full / part sun / shade</label>
+            </div>
+            <p class="hint">Times are Vancouver time.</p>
+          </form>
+          <p id="result-summary" class="summary" aria-live="polite"></p>
+
+          <details class="debug">
+            <summary>Debug details</summary>
+            <dl id="debug-facts" class="facts"></dl>
+          </details>
         </div>
       </section>
     </main>

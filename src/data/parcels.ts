@@ -1,5 +1,5 @@
 // ParcelMap BC lot lookup.
-import { LARGE_LOT_M2, PARCEL_BUFFER_M, PARCEL_LAYER, PARCEL_PROPERTIES, WFS_URL } from '../config';
+import { PARCEL_BUFFER_M, PARCEL_LAYER, PARCEL_PROPERTIES, WFS_URL } from '../config';
 import { localFrame } from '../geo/local';
 import { distanceToGeometry, geometryArea, geometryKey, mapGeometry, type AreaGeometry, type Position } from '../geo/polygon';
 import { toBcAlbers } from '../geo/proj';
@@ -32,7 +32,7 @@ export interface ParcelLookup {
   candidates: Parcel[];
 }
 
-export type ParcelNotice = 'approximate-lines' | 'strata' | 'nearest-lot' | 'large-lot';
+export type ParcelNotice = 'approximate-lines' | 'strata' | 'nearest-lot';
 
 /** Thrown when lots come back but none contains the point: almost certainly an axis-order bug. */
 export class ParcelAxisError extends Error {
@@ -167,7 +167,6 @@ export function parcelNotices(p: Parcel, lookup: ParcelLookup, opts: { approxima
   const notices: ParcelNotice[] = [];
   if (lookup.method === 'buffer' || (opts.approximateGeocode && !p.containsPoint)) notices.push('nearest-lot');
   if (isStrata(p)) notices.push('strata');
-  if (p.areaM2 > LARGE_LOT_M2) notices.push('large-lot');
   notices.push('approximate-lines');
   return notices;
 }

@@ -144,8 +144,7 @@ describe('parcelNotices', () => {
     expect(parcelNotices(lot({}), direct, { approximateGeocode: false })).toEqual(['approximate-lines']);
   });
 
-  it('flags big lots and strata plans', () => {
-    expect(parcelNotices(lot({ areaM2: 30_000 }), direct, { approximateGeocode: false })).toContain('large-lot');
+  it('flags strata plans', () => {
     expect(parcelNotices(lot({ planNumber: 'NWS3458' }), direct, { approximateGeocode: false })).toContain('strata');
     expect(parcelNotices(lot({ planNumber: 'EPP76647' }), direct, { approximateGeocode: false })).not.toContain('strata');
   });
