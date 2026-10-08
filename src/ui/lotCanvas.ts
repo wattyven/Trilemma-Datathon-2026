@@ -1,27 +1,19 @@
 // The lot canvas: the Phase 1 outline, and once elevation is in, the Phase 2 debug heatmap
 // (hillshaded DSM + per-cell results) drawn through the grid → local affine so TRUE north is up.
 // Phase 3 replaces this with the three.js scene.
-import { CLASS_THRESHOLDS } from '../config';
 import type { PixelWindow } from '../elevation/window';
 import { invertAffine, type GridAffine } from '../geo/gridAffine';
 import { frameForGeometry, type LocalFrame } from '../geo/local';
 import { bounds, mapGeometry, polygonsOf, type AreaGeometry, type Position } from '../geo/polygon';
-import { CLASS_RGB, SHADE_RGB, SUN_RGB, WATER_RGB, cividis, type Rgb } from './colors';
+import { WATER_RGB } from './colors';
+import { buildCellIndex, cellAtPixel, layerRgba, type Layer } from './cellPaint';
 
-export const HOURS_SCALE_MAX = 16;
+export { HOURS_SCALE_MAX, type Layer, type LayerKind } from './cellPaint';
 
 export interface OutlineModel {
   candidates: AreaGeometry[]; // lon/lat
   selected: number;
   point: Position; // lon/lat
-}
-
-export type LayerKind = 'hours' | 'moment' | 'percent';
-
-export interface Layer {
-  kind: LayerKind;
-  values: Float32Array | Uint8Array;
-  asClasses: boolean;
 }
 
 export interface AnalysisModel {
@@ -38,14 +30,6 @@ export interface AnalysisModel {
 export interface CanvasHandlers {
   onHover(cell: number | null): void;
   onPick(cell: number): void;
-}
-
-export function layerColor(layer: Layer, i: number): Rgb {
-  const v = layer.values[i]!;
-  if (layer.kind === 'moment') return v ? SUN_RGB : SHADE_RGB;
-  if (layer.kind === 'percent') return Number.isNaN(v) ? WATER_RGB : cividis(1 - v / 100);
-  if (layer.asClasses) return CLASS_RGB[v >= CLASS_THRESHOLDS.fullSunH ? 2 : v >= CLASS_THRESHOLDS.partSunH ? 1 : 0];
-  return cividis(v / HOURS_SCALE_MAX);
 }
 
 function cssVar(el: Element, name: string, fallback: string): string {
@@ -149,35 +133,16 @@ export class LotCanvas {
     this.draw();
   }
 
-  /** Cell rectangle in window pixels (blocks when the grid was coarsened). */
-  private block(m: AnalysisModel, i: number) {
-    const x0 = Math.max(0, Math.round(m.px[i]! - m.step / 2));
-    const y0 = Math.max(0, Math.round(m.py[i]! - m.step / 2));
-    return { x0, y0, x1: Math.min(m.window.width, x0 + m.step), y1: Math.min(m.window.height, y0 + m.step) };
+  private grid(m: AnalysisModel) {
+    return { width: m.window.width, height: m.window.height, px: m.px, py: m.py, covered: m.covered, step: m.step };
   }
 
   private buildIndex(m: AnalysisModel): Int32Array {
-    const idx = new Int32Array(m.window.width * m.window.height).fill(-1);
-    for (let i = 0; i < m.px.length; i++) {
-      const b = this.block(m, i);
-      for (let y = b.y0; y < b.y1; y++) for (let x = b.x0; x < b.x1; x++) idx[y * m.window.width + x] = i;
-    }
-    return idx;
+    return buildCellIndex(this.grid(m));
   }
 
   private paintCells(m: AnalysisModel, layer: Layer): HTMLCanvasElement {
-    const img = new ImageData(m.window.width, m.window.height);
-    for (let i = 0; i < m.px.length; i++) {
-      const [r, g, b] = layerColor(layer, i);
-      const b2 = this.block(m, i);
-      for (let y = b2.y0; y < b2.y1; y++) {
-        for (let x = b2.x0; x < b2.x1; x++) {
-          const hatch = m.covered[i] && (x + y) % 4 === 0; // roof or canopy overhead
-          const k = hatch ? 0.45 : 1;
-          img.data.set([r * k, g * k, b * k, 235], (y * m.window.width + x) * 4);
-        }
-      }
-    }
+    const img = new ImageData(layerRgba(this.grid(m), layer), m.window.width, m.window.height);
     const c = document.createElement('canvas');
     c.width = m.window.width;
     c.height = m.window.height;
@@ -193,10 +158,7 @@ export class LotCanvas {
     const { cx, cy, s, w, h } = this.view;
     const local: Position = [cx + (X - w / 2) / s, cy - (Y - h / 2) / s];
     const [px, py] = invertAffine(m.affine, local);
-    const x = Math.floor(px), y = Math.floor(py);
-    if (x < 0 || y < 0 || x >= m.window.width || y >= m.window.height) return null;
-    const i = this.cellIndex[y * m.window.width + x]!;
-    return i >= 0 ? i : null;
+    return cellAtPixel(this.grid(m), this.cellIndex, px, py);
   }
 
   draw() {

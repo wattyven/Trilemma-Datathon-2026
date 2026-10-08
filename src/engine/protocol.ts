@@ -45,8 +45,9 @@ export interface LoadedMessage {
   py: Float32Array;
   z0: Float32Array;
   covered: Uint8Array;
-  /** The DSM window (NaN = nodata), for the debug background. */
+  /** The DSM and DTM windows (NaN = nodata), for the map background and the 3D terrain. */
   dsm: Float32Array;
+  dtm: Float32Array;
 }
 
 export type ComputeResult =

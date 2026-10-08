@@ -23,8 +23,18 @@ export interface SunSample {
   weightH: number;
 }
 
+/**
+ * A Vancouver WALL-CLOCK time: `minuteOfDay` 720 is 12:00 on the clock even on a day the clocks
+ * change (adding elapsed minutes to midnight would be an hour off). 1440 means the next midnight.
+ */
 export function vancouver(d: LocalDate, minuteOfDay = 12 * 60): DateTime {
-  return DateTime.fromObject({ year: d.year, month: d.month, day: d.day }, { zone: SUN.zone }).plus({ minutes: minuteOfDay });
+  const m = Math.round(minuteOfDay);
+  const extraDays = Math.floor(m / 1440);
+  const wall = m - extraDays * 1440;
+  return DateTime.fromObject(
+    { year: d.year, month: d.month, day: d.day, hour: Math.floor(wall / 60), minute: wall % 60 },
+    { zone: SUN.zone },
+  ).plus({ days: extraDays });
 }
 
 export function sunPosition(time: Date, lat: number, lon: number): { altDeg: number; azTrueDeg: number } {

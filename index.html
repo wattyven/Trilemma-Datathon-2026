@@ -42,12 +42,36 @@
 
       <section id="lot" class="lot" aria-labelledby="lot-heading" hidden>
         <div class="lot-visual">
-          <div class="lot-canvas-wrap">
+          <div class="view-toolbar">
+            <fieldset class="segmented">
+              <legend class="visually-hidden">View</legend>
+              <label><input type="radio" name="view" value="3d" checked /> 3D</label>
+              <label><input type="radio" name="view" value="map" /> Map</label>
+            </fieldset>
+            <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
+          </div>
+          <div class="view-stage">
             <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
+            <div id="scene-host" class="scene-host" hidden>
+              <div id="hud" class="hud" hidden>
+                <div id="compass" class="compass" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="30" height="30"><text x="12" y="7" text-anchor="middle">N</text><path d="M12 8.5 L16 21 L12 18.5 L8 21 Z" /></svg>
+                </div>
+                <button type="button" id="reset-view" class="ghost">Reset view</button>
+              </div>
+            </div>
+            <p id="sun-note" class="sun-note" hidden></p>
+          </div>
+          <p id="view-note" class="readout" hidden></p>
+          <div id="timeline" class="timeline" hidden>
+            <label>Date <input type="date" id="tl-date" /></label>
+            <button type="button" id="tl-play" class="ghost" aria-pressed="false">Play the day</button>
+            <label class="slider">Time <input type="range" id="tl-time" min="0" max="1435" step="5" />
+              <output id="tl-time-label" for="tl-time"></output></label>
           </div>
           <div id="legend" class="legend" hidden></div>
           <p id="readout" class="readout" aria-live="polite"></p>
-          <pre id="inspector" class="inspector" hidden></pre>
+          <section id="inspector" class="inspector" aria-live="polite" hidden></section>
         </div>
         <div class="lot-info">
           <h2 id="lot-heading"></h2>
@@ -82,10 +106,6 @@
               <label>From <input type="date" name="start" /></label>
               <label>To <input type="date" name="end" /></label>
             </div>
-            <div class="row" data-for="day moment">
-              <label>Date <input type="date" name="date" /></label>
-              <label data-for="moment">Time <input type="time" name="time" step="600" /></label>
-            </div>
             <div class="row" data-for="shade">
               <label>From <input type="date" name="shadeStart" /></label>
               <label>To <input type="date" name="shadeEnd" /></label>
@@ -104,12 +124,13 @@
               </label>
               <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full / part sun / shade</label>
             </div>
-            <p class="hint">Times are Vancouver time.</p>
+            <p class="hint" data-for="day moment">Pick the day and time under the view. Times are Vancouver time.</p>
           </form>
           <p id="result-summary" class="summary" aria-live="polite"></p>
 
           <details class="debug">
             <summary>Debug details</summary>
+            <label class="check"><input type="checkbox" id="compare-toggle" /> Compare 3D shadows with the shade engine (engine shade is tinted blue)</label>
             <dl id="debug-facts" class="facts"></dl>
           </details>
         </div>

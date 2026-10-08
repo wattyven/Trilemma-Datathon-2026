@@ -41,14 +41,17 @@ async function settle(page: Page) {
       const state = document.querySelector('#lot-canvas')?.getAttribute('data-state');
       const msg = !(document.querySelector('#message') as HTMLElement).hidden;
       const lotShown = !(document.querySelector('#lot') as HTMLElement).hidden;
-      return state === 'result' || (msg && (!lotShown || state !== 'elevation'));
+      const scene = document.querySelector('.scene-canvas')?.getAttribute('data-state');
+      const sceneReady = !document.querySelector('.scene-canvas') || scene === 'result';
+      return (state === 'result' && sceneReady) || (msg && (!lotShown || state !== 'elevation'));
     },
     null,
     { timeout: 60_000 },
   );
 }
 
-const browser = await chromium.launch();
+// SwiftShader keeps WebGL working the same way in headless runs on any machine.
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
 const consoleErrors: string[] = [];
 page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
@@ -103,17 +106,61 @@ try {
     if (debug) console.log(`      ${debug.replace(/(Grid|Cells|Window|LiDAR|Timings)/g, ' | $1').trim()}`);
     if (c.screenshot) await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-${c.name.replace(/\W+/g, '-').toLowerCase()}.png`), fullPage: true });
 
-    // After the first lot: winter solstice noon as a Moment, where shadows should point due (true) north.
+    // After the first lot: Phase 3 interactions on the 3D view.
     if (c === cases[0] && state === 'result') {
-      const before = await page.locator('#result-summary').innerText();
+      const summary = () => page.locator('#result-summary').innerText();
+      const before = await summary();
+      // Dec 21 at solar noon as a Moment: the 3D shadows and the engine should both point true north.
       await page.locator('input[name="mode"][value="moment"]').check();
-      await page.locator('input[name="date"]').fill('2026-12-21');
-      await page.locator('input[name="time"]').fill('12:10');
-      await page.locator('input[name="time"]').dispatchEvent('change');
-      await page.waitForFunction((b) => document.querySelector('#result-summary')?.textContent !== b && !/Recalculating/.test(document.querySelector('#result-summary')?.textContent ?? ''), before, { timeout: 30_000 });
-      console.log(`      Moment Dec 21 12:10 → ${await page.locator('#result-summary').innerText()}`);
-      await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-moment-dec21-noon.png`), fullPage: true });
+      await page.locator('#tl-date').fill('2026-12-21');
+      await page.locator('#tl-date').dispatchEvent('change');
+      await page.locator('#tl-time').evaluate((el: HTMLInputElement) => {
+        el.value = String(12 * 60 + 10);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.waitForFunction((b) => {
+        const t = document.querySelector('#result-summary')?.textContent ?? '';
+        return t !== b && !/Recalculating/.test(t);
+      }, before, { timeout: 30_000 });
+      console.log(`      Moment Dec 21 12:10 → ${await summary()} (slider label ${await page.locator('#tl-time-label').innerText()})`);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-3d-moment-dec21-noon.png`), fullPage: true });
+      // Summer late afternoon: shadows fall to the east, visible from the home view.
+      await page.locator('#tl-date').fill('2026-06-21');
+      await page.locator('#tl-date').dispatchEvent('change');
+      await page.locator('#tl-time').evaluate((el: HTMLInputElement) => {
+        el.value = String(17 * 60);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await page.waitForFunction(() => /in the west/.test(document.querySelector('#result-summary')?.textContent ?? ''), null, { timeout: 30_000 });
+      await page.waitForTimeout(500);
+      await page.locator('.view-stage').screenshot({ path: join(OUT_DIR, `screen-${tag}-3d-jun21-1700.png`) });
+      // Debug compare: engine shade over the 3D shadows.
+      await page.locator('details.debug summary').click();
+      await page.locator('#compare-toggle').check();
+      await page.waitForTimeout(600);
+      await page.locator('.view-stage').screenshot({ path: join(OUT_DIR, `screen-${tag}-3d-compare.png`) });
+      await page.locator('#compare-toggle').uncheck();
+      // Keyboard inspector: focus the 3D view, Enter → inspector with 12 bars and a strip.
+      await page.locator('.scene-canvas').focus();
+      await page.keyboard.press('ArrowUp');
+      await page.keyboard.press('Enter');
+      await page.locator('#inspector:not([hidden]) svg.chart').waitFor({ timeout: 20_000 });
+      const bars = await page.locator('#inspector svg.chart g.bar').count();
+      const strip = await page.locator('#inspector svg.strip rect').count();
+      const inspectorOk = bars === 12 && strip > 0;
+      if (!inspectorOk) failures++;
+      console.log(`${inspectorOk ? 'PASS' : 'FAIL'}  keyboard inspector: ${bars} bars, ${strip} strip runs — ${(await page.locator('#inspector h3').innerText())}`);
       await page.locator('input[name="mode"][value="season"]').check();
+      await page.waitForFunction(() => /sample days/.test(document.querySelector('#result-summary')?.textContent ?? ''), null, { timeout: 30_000 });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(OUT_DIR, `screen-${tag}-3d-season-inspector.png`), fullPage: true });
+      // Map view toggle.
+      await page.locator('input[name="view"][value="map"]').check({ force: true });
+      const mapVisible = await page.locator('#lot-canvas').isVisible();
+      if (!mapVisible) failures++;
+      console.log(`${mapVisible ? 'PASS' : 'FAIL'}  map view toggle`);
+      await page.locator('input[name="view"][value="3d"]').check({ force: true });
     }
   }
 } finally {

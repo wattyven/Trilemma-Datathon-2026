@@ -111,8 +111,9 @@ async function load(id: number, req: LoadRequest) {
     z0: copy(cells.z0),
     covered: copy(cells.covered),
     dsm: copy(dsm.data),
+    dtm: copy(rasters.dtm.data),
   };
-  post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer]);
+  post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer]);
 }
 
 function compute(req: ComputeRequest): ComputeResult {

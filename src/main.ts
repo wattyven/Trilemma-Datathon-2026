@@ -7,6 +7,7 @@ import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from '
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
 import { defaultState, initControls } from './ui/controls';
+import { Timeline, initialTimeline } from './ui/timeline';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
@@ -37,6 +38,16 @@ const analysisEls: AnalysisElements = {
   summary: byId('result-summary'),
   inspector: byId('inspector'),
   debug: byId<HTMLDListElement>('debug-facts'),
+  sceneHost: byId('scene-host'),
+  mapCanvas: byId<HTMLCanvasElement>('lot-canvas'),
+  hud: byId('hud'),
+  compass: byId('compass'),
+  sunNote: byId('sun-note'),
+  viewNote: byId('view-note'),
+  viewRadios: Array.from(document.querySelectorAll<HTMLInputElement>('input[name="view"]')),
+  shadowsToggle: byId<HTMLInputElement>('shadows-toggle'),
+  compareToggle: byId<HTMLInputElement>('compare-toggle'),
+  resetView: byId<HTMLButtonElement>('reset-view'),
 };
 
 const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
@@ -46,7 +57,18 @@ const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
 const controls = initControls(byId<HTMLFormElement>('sun-controls'), defaultState(todayInVancouver(), nowMinuteInVancouver()), (_s, kind) =>
   void analysis.onControls(kind),
 );
-const analysis = new Analysis(lotCanvas, controls, lotEls, analysisEls);
+const timeline = new Timeline(
+  {
+    root: byId('timeline'),
+    date: byId<HTMLInputElement>('tl-date'),
+    slider: byId<HTMLInputElement>('tl-time'),
+    label: byId<HTMLOutputElement>('tl-time-label'),
+    play: byId<HTMLButtonElement>('tl-play'),
+  },
+  initialTimeline(todayInVancouver(), nowMinuteInVancouver()),
+  (t, dateChanged) => void analysis.onTimeline(t, dateChanged),
+);
+const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
 

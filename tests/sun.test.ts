@@ -67,6 +67,13 @@ describe('time-zone golden values (identical in any process TZ)', () => {
     expect(new Date(momentSample({ year: 2026, month: 7, day: 15 }, 9 * 60, LAT, LON).time).toISOString()).toBe('2026-07-15T16:00:00.000Z');
   });
 
+  it('reads minutes of the day as wall-clock time, even on a clock-change day', () => {
+    const mar8 = { year: 2026, month: 3, day: 8 }; // 02:00 PST → 03:00 PDT
+    expect(formatLocal(vancouver(mar8, 12 * 60).toMillis())).toBe('12:00');
+    expect(formatLocal(vancouver(mar8, 60).toMillis())).toBe('01:00');
+    expect(vancouver(mar8, 24 * 60).toISODate()).toBe('2026-03-09');
+  });
+
   it("knows Vancouver's date at a UTC instant", () => {
     expect(todayInVancouver(new Date('2026-07-01T06:00:00Z'))).toEqual({ year: 2026, month: 6, day: 30 });
   });
