@@ -25,3 +25,10 @@ ShadeMap is an existing tool that allows users to visualize sunlight and shade p
 We aim to address this gap by combining LiDAR data, a geocoder, and SunCalc to create a tool that estimates sunlight availability for a specific property. Users will enter an address and select a time range of at least one month, allowing sunlight data to be averaged over the selected period. The tool will account for seasonal patterns in the sun's position, daylight hours, and weather conditions to provide a more representative estimate of sunlight conditions. It will output the average minimum and maximum hours of sunlight during the selected period, along with the 1 m² area of the property that receives the most sunlight and the 1 m² area that receives the least sunlight.
 
 By providing both the average range of sunlight and the locations of the sunniest and shadiest areas, the tool will give homeowners, gardeners, and prospective homebuyers a simple way to better understand how sunlight varies across their property and throughout the seasons, helping them make more informed decisions about how they use or evaluate their outdoor space.
+
+
+## Data Sources
+
+LiDAR: https://open-data-portal-metrovancouver.hub.arcgis.com/search?q=lidar
+Geocoder: https://www2.gov.bc.ca/gov/content/data/geographic-data-services/location-services/geocoder
+SunCalc: https://github.com/mourner/suncalc
