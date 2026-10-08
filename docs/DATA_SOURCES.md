@@ -412,13 +412,18 @@ fully static** and skips LidarBC; everything else in this section works from the
 
 ### 7.2 Which surface a lot gets
 
-The first result always comes from HRDEM 1 m (§4). Then, in the background, the worker loads the best of these and swaps the
-results in place (`elevation/hires.ts` chooses; `elevation/build.ts` builds):
+The first result always comes from HRDEM 1 m (§4). Then, in the background, the worker loads a sharper surface and swaps the
+results in place (`elevation/hires.ts` lists the options; `elevation/build.ts` builds them). A lot can have up to three, and
+the "Elevation data" setting (URL `elev=`) picks one:
 
-1. **LidarBC** 1 m, if the proxy is set and its survey year is newer than both the HRDEM survey at the lot and the best point
-   cloud.
-2. Otherwise the **NRCan point cloud** at 0.5 m, if it's no older than the HRDEM survey at the lot.
-3. Otherwise HRDEM stays. So do lots over 40,000 m².
+| Choice | When it's offered | Surface |
+|---|---|---|
+| **Best of both** (default) | both of the others exist | the point cloud at 0.5 m where nothing changed, LidarBC where it did (§7.7) |
+| **Newest survey** | LidarBC (through the proxy) is newer than the HRDEM survey and the point cloud | LidarBC, 1 m |
+| **Most detailed** | an NRCan point cloud no older than the HRDEM survey | the point cloud, 0.5 m |
+
+With only one of them, that one is used and no choice is shown. If a surface fails to load, the next is tried (best, detailed,
+newest). HRDEM stays for lots over 40,000 m², or with `elev=hrdem` (debug).
 
 Both sharper surfaces sit on HRDEM resampled into a UTM 10N grid (EPSG:3157; a 3-point affine, within 2 cm of proj4 over
 440 m). HRDEM fills anything they don't cover. File lists come from `src/elevation/hires-index.json` (227 KiB, 30 KiB
@@ -498,3 +503,44 @@ them all.
 - **Placement:** in 3D the photo drapes over the high-detail terrain around the lot through a second set of texture
   coordinates, a grid → photo affine within 2 cm of proj4. On the map, it replaces the shaded relief.
 - **Lean:** these are orthophotos, not true orthos, so tall buildings lean a little in them.
+
+### 7.7 Best of both: 2016 detail, 2025 currency
+
+**The ideal source, and why it isn't used.** LidarBC also publishes the 2024/2025 point clouds:
+- `…/<year>/pointcloud/bc_<bcgs>_xyes_8_utm10_<dates>.laz`, about 31 points/m².
+- They're plain LAZ 1.4 (point format 6), not COPC. The City Hall tile holds 78 million points in 458 MB, in 50,000-point
+  chunks with a compressed chunk table at the end of the file, and has no spatial index.
+- So reading one lot means downloading the whole file, and converting the region's roughly 1,000 tiles to COPC would mean
+  hosting about 0.5 TB.
+
+If NRCan republishes them as COPC (as it did for 2016–2023), re-running `spike/12-hires-index.ts` gives VanShade 0.5 m
+detail from the newest survey with no code change.
+
+**The merge** (`elevation/change.ts`, `build.ts` `buildMerged`). The two surveys are compared on the 1 m grid (0.5 m windows
+start on whole metres, so each 1 m cell is exactly 2 × 2 cells):
+1. The 2016 value per metre is the highest of its four 0.5 m cells.
+2. A cell counts as changed only if 2025 is more than 2.5 m above or below every 2016 value in its 3 × 3 neighbourhood.
+   This slack absorbs the surveys' horizontal offset of a few tens of centimetres.
+3. A 3 × 3 opening drops slivers, and areas under 20 m² are ignored.
+4. The rest grows by 2 m, so the seam between surveys lies on unchanged ground.
+
+Changed areas take 2025 copied to 2 × 2 cells (nearest, not interpolated, so walls stay walls). Elsewhere the 2016 point cloud
+is used, and LidarBC covers the window beyond the point cloud's area. Each survey's datum is checked against HRDEM ground. The
+DTM near the lot comes from the 2025 DEM.
+
+| Measured (155 × 155 m around the lot) | 410 W Georgia | Kitsilano houses |
+|---|---|---|
+| Cells differing by more than 2.5 m, naive | 29% | 20% |
+| With the ±1 cell slack | 13% | 5% |
+| After the opening | 8.6% | 1.1% |
+| Changed share as built (with the 2 m growth) | 12.8% | 1.9% |
+| Largest change | the Deloitte Summit (finished 2023): 2,225 m², 1.8 m from the address, on average 52 m higher than 2016 | 67 m² |
+
+Building Best of both takes about 3.5 s in Node for the downtown lot (the point cloud is about 10 MB there). In the browser,
+switching between the three choices afterwards takes 0.3–1.9 s, because the worker keeps each lot's downloads
+(`elevation/cache.ts`).
+
+**Spikes.** Point-cloud and LidarBC surfaces drop cells at least 2.5 m above three-quarters of their neighbours that have
+data (wires, poles, birds), replacing them with the neighbours' median. Roof edges and 2 × 2 chimneys stay.
+
+**Vertical walls** are a rendering change only (`scene/terrain.ts` `buildTerraced`).

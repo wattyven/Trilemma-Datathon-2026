@@ -199,8 +199,9 @@
       <p>
         VanShade works out where direct sunlight falls on a Metro Vancouver lot. It finds the lot from your address, loads 1 m
         LiDAR elevation for the lot and 200 m around it (roofs, neighbouring buildings, trees and hedges included), and for every
-        square metre of the lot works out which parts of the sky are blocked. It then looks for sharper or newer LiDAR (NRCan point
-        clouds at 0.5 m, or the Province's 2024–2025 surveys) and updates the results when it finds some. It then follows the sun across the day or season
+        square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
+        keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
+        the newer survey wherever something did. "Elevation data" lets you pick either survey on its own. It then follows the sun across the day or season
         to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests.
       </p>
       <h3>What to keep in mind</h3>

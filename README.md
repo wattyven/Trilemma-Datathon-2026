@@ -28,6 +28,9 @@ afternoon.
 - **Time slider and Play the day:** move the sun and its real-time shadows.
 - **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
   and its sun/shade through the day.
+- **Elevation data:** where both surveys exist, choose *Best of both* (2016 detail, updated wherever something changed by
+  2025; the default), *Newest survey* (2025, 1 m) or *Most detailed* (2016, 0.5 m). *Show changes since 2016* hatches what
+  changed.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
   North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), drape the photo under the results, with a
   slider for how see-through the results are.
@@ -52,8 +55,9 @@ address ─▶ BC Address Geocoder (parcel point) ─▶ ParcelMap BC WFS (lot p
    1,500 positions and takes milliseconds.
 4. **Sharper, newer LiDAR.** Once the first result is up, VanShade looks for better data for the lot. One source is NRCan's
    cloud-optimized point clouds: it reads only the octree nodes near the lot (3–8 MB, decoded with laz-perf in WebAssembly)
-   and grids the highest return per 0.5 m. The other is the Province's 2024/2025 LidarBC surveys at 1 m. A newer survey wins;
-   the heights are checked against NRCan's ground model before use.
+   and grids the highest return per 0.5 m. The other is the Province's 2024/2025 LidarBC surveys at 1 m. By default it
+   combines them: the 2016 detail wherever the two surveys agree, and 2025 wherever something changed by more than 2.5 m
+   (a new tower, a demolished house, trees removed). The heights are checked against NRCan's ground model before use.
 5. **Grid north isn't true north.** The elevation grid (EPSG:3979) is rotated about 25° from true north in Vancouver.
    VanShade computes that per lot and applies it everywhere, from sun directions to drawing.
 
