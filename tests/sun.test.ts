@@ -37,13 +37,28 @@ describe('solar noon at Vancouver (49.25°N)', () => {
 });
 
 describe('time-zone golden values (identical in any process TZ)', () => {
+  // UTC instants, so the values don't depend on Vancouver's clock rules (which changed in 2026, below).
+  const utcMinute = (d: Date) => d.toISOString().slice(0, 16);
   it.each([
-    [{ year: 2026, month: 6, day: 21 }, '05:06', '21:21', '13:14'],
-    [{ year: 2026, month: 12, day: 21 }, '08:05', '16:16', '12:10'],
-    [{ year: 2026, month: 3, day: 8 }, '07:40', '19:06', '13:23'], // DST starts at 02:00 that day, so PDT
-  ])('%o sunrise/sunset/noon in Vancouver local time', (date, rise, set, noon) => {
+    [{ year: 2026, month: 6, day: 21 }, '2026-06-21T12:06', '2026-06-22T04:21', '2026-06-21T20:14'],
+    [{ year: 2026, month: 12, day: 21 }, '2026-12-21T16:05', '2026-12-22T00:16', '2026-12-21T20:10'],
+    [{ year: 2026, month: 3, day: 8 }, '2026-03-08T14:40', '2026-03-09T02:06', '2026-03-08T20:23'], // last spring-forward day
+  ])('%o sunrise/sunset/noon', (date, rise, set, noon) => {
     const t = sunTimes(date, LAT, LON);
-    expect([formatLocal(t.sunrise!), formatLocal(t.sunset!), formatLocal(t.solarNoon)]).toEqual([rise, set, noon]);
+    expect([utcMinute(t.sunrise!), utcMinute(t.sunset!), utcMinute(t.solarNoon)]).toEqual([rise, set, noon]);
+  });
+
+  it('formats Vancouver local time (dates where every tz release agrees)', () => {
+    const t = sunTimes({ year: 2026, month: 6, day: 21 }, LAT, LON);
+    expect([formatLocal(t.sunrise!), formatLocal(t.sunset!)]).toEqual(['05:06', '21:21']);
+  });
+
+  // tzdb 2026b: British Columbia moved to permanent UTC−7 on 2026-03-09, so there is no fall-back
+  // on 2026-11-01. Runtimes with older tz data (e.g. Node 25.8 ships 2026a) still say UTC−8.
+  const tz = (globalThis as { process?: { versions?: { tz?: string } } }).process?.versions?.tz ?? '';
+  it.skipIf(tz < '2026b')('knows BC stays on UTC−7 after 2026-11-01 (tz data ≥ 2026b)', () => {
+    expect(vancouver({ year: 2026, month: 12, day: 21 }, 0).offset).toBe(-420);
+    expect(formatLocal(sunTimes({ year: 2026, month: 12, day: 21 }, LAT, LON).sunrise!)).toBe('09:05');
   });
 
   it('builds local times in America/Vancouver, not the process zone', () => {

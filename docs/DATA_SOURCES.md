@@ -37,6 +37,7 @@ npm run browser    # Vite + Playwright Chromium: every probe under real CORS →
 10. **The data is older than you might expect:** 12 of the 14 Metro test points come from 2016 LiDAR.
 11. **SunCalc 2 changed every convention §5.4 assumes** (found in Phase 2, released June 2026; we use 2.1.1). Angles are degrees, azimuth is clockwise from true north, and altitude is apparent (refraction-corrected). `getTimes` takes an optional UTC offset for the civil day.
 12. **STAC `proj:transform` on the HRDEM items is in GDAL geotransform order**, `[originX, res, 0, originY, 0, −res]`, not the STAC `[a…f]` order. The app reads tile geometry from the COG header instead.
+14. **British Columbia dropped clock changes.** IANA tzdb 2026b (April 2026) says BC moved to permanent UTC−7 on 2026-03-09, so Vancouver doesn't fall back on 2026-11-01. DST-aware handling through luxon/Intl still works, but only on runtimes with tz data 2026b or later. Node 25.8.1 (tz 2026a) still models UTC−8 for winter 2026. Sun positions use UTC instants and are unaffected; only how user-entered local times are read and how times are displayed depend on it. Current browsers update their tz data regularly.
 13. **The EPSG:3979 scale factor in Metro Vancouver is about 0.999**, so a 1 m grid pixel is about 1.001 m on the ground. The effect on horizon angles (under 0.05°) is ignored.
 
 ---
