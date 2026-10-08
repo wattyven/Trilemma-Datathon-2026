@@ -381,6 +381,9 @@ So the geocoder and a plain WFS `fetch` work from `https://wattyven.github.io`, 
 | S3 extent GeoJSON | `*` | ✅ | |
 | WCS spec URL `/ows/elevation` | none (308) | ❌ | redirect lacks CORS |
 | WCS `/wrapper/ogc/elevation-hrdem-mosaic` | reflects origin | ✅ | WCS 1.1.1 only |
+| S3 COPC point clouds (Range) | `*` | ✅ | §7.3 |
+| LidarBC object store | none, preflight 403 | ❌ | read through `proxy/lidarbc` (§7.1) |
+| Municipal orthophoto services (11) | reflects origin (Delta `*`) | ✅ | §7.6 |
 
 ## 6. Rate limits and licences
 
@@ -389,5 +392,109 @@ So the geocoder and a plain WFS `fetch` work from `https://wattyven.github.io`, 
 | BC Address Geocoder | 3,000 req/min, keyless | Open Government Licence – British Columbia |
 | ParcelMap BC (DataBC WFS) | gateway 60,000 req/s | Open Government Licence – British Columbia. Not a legal survey. |
 | HRDEM mosaic (STAC, S3, WCS) | none published | Open Government Licence – Canada 2.0. Contains information licensed under the OGL-Canada. |
+| NRCan CanElevation point clouds (S3) | none published | Open Government Licence – Canada 2.0 |
+| LidarBC rasters (via our proxy) | none published; Cloudflare free plan allows 100,000 requests/day | Open Government Licence – British Columbia |
+| Municipal aerial photos | none published | each municipality's Open Government Licence (§7.6) |
 
 The spike ran requests one at a time with a 350 ms gap and an in-memory cache. Geocoder: about 150 requests. WFS: about 40. Elevation: a few dozen windows. Nothing was bulk-downloaded.
+
+## 7. Sharper and newer elevation, and aerial photos (stretch work, 2026-10-08)
+
+Measured with `spike/12`–`19` (the `*.live.test.ts` ones run with `npx vitest run --config spike/vitest.live.config.ts`).
+
+### 7.1 The one server-side piece: a LidarBC CORS proxy (approved exception)
+
+VanShade is a static site. On 2026-10-08 the owner approved one exception: a small Cloudflare Worker
+([`proxy/lidarbc/`](../proxy/lidarbc)) that adds CORS headers to the LidarBC object store, which has the newest LiDAR and no
+CORS. It forwards `GET`/`HEAD` of LidarBC DSM/DEM tiles only, passes `Range` through, and caches at the edge for a day. The
+site reads its URL from the build-time variable `VITE_LIDARBC_PROXY` (a GitHub repository variable). **Without it the site is
+fully static** and skips LidarBC; everything else in this section works from the browser directly.
+
+### 7.2 Which surface a lot gets
+
+The first result always comes from HRDEM 1 m (§4). Then, in the background, the worker loads the best of these and swaps the
+results in place (`elevation/hires.ts` chooses; `elevation/build.ts` builds):
+
+1. **LidarBC** 1 m, if the proxy is set and its survey year is newer than both the HRDEM survey at the lot and the best point
+   cloud.
+2. Otherwise the **NRCan point cloud** at 0.5 m, if it's no older than the HRDEM survey at the lot.
+3. Otherwise HRDEM stays. So do lots over 40,000 m².
+
+Both sharper surfaces sit on HRDEM resampled into a UTM 10N grid (EPSG:3157; a 3-point affine, within 2 cm of proj4 over
+440 m). HRDEM fills anything they don't cover. File lists come from `src/elevation/hires-index.json` (227 KiB, 30 KiB
+gzipped, lazy-loaded), built from S3 listings by `spike/12-hires-index.ts`. Tiles are BCGS 1:2 500 sheets (`elevation/bcgs.ts`)
+or 1 km UTM squares.
+
+### 7.3 NRCan point clouds (COPC)
+
+- `canelevation-lidar-point-clouds.s3.ca-central-1.amazonaws.com`, `pointclouds_nuagespoints/BC/…` and `…/NRCAN/…`. CORS `*`,
+  Range, S3 listing. In Metro: Lower Mainland 2016 (BCGS tiles, 13–15 points/m² per the research), Vancouver Island/Sunshine
+  Coast 2018 (some coastal BCGS tiles; one measured 9 points/m²), Lower Mainland 2019/2020 and FHIMP 2023 (1 km UTM tiles;
+  a FHIMP tile measured 19 points/m²).
+- Read with `copc` 0.0.9 and `laz-perf` 0.0.7. laz-perf's web-worker build runs in our module worker; its `.wasm` (214 KiB)
+  loads from our assets. `vite.config.ts` points copc's own `laz-perf` import at that build.
+- Only octree nodes overlapping the lot + 60 m (the margin shrinks to keep the area under 40,000 m²) are read. Levels are
+  chosen by density gained per point read, up to about 8 points/m². Shallow levels have nodes hundreds of metres across, so
+  they're mostly skipped. Points are gridded as max z per 0.5 m cell, excluding noise classes 7 and 18, then small holes are
+  filled.
+- **Cost per lot: 0.5–1.0 M points, 3–8 MB, 2–5 s.** Before level selection it was 1–2.8 M points and up to 33 MB.
+- **Vertical datum:** the files don't say. The median of (ground-class points − HRDEM DTM) measured +0.000 to +0.003 m at
+  City Hall, Kitsilano and Maple Ridge, so the files match HRDEM's CGVD2013. The offset is still measured and removed for
+  every lot, and the load is rejected above 30 m.
+
+### 7.4 LidarBC rasters
+
+- `nrs.objectstore.gov.bc.ca/gdwuts/092/092g/<year>/(dsm|dem)/bc_<bcgs>_xli1m_utm10_<start>_<end>[_dsm].tif`.
+  **No CORS** (the preflight gets a 403). Range and S3 listing work.
+- Coverage: 2025 covers Vancouver, Burnaby, the Tri-Cities, the North Shore and Maple Ridge. 2024 covers Richmond, Delta,
+  Surrey and Langley. 2023 tiles are also present. 1,060 tiles in Metro.
+- 1 m, GeoKeys `ProjectedCSTypeGeoKey 3157` + `VerticalCSTypeGeoKey 6647` ("NAD83(CSRS) / UTM zone 10N + CGVD2013(CGG2013)
+  height"), nodata −32767, about 1,850 × 1,422 px, 0.5–34 MB per file. The origins are whole metres, so they match our
+  aligned UTM grid pixel for pixel.
+- **Strip TIFFs with one row per strip.** geotiff.js 3 without a block cache read each strip offset with its own 4-byte
+  request: **1,358 requests** for one 450 m window. With `blockSize: 262144` it takes **10 requests** (2.5 MB, 0.2 s).
+  `elevation/cog.ts` `openImage(url, { blockSize })` does this.
+- Measured datum offsets against HRDEM ground: −0.06 m (City Hall, Kitsilano), +0.09 m (Surrey), −0.02 m (Maple Ridge),
+  consistent with real ground change since 2016. Near the lot the newer DEM replaces HRDEM's ground model.
+- Cost per lot through the proxy: 1–4 tiles, about 20–40 requests and 3–6 MB. Elevation took 0.8–1.8 s.
+
+### 7.5 A browser cache bug in byte-range reads
+
+Chrome's HTTP cache sometimes answers a byte range it has seen before with the wrong body. One example: **3,137 bytes for a
+1,103,537-byte HRDEM tile**. geotiff then decoded a short tile and threw "Offset is outside the bounds of the DataView". It
+happened when a refinement re-read tiles the first result had fetched, and on shared links to a lot already viewed. The bug
+predates the refinement work, which only made it common. Every range read now goes through `elevation/rangeFetch.ts`: if
+the body isn't the requested size, it's fetched again with `cache: 'reload'`.
+
+### 7.6 Aerial photos
+
+Optional (the "Aerial photo" toggle). They come from the municipalities' own orthophoto services. All 11 are keyless, send
+CORS headers (they echo the origin; Delta sends `*`) and answer Web Mercator requests. `spike/18-imagery-check.ts` re-checks
+them all.
+
+| Municipality | Service | Year, pixel | Licence |
+|---|---|---|---|
+| City of Vancouver (also UBC/UEL) | `tiles.arcgis.com/…/Orthophotos_2025/MapServer` tiles, z19 | 2025, 7.5 cm | Made from Metro Vancouver's 2025 imagery: OGL – Metro Vancouver. The tile item itself has no licence text. |
+| Burnaby | `gis.burnaby.ca/…/Burnaby_Ortho_2025/MapServer/export` | 2025, 7.5 cm | OGL – Burnaby (stated for its 2020 ortho; the 2025 service has no text) |
+| Surrey | `gisservices.surrey.ca/…/AerialImages_Web_Mercator/MapServer/export`, layer 0 | 2025 | OGL – Surrey |
+| Coquitlam | `geodata.coquitlam.ca/…/Imagery_2025/MapServer` tiles, z19 | 2025, 7.5 cm | OGL – Coquitlam |
+| District of North Vancouver | `geoweb.dnv.org/…/Basemap_Ortho2024/MapServer/export` | 2024, 6.6 cm | OGL – North Vancouver |
+| Delta | `maps.delta.ca/…/Orthophotography/2022/ImageServer/exportImage` | 2022, 10 cm | OGL – Delta |
+| Maple Ridge | `geoservices.mapleridge.ca/…/2025_7_5cm/ImageServer/exportImage` | 2025, 7.5 cm | OGL – Maple Ridge |
+| Township of Langley | `mapsvr.tol.ca/…/Ortho_2025/MapServer/export` | 2025, 6.6 cm | OGL – Township of Langley |
+| City of Langley | `maps.langleycity.ca/…/Imagery2025/MapServer/export` | 2025 | OGL – City of Langley |
+| Port Coquitlam | `maps.portcoquitlam.ca/…/Basemap_Ortho2025_Legal/MapServer/export`, layer 20 | 2025 | OGL – Port Coquitlam |
+| White Rock | `maps.whiterockcity.ca/…/opendata/Ortho2025/ImageServer/exportImage` | 2025, 7.5 cm | The City's Open Data Policy 801 releases its open data under its Open Government Licence. The service sits in its `opendata` folder but has no licence text of its own. |
+
+- **Gaps:** Richmond, the City of North Vancouver, New Westminster, West Vancouver, Port Moody, Pitt Meadows, Bowen Island and
+  the villages. These say "No open aerial photo is published for …".
+- **Excluded:**
+  - Esri World Imagery: proprietary licence, and it needs a token for basemap use.
+  - BC ImageX: Access Only, `ACAO: (null)`, and the imagery is from 1999–2009.
+  - `maps.vancouver.ca`: CORS is limited to vanmap.
+  - Metro Vancouver's regional 7.5 cm mosaic: MrSID downloads only.
+- **Request:** the lot box + 48 m, either as one export at about 0.15 m per pixel (capped at 2,048 px) or as 16–25 z19
+  tiles. Requests happen only while the photo is switched on.
+- **Placement:** in 3D the photo drapes over the high-detail terrain around the lot through a second set of texture
+  coordinates, a grid → photo affine within 2 cm of proj4. On the map, it replaces the shaded relief.
+- **Lean:** these are orthophotos, not true orthos, so tall buildings lean a little in them.

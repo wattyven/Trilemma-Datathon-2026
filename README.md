@@ -28,7 +28,10 @@ afternoon.
 - **Time slider and Play the day:** move the sun and its real-time shadows.
 - **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
   and its sun/shade through the day.
-- **Copy link to this view:** the address, lot, mode, dates and time are all in the URL.
+- **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
+  North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), drape the photo under the results, with a
+  slider for how see-through the results are.
+- **Copy link to this view:** the address, lot, mode, dates, time and photo setting are all in the URL.
 
 ## How it works
 
@@ -37,6 +40,8 @@ address ─▶ BC Address Geocoder (parcel point) ─▶ ParcelMap BC WFS (lot p
         ─▶ NRCan HRDEM 1 m LiDAR surface (DSM) for the lot + 200 m, ground (DTM) near the lot
         ─▶ Web Worker: horizon precompute ─▶ SunCalc sun positions ─▶ hours of direct sun per cell
         ─▶ three.js view (true north up)
+        ─▶ then, in the background: a sharper or newer surface (NRCan point cloud at 0.5 m, or LidarBC 2024/2025 at 1 m),
+           and the results swap over
 ```
 
 1. **Elevation.** Read straight from NRCan's Cloud-Optimized GeoTIFFs on S3 with geotiff.js range requests. There's no server
@@ -45,7 +50,11 @@ address ─▶ BC Address Geocoder (parcel point) ─▶ ParcelMap BC WFS (lot p
    records the highest angle anything blocks. Big lots split this across helper threads.
 3. **Sun.** Each sun position (SunCalc, America/Vancouver time) becomes a table lookup per cell. A whole season is about
    1,500 positions and takes milliseconds.
-4. **Grid north isn't true north.** The elevation grid (EPSG:3979) is rotated about 25° from true north in Vancouver.
+4. **Sharper, newer LiDAR.** Once the first result is up, VanShade looks for better data for the lot. One source is NRCan's
+   cloud-optimized point clouds: it reads only the octree nodes near the lot (3–8 MB, decoded with laz-perf in WebAssembly)
+   and grids the highest return per 0.5 m. The other is the Province's 2024/2025 LidarBC surveys at 1 m. A newer survey wins;
+   the heights are checked against NRCan's ground model before use.
+5. **Grid north isn't true north.** The elevation grid (EPSG:3979) is rotated about 25° from true north in Vancouver.
    VanShade computes that per lot and applies it everywhere, from sun directions to drawing.
 
 The engine is covered by tests for:
@@ -58,7 +67,8 @@ The engine is covered by tests for:
 ## Accuracy, in short
 
 - Lot lines come from ParcelMap BC and are approximate, not a legal survey.
-- The LiDAR has a date: most of Metro Vancouver is 2016. Newer buildings and tree growth aren't in it.
+- The LiDAR has a date. Most of Metro Vancouver is 2016 in the first result. Where the newer LidarBC surveys are available
+  (2024–2025), they replace it. Anything built or grown since isn't in it.
 - Trees count as solid all year. Deciduous trees let more winter sun through.
 - It's potential direct sun on clear days, not adjusted for weather.
 - Only things within about 200 m cast shadows, so distant hills aren't included.
@@ -71,11 +81,14 @@ The app's **About accuracy** panel has the details.
 |---|---|---|
 | Addresses | BC Address Geocoder | Open Government Licence – British Columbia |
 | Lot lines | ParcelMap BC (DataBC WFS) | Open Government Licence – British Columbia |
-| Elevation | NRCan High Resolution Digital Elevation Model (HRDEM) 1 m mosaic | Open Government Licence – Canada |
+| Elevation | NRCan High Resolution Digital Elevation Model (HRDEM) 1 m mosaic, and CanElevation LiDAR point clouds | Open Government Licence – Canada |
+| Newer elevation | LidarBC 1 m surface and ground models (2024, 2025), read through [a small CORS proxy](proxy/lidarbc) | Open Government Licence – British Columbia |
+| Aerial photos | Each municipality's orthophoto service (list in the app's About panel) | Each municipality's Open Government Licence |
 
 Built with [three.js](https://threejs.org/), [SunCalc](https://github.com/mourner/suncalc),
-[geotiff.js](https://geotiffjs.github.io/), [proj4js](https://github.com/proj4js/proj4js) and
-[Luxon](https://moment.github.io/luxon/). Headings use [Fraunces](https://github.com/undercasetype/Fraunces) (SIL OFL).
+[geotiff.js](https://geotiffjs.github.io/), [proj4js](https://github.com/proj4js/proj4js),
+[Luxon](https://moment.github.io/luxon/), [copc.js](https://github.com/connormanning/copc.js) and
+[laz-perf](https://github.com/hobuinc/laz-perf). Headings use [Fraunces](https://github.com/undercasetype/Fraunces) (SIL OFL).
 
 Endpoint details, quirks and measurements are in [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md).
 
@@ -91,7 +104,9 @@ npm run build
 npm run smoke        # Playwright smoke test (BASE_URL=… to point at a deployed site)
 ```
 
-The app is a static Vite + TypeScript site with no backend. Every push to `main` runs CI:
+The app is a static Vite + TypeScript site with no backend. The one optional exception is the LidarBC proxy in
+[`proxy/lidarbc/`](proxy/lidarbc): deploy it once with `npx wrangler deploy`, then set the repository variable
+`VITE_LIDARBC_PROXY`. Without it, the site skips LidarBC. Every push to `main` runs CI:
 1. typecheck, both time-zone test runs, and build
 2. deploy to GitHub Pages
 3. the Playwright smoke test against the live site
@@ -99,7 +114,9 @@ The app is a static Vite + TypeScript site with no backend. Every push to `main`
 | Path | What's there |
 |---|---|
 | `src/data/` | geocoder, ParcelMap BC, scope rules (Metro Vancouver jurisdictions) |
-| `src/elevation/` | STAC lookup, pixel windows, COG reads, LiDAR vintage |
+| `src/elevation/` | STAC lookup, pixel windows, COG reads, LiDAR vintage, point clouds and LidarBC (the sharper surfaces) |
+| `src/imagery/` | municipal aerial photos: sources, fetching, placement |
+| `proxy/lidarbc/` | the Cloudflare Worker that adds CORS headers to LidarBC |
 | `src/engine/` | cells, horizons, sun sampling, outputs; the worker protocol and client |
 | `src/workers/` | the shade worker and its horizon helper threads |
 | `src/scene/` | the three.js view (lazy-loaded) and its pure geometry helpers |
