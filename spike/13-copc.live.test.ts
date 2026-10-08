@@ -4,7 +4,7 @@ import { createLazPerf } from 'laz-perf/lib/node/index.js';
 import { describe, expect, it } from 'vitest';
 import { buildRasters } from '../src/elevation/build';
 import { useLazPerf } from '../src/elevation/copc';
-import { loadHiresIndex, selectCopc } from '../src/elevation/hires';
+import { loadHiresIndex, selectCopc, selectLidarbc } from '../src/elevation/hires';
 import { findMosaicItem } from '../src/elevation/stac';
 import type { Ring } from '../src/geo/polygon';
 
@@ -38,6 +38,26 @@ describe('COPC surface, live', () => {
       const nan = r.dsm.data.reduce((n, v) => n + (v === v ? 0 : 1), 0);
       console.log(`${name}: ${choice!.project}, ${choice!.copc.urls.length} file(s); ${r.window.width}×${r.window.height} @ ${r.window.res} m; ${r.source.detail}; ${ms} ms; DSM NaN ${(100 * nan / r.dsm.data.length).toFixed(2)}%`);
       expect(r.window.res).toBe(0.5);
+    });
+  }
+});
+
+// Node needs no CORS, so the "proxy" can be the LidarBC object store itself.
+describe('LidarBC surface, live', () => {
+  for (const [name, lonLat] of LOTS.slice(0, 3)) {
+    it(name, async () => {
+      const item = await findMosaicItem(lonLat);
+      const choice = selectLidarbc(await loadHiresIndex(), lot(lonLat), 2016, 'https://nrs.objectstore.gov.bc.ca');
+      expect(item && choice).toBeTruthy();
+      const t0 = performance.now();
+      const r = await buildRasters(
+        { kind: 'lidarbc', hrdem: { dsmUrl: item!.dsm, dtmUrl: item!.dtm }, lidarbc: choice!.lidarbc, label: `LidarBC ${choice!.year}`, year: String(choice!.year) },
+        lot(lonLat),
+        200,
+        () => true,
+      );
+      console.log(`${name}: LidarBC ${choice!.year}; ${r.window.width}×${r.window.height} @ ${r.window.res} m; ${r.source.detail}; ${Math.round(performance.now() - t0)} ms`);
+      expect(r.window.res).toBe(1);
     });
   }
 });

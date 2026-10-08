@@ -164,7 +164,7 @@ export class Analysis {
    * Progressive refinement: with the first (HRDEM 1 m) result on screen, load a sharper surface in
    * the background and swap it in. Any failure just keeps the first result.
    */
-  private async refine() {
+  private async refine(attempt = 0) {
     const lot = this.lot, req = this.lotRequest;
     if (!lot || !req || lot.signal.aborted) return;
     const seq = ++this.refineSeq;
@@ -182,9 +182,13 @@ export class Analysis {
       await this.swapIn(loaded, lot.parcel, lot.signal);
     } catch (e) {
       if (seq !== this.refineSeq || !this.refinement) return;
-      // Superseded by an observer reload (onControls restarts it), or a real failure.
+      // Superseded by an observer reload (onControls restarts it), or a real failure: those are
+      // occasionally transient (a garbled range read), so try once more before giving up.
       if ((e as { name?: string }).name === 'AbortError') this.refinement.state = 'interrupted';
-      else this.refinement = { ...this.refinement, state: 'failed', note: e instanceof Error ? e.message : String(e) };
+      else {
+        this.refinement = { ...this.refinement, state: attempt === 0 ? 'interrupted' : 'failed', note: e instanceof Error ? e.message : String(e) };
+        if (attempt === 0) setTimeout(() => seq === this.refineSeq && void this.refine(1), 2000);
+      }
     } finally {
       if (seq === this.refineSeq) {
         this.renderSurfaceFact();
@@ -208,12 +212,14 @@ export class Analysis {
       this.inspectedCell = this.nearestCell(inspectedAt);
       if (this.inspectedCell !== null) this.scene?.setCursor(this.inspectedCell);
     }
-    if (this.refinement?.spec.year && this.refinement.spec.kind !== 'hrdem') {
-      const year = this.refinement.spec.year;
-      if (!this.vintageText.startsWith(year)) {
-        this.vintageText = copy.lidarValue(copy.lidarNearLot(this.refinement.spec.label), year);
-        setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
-      }
+    const spec = this.refinement?.spec;
+    if (spec?.year && spec.kind !== 'hrdem' && !this.vintageText.startsWith(spec.year)) {
+      // A newer survey than the HRDEM one: say so in the facts and caveats.
+      const label = spec.kind === 'copc' ? `${spec.label} point cloud` : spec.label;
+      this.vintageText = copy.lidarValue(copy.lidarNearLot(label), spec.year);
+      setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
+      this.els.caveatLidar.textContent = copy.caveatLidar(spec.year);
+      this.els.aboutLidar.textContent = copy.aboutLidar(label, spec.year);
     }
     await this.compute(signal);
     await this.updateCompare();
@@ -246,7 +252,7 @@ export class Analysis {
     const r = this.refinement;
     const value =
       r?.state === 'running' ? copy.surface.refining(s.source.resM)
-      : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.resM, s.source.year)
+      : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.kind, s.source.resM, s.source.year)
       : copy.surface.base(s.source.resM);
     setFact(this.lotEls, 'surface', copy.surfaceFact, value);
   }

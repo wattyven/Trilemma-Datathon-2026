@@ -81,7 +81,12 @@ export const HIRES = {
   minFilled: 0.6,
   /** A datum offset bigger than this (m) means something is wrong with the file: don't use it. */
   maxDatumOffsetM: 30,
+  /** geotiff block size for LidarBC's strip TIFFs (see elevation/cog.ts). */
+  lidarbcBlockSize: 262_144,
 } as const;
+
+/** LidarBC rasters have no CORS headers, so they're read through our proxy (proxy/lidarbc). Unset: skipped. */
+export const LIDARBC_PROXY = (import.meta.env.VITE_LIDARBC_PROXY ?? '').replace(/\/+$/, '');
 
 /** A step of max(0.5 m, 0.02·d) is usual; 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
 export const HORIZON = {

@@ -1,7 +1,7 @@
 // Which sharper elevation source can refine a lot's first (HRDEM) result. Main thread; the file
 // index (hires-index.json, from spike/12-hires-index.ts) is loaded only when a lot is analysed.
-import { HIRES } from '../config';
-import type { CopcSpec, ElevationSpec, HrdemSpec } from '../engine/protocol';
+import { ELEVATION, HIRES, LIDARBC_PROXY } from '../config';
+import type { CopcSpec, ElevationSpec, HrdemSpec, LidarbcSpec } from '../engine/protocol';
 import type { Position, Ring } from '../geo/polygon';
 import { ringSignedArea } from '../geo/polygon';
 import { toCrs } from '../geo/proj';
@@ -119,18 +119,54 @@ export function selectCopc(index: HiresIndex, lotLonLat: Ring[][], minYear: numb
   return best;
 }
 
-/** Debug override for which surface to use (URL `elev=`); `auto` picks the best available. */
-export type SourcePreference = 'auto' | 'hrdem' | 'copc';
+export interface LidarbcChoice {
+  lidarbc: LidarbcSpec;
+  year: number;
+}
 
 /**
- * The sharper surface to load after the first HRDEM result, or null to keep HRDEM: too big a lot,
- * no point cloud here, or only one older than the HRDEM survey (unless forced).
+ * LidarBC rasters for a lot: the newest survey year that has every tile under the lot, newer than
+ * `afterYear`. DSMs for every tile the analysis window touches (from that year; HRDEM fills the
+ * rest), DEMs for the tiles near the lot. URLs go through `proxy`.
  */
-export async function refinementFor(hrdem: HrdemSpec, lotLonLat: Ring[][], lonLat: Position, pref: SourcePreference = 'auto'): Promise<ElevationSpec | null> {
+export function selectLidarbc(index: HiresIndex, lotLonLat: Ring[][], afterYear: number, proxy: string, bufferM: number = ELEVATION.bufferM): LidarbcChoice | null {
+  const { tiles, base } = index.lidarbc;
+  const lotDeg = lonLatBox(lotLonLat);
+  const lotTiles = bcgsTilesInBox(degBox(lotDeg, 1));
+  const years = lotTiles.map((id) => new Set((tiles[id] ?? []).map((e) => e[0])));
+  const candidates = [...(years[0] ?? [])].filter((y) => y > afterYear && years.every((ys) => ys.has(y))).sort((a, b) => b - a);
+  const year = candidates[0];
+  if (year === undefined) return null;
+  const path = new URL(base).pathname; // /gdwuts/092/092g/
+  const url = (id: string, kind: 'dsm' | 'dem') => {
+    const e = tiles[id]?.find((x) => x[0] === year);
+    if (!e || (kind === 'dem' && !e[2])) return null;
+    return `${proxy}${path}${year}/${kind}/bc_${id}_xli1m_utm10_${e[1]}${kind === 'dsm' ? '_dsm' : ''}.tif`;
+  };
+  const dsm = bcgsTilesInBox(degBox(lotDeg, bufferM + 10)).map((id) => url(id, 'dsm')).filter((u): u is string => !!u);
+  const dem = bcgsTilesInBox(degBox(lotDeg, ELEVATION.dtmMarginM)).map((id) => url(id, 'dem')).filter((u): u is string => !!u);
+  return { lidarbc: { dsm, dem }, year };
+}
+
+/** Debug override for which surface to use (URL `elev=`); `auto` picks the best available. */
+export type SourcePreference = 'auto' | 'hrdem' | 'copc' | 'lidarbc';
+
+/**
+ * The sharper surface to load after the first HRDEM result, or null to keep HRDEM. Newer data
+ * wins: LidarBC (through the proxy, when configured) if it's newer than both the HRDEM survey and
+ * the best point cloud; else the point cloud, if it's no older than the HRDEM survey.
+ */
+export async function refinementFor(hrdem: HrdemSpec, lotLonLat: Ring[][], lonLat: Position, pref: SourcePreference = 'auto', proxy: string = LIDARBC_PROXY): Promise<ElevationSpec | null> {
   if (pref === 'hrdem' || lotAreaM2(lotLonLat) > HIRES.copcMaxLotM2) return null;
+  const index = await loadHiresIndex();
   const vintage = vintageAt(lonLat);
-  const minYear = pref === 'copc' || !vintage ? null : Number(vintage.date.slice(0, 4));
-  const choice = selectCopc(await loadHiresIndex(), lotLonLat, minYear);
-  if (!choice) return null;
-  return { kind: 'copc', hrdem, copc: choice.copc, label: choice.project, year: String(choice.year) };
+  const hrdemYear = vintage ? Number(vintage.date.slice(0, 4)) : null;
+  const copc = pref === 'lidarbc' ? null : selectCopc(index, lotLonLat, pref === 'copc' ? null : hrdemYear);
+  if (proxy && pref !== 'copc') {
+    const after = pref === 'lidarbc' ? 0 : Math.max(hrdemYear ?? 0, copc?.year ?? 0);
+    const lb = selectLidarbc(index, lotLonLat, after, proxy);
+    if (lb) return { kind: 'lidarbc', hrdem, lidarbc: lb.lidarbc, label: `LidarBC ${lb.year}`, year: String(lb.year) };
+  }
+  if (!copc) return null;
+  return { kind: 'copc', hrdem, copc: copc.copc, label: copc.project, year: String(copc.year) };
 }

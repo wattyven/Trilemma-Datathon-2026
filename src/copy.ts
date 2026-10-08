@@ -53,9 +53,10 @@ export const copy = {
   surface: {
     base: (resM: number) => `${resM} m grid`,
     refining: (resM: number) => `${resM} m grid; loading finer detail…`,
-    refined: (resM: number, year: string | null) => `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud`,
+    refined: (kind: 'copc' | 'lidarbc', resM: number, year: string | null) =>
+      kind === 'copc' ? `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud` : `${resM} m grid from ${year ? `${year} ` : ''}LidarBC LiDAR`,
   },
-  lidarNearLot: (project: string) => `${project} point cloud, near the lot`,
+  lidarNearLot: (label: string) => `${label}, near the lot`,
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
   legend: {

@@ -1,14 +1,52 @@
 // Worker-side COG access with geotiff.js (path A in docs/DATA_SOURCES.md). Tile offsets load
 // lazily, so opening a 133 GB mosaic costs ~5 KiB; a lot window costs a few 1 MiB tiles.
-import { fromUrl, type GeoTIFFImage } from 'geotiff';
+import { BaseClient, BaseResponse, fromCustomClient, type GeoTIFFImage } from 'geotiff';
+import { fetchRange } from './rangeFetch';
 import type { PixelWindow, TileGrid } from './window';
 
 const images = new Map<string, Promise<GeoTIFFImage>>();
 
-export function openImage(url: string): Promise<GeoTIFFImage> {
+class CheckedResponse extends BaseResponse {
+  constructor(
+    private response: Response,
+    private data: ArrayBuffer,
+  ) {
+    super();
+  }
+  override get status() {
+    return this.response.status;
+  }
+  override getHeader(name: string) {
+    return this.response.headers.get(name) ?? undefined;
+  }
+  override async getData() {
+    return this.data;
+  }
+}
+
+/** geotiff's fetch client, with range reads checked for a browser cache bug (see rangeFetch.ts). */
+class CheckedFetchClient extends BaseClient {
+  override async request({ headers, signal }: { headers?: Record<string, string>; signal?: AbortSignal } = {}) {
+    const range = /^bytes=(\d+)-(\d+)$/.exec(headers?.Range ?? '');
+    if (!range) {
+      const response = await fetch(this.url, { headers, signal });
+      return new CheckedResponse(response, await response.arrayBuffer());
+    }
+    const { response, data } = await fetchRange(this.url, Number(range[1]), Number(range[2]), { headers, signal });
+    return new CheckedResponse(response, data);
+  }
+}
+
+/**
+ * `blockSize` turns on geotiff's block cache: needed for strip TIFFs whose strip offsets would
+ * otherwise be read four bytes per request (LidarBC: 1,358 requests for one window, 10 with it).
+ */
+export function openImage(url: string, opts: { blockSize?: number } = {}): Promise<GeoTIFFImage> {
   let p = images.get(url);
   if (!p) {
-    p = fromUrl(url).then((tiff) => tiff.getImage());
+    // geotiff's types omit the block-cache options that fromUrl passes through to its source.
+    const options = (opts.blockSize ? { blockSize: opts.blockSize, cacheSize: 64 } : {}) as Parameters<typeof fromCustomClient>[1];
+    p = fromCustomClient(new CheckedFetchClient(url), options).then((tiff) => tiff.getImage());
     p.catch(() => images.delete(url));
     images.set(url, p);
   }

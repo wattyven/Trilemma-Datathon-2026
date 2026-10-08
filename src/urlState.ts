@@ -29,7 +29,7 @@ export interface UrlState {
   source?: Source;
 }
 
-export type Source = 'hrdem' | 'copc';
+export type Source = 'hrdem' | 'copc' | 'lidarbc';
 
 const KEYS: Record<keyof UrlState, string> = {
   address: 'a',
@@ -57,7 +57,7 @@ const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
 const PRESETS = new Set(['growing', 'summer', 'winter', 'year', 'custom']);
 const OBSERVERS = new Set<ObserverId>(['bed', 'seated', 'surface']);
 const VIEWS = new Set<View>(['3d', 'map']);
-const SOURCES = new Set<Source>(['hrdem', 'copc']);
+const SOURCES = new Set<Source>(['hrdem', 'copc', 'lidarbc']);
 
 /** A real calendar date, normalised to YYYY-MM-DD. */
 function validDate(s: string | null): string | undefined {

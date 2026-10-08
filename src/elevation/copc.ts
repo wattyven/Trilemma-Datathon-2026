@@ -5,6 +5,7 @@ import { Copc, type Getter } from 'copc';
 import { createLazPerf, type LazPerf } from 'laz-perf/lib/worker/index.js';
 import lazPerfWasmUrl from 'laz-perf/lib/worker/laz-perf.wasm?url';
 import { GROUND_CLASS, NOISE_CLASSES, Reservoir, addPoint, createPointGrid, type PointGrid } from './pointRaster';
+import { fetchRange } from './rangeFetch';
 import { toPixel, type PixelWindow, type Bbox } from './window';
 import type { Region } from './resample';
 
@@ -22,14 +23,14 @@ export interface CopcStats {
   failed: number;
 }
 
-/** Range getter over fetch (end exclusive, as copc.js expects), counting bytes. One retry, 30 s timeout. */
+/** Range getter (end exclusive, as copc.js expects), counting bytes. One retry, 30 s timeout. */
 function rangeGetter(url: string, stats: CopcStats): Getter {
   const once = async (begin: number, end: number) => {
-    const res = await fetch(url, { headers: { Range: `bytes=${begin}-${end - 1}` }, signal: AbortSignal.timeout(30_000) });
-    if (res.status !== 206 && res.status !== 200) throw new Error(`COPC read failed (${res.status})`);
-    const buf = new Uint8Array(await res.arrayBuffer());
-    stats.bytes += buf.byteLength;
-    return res.status === 200 ? buf.subarray(begin, end) : buf;
+    const { response, data } = await fetchRange(url, begin, end - 1, { signal: AbortSignal.timeout(30_000) });
+    if (response.status !== 206 && response.status !== 200) throw new Error(`COPC read failed (${response.status})`);
+    stats.bytes += data.byteLength;
+    const buf = new Uint8Array(data);
+    return response.status === 200 ? buf.subarray(begin, end) : buf;
   };
   return (begin, end) => once(begin, end).catch(() => once(begin, end));
 }

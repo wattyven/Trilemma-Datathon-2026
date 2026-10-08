@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import index from '../src/elevation/hires-index.json';
-import { lotAreaM2, projectLabel, selectCopc, type HiresIndex } from '../src/elevation/hires';
+import { lotAreaM2, projectLabel, refinementFor, selectCopc, selectLidarbc, type HiresIndex } from '../src/elevation/hires';
 import type { Ring } from '../src/geo/polygon';
 
 const idx = index as unknown as HiresIndex;
@@ -41,5 +41,46 @@ describe('point-cloud file selection', () => {
   it('labels projects and measures lots', () => {
     expect(projectLabel('pointclouds_nuagespoints/NRCAN/FHIMP_PICAI_BC_South_West_UTM10_2023/')).toBe('Fraser Valley (FHIMP) 2023');
     expect(lotAreaM2(lot([-123.1139388, 49.261317], 30))).toBeCloseTo(900, -1);
+  });
+});
+
+const CITY_HALL: [number, number] = [-123.1139388, 49.261317];
+const SURREY: [number, number] = [-122.849, 49.191];
+const PROXY = 'https://proxy.example';
+
+describe('LidarBC tile selection', () => {
+  it('picks the 2025 survey at City Hall, through the proxy', () => {
+    const c = selectLidarbc(idx, lot(CITY_HALL), 2016, PROXY)!;
+    expect(c.year).toBe(2025);
+    expect(c.lidarbc.dsm).toContain(`${PROXY}/gdwuts/092/092g/2025/dsm/bc_092g025_3_2_2_xli1m_utm10_20250425_20250826_dsm.tif`);
+    expect(c.lidarbc.dem).toContain(`${PROXY}/gdwuts/092/092g/2025/dem/bc_092g025_3_2_2_xli1m_utm10_20250425_20250826.tif`);
+    // The 200 m buffer reaches neighbouring tiles; the DEM (lot + 44 m) needs fewer.
+    expect(c.lidarbc.dsm.length).toBeGreaterThanOrEqual(c.lidarbc.dem.length);
+    expect(c.lidarbc.dsm.every((u) => u.includes('/2025/dsm/'))).toBe(true);
+  });
+
+  it('picks 2024 in Surrey and nothing when no survey is newer than asked', () => {
+    expect(selectLidarbc(idx, lot(SURREY), 2016, PROXY)?.year).toBe(2024);
+    expect(selectLidarbc(idx, lot(CITY_HALL), 2025, PROXY)).toBeNull();
+  });
+});
+
+describe('which sharper surface refines a lot', () => {
+  const hrdem = { dsmUrl: 'dsm.tif', dtmUrl: 'dtm.tif' };
+  it('prefers the newer LidarBC survey when the proxy is configured', async () => {
+    const spec = await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'auto', PROXY);
+    expect(spec?.kind).toBe('lidarbc');
+    expect(spec?.year).toBe('2025');
+  });
+
+  it('falls back to the point cloud without a proxy, and honours the debug override', async () => {
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'auto', ''))?.kind).toBe('copc');
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'copc', PROXY))?.kind).toBe('copc');
+    expect(await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'hrdem', PROXY)).toBeNull();
+    expect(await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'lidarbc', '')).toBeNull();
+  });
+
+  it('leaves very big lots on HRDEM', async () => {
+    expect(await refinementFor(hrdem, lot(CITY_HALL, 250), CITY_HALL, 'auto', PROXY)).toBeNull();
   });
 });

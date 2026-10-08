@@ -8,11 +8,14 @@ import { OUT_DIR } from './lib.ts';
 const base = process.argv[2] ?? 'http://localhost:5180/VanShade/';
 mkdirSync(OUT_DIR, { recursive: true });
 const RESULT = '.scene-canvas[data-state="result"]';
-const LOTS = [
+const ALL_LOTS = [
   ['kits', '2425 MacDonald St, Vancouver'],
-  ['burnaby', '4949 Canada Way, Burnaby'],
+  ['surrey', '13450 104 Ave, Surrey'],
   ['mapleridge', '11995 Haney Pl, Maple Ridge'],
 ];
+const LOTS = process.env.LOTS ? ALL_LOTS.filter(([k]) => process.env.LOTS!.split(',').includes(k!)) : ALL_LOTS;
+// Sources to compare, e.g. ELEV=hrdem,copc,auto (auto = what the app picks).
+const SOURCES = (process.env.ELEV ?? 'hrdem,auto').split(',');
 
 const debugRows = (page: Page) =>
   page.locator('#debug-facts').evaluate((dl) => {
@@ -25,8 +28,10 @@ const debugRows = (page: Page) =>
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   for (const [key, address] of LOTS) {
-    for (const elev of ['hrdem', 'auto']) {
+    for (const elev of SOURCES) {
       const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      page.on('console', (m) => m.text().includes('VanShade') && console.log('  console:', m.text()));
+      page.on('worker', (w) => w.on('console', (m) => m.text().includes('VanShade') && console.log('  worker console:', m.text(), JSON.stringify(m.location()))));
       const hash = new URLSearchParams({ a: address!, d: '2026-06-21', t: '17:00', m: 'moment' });
       if (elev !== 'auto') hash.set('elev', elev);
       const t0 = Date.now();
@@ -34,8 +39,8 @@ try {
       await page.locator(RESULT).waitFor({ timeout: 90_000 });
       const first = Date.now() - t0;
       let refined = 0;
-      if (elev === 'auto') {
-        await page.locator('#lot-facts dd[data-key="surface"]', { hasText: '0.5 m' }).waitFor({ timeout: 90_000 }).catch(() => {});
+      if (elev !== 'hrdem') {
+        await page.locator('#lot-facts dd[data-key="surface"]', { hasText: /from/ }).waitFor({ timeout: 90_000 }).catch(() => {});
         await page.locator(RESULT).waitFor();
         refined = Date.now() - t0;
       }

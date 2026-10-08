@@ -15,13 +15,21 @@ export interface CopcSpec {
   urls: string[];
 }
 
+/** LidarBC 1 m rasters (through the proxy) for the tiles the window touches, one survey year. */
+export interface LidarbcSpec {
+  dsm: string[];
+  /** Bare-earth DEMs for the tiles near the lot. */
+  dem: string[];
+}
+
 /**
  * Where elevation comes from for this load (chosen on the main thread; see elevation/hires.ts).
  * The high-resolution kinds still read HRDEM for the ground model and the outer window.
  */
 export type ElevationSpec =
   | { kind: 'hrdem'; hrdem: HrdemSpec; label: string; year: string | null }
-  | { kind: 'copc'; hrdem: HrdemSpec; copc: CopcSpec; label: string; year: string | null };
+  | { kind: 'copc'; hrdem: HrdemSpec; copc: CopcSpec; label: string; year: string | null }
+  | { kind: 'lidarbc'; hrdem: HrdemSpec; lidarbc: LidarbcSpec; label: string; year: string | null };
 
 export interface SourceInfo {
   kind: ElevationSpec['kind'];

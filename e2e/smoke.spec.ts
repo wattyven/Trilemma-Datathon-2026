@@ -17,8 +17,9 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
-  // The first result is the 1 m HRDEM surface; the 0.5 m point-cloud surface then swaps in.
-  await expect(page.locator('#lot-facts dd[data-key="surface"]')).toContainText('0.5 m grid from the 2016 LiDAR point cloud', { timeout: 90_000 });
+  // The first result is the 1 m HRDEM surface; a sharper one then swaps in: the 2016 point cloud
+  // at 0.5 m, or LidarBC 2025 at 1 m where the build has the LidarBC proxy configured.
+  await expect(page.locator('#lot-facts dd[data-key="surface"]')).toContainText(/0\.5 m grid from the 2016 LiDAR point cloud|1 m grid from 2025 LidarBC LiDAR/, { timeout: 90_000 });
   await expect(page.locator(RESULT)).toBeVisible();
 
   // Keyboard inspector: 12 monthly bars.
