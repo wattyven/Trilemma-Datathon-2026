@@ -85,6 +85,9 @@ export const HIRES = {
   lidarbcBlockSize: 262_144,
 } as const;
 
+/** Aerial photos cover the lot bbox + this margin: the high-detail terrain around the lot (40 m, snapped to 4 m) and its skirt. */
+export const IMAGERY = { marginM: 48, defaultOpacity: 0.7 } as const;
+
 /** LidarBC rasters have no CORS headers, so they're read through our proxy (proxy/lidarbc). Unset: skipped. */
 export const LIDARBC_PROXY = (import.meta.env.VITE_LIDARBC_PROXY ?? '').replace(/\/+$/, '');
 

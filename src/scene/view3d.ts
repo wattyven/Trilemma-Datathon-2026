@@ -27,6 +27,12 @@ export interface SceneModel {
   lotLocal: AreaGeometry;
 }
 
+export interface ScenePhoto {
+  image: HTMLCanvasElement;
+  /** Grid pixel → photo texture coordinates (see imagery/georef.ts). */
+  uv: GridAffine;
+}
+
 export interface SceneSun {
   azTrueDeg: number;
   altDeg: number;
@@ -68,6 +74,10 @@ export class LotScene {
   private hemi = new THREE.HemisphereLight(SCENE.sky, SCENE.horizon, 1.2);
   private world = new THREE.Group(); // per-lot objects
   private terrain: THREE.Mesh[] = [];
+  private clayMaterial: THREE.Material | null = null;
+  private photo: ScenePhoto | null = null;
+  private photoTexture: THREE.CanvasTexture | null = null;
+  private resultsOpacity = 1;
   private overlay: THREE.Mesh | null = null;
   private layerTexture: THREE.CanvasTexture | null = null;
   private compareTexture: THREE.CanvasTexture | null = null;
@@ -158,6 +168,8 @@ export class LotScene {
     const inner = innerRect(lotRect, marginPx, outerStep, width, height);
     const outer: PixelRect = { c0: 0, r0: 0, c1: Math.floor((width - 1) / outerStep) * outerStep, r1: Math.floor((height - 1) / outerStep) * outerStep };
     const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    this.clayMaterial = material;
+    this.photo = null; // its texture coordinates belong to the previous grid; the caller re-applies it
     for (const arrays of [buildGrid(input, inner, innerStep, colors, { skirtM: 3 }), buildGrid(input, outer, outerStep, colors, { hole: inner })]) {
       const mesh = new THREE.Mesh(toGeometry(arrays), material);
       mesh.castShadow = true;
@@ -171,7 +183,7 @@ export class LotScene {
     for (let i = 1; i < lotGrid.positions.length; i += 3) lotGrid.positions[i]! += 0.06;
     this.overlay = new THREE.Mesh(
       toGeometry(lotGrid),
-      new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false }),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: this.resultsOpacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false }),
     );
     this.overlay.visible = false;
     this.overlay.renderOrder = 2;
@@ -242,6 +254,48 @@ export class LotScene {
     mat.needsUpdate = true;
     this.overlay.visible = !!mat.map;
     this.canvas.dataset.state = this.hasLayer ? 'result' : this.model ? 'elevation' : 'empty';
+    this.invalidate();
+  }
+
+  /**
+   * Drape an aerial photo over the terrain near the lot (null: back to the clay model). `uv` maps
+   * grid pixels to the photo's texture coordinates; the far terrain stays clay.
+   */
+  setPhoto(photo: ScenePhoto | null) {
+    this.photo = photo;
+    const inner = this.terrain[0], m = this.model;
+    if (!inner || !m || !this.clayMaterial) return;
+    if (inner.material !== this.clayMaterial) (inner.material as THREE.Material).dispose();
+    this.photoTexture?.dispose();
+    this.photoTexture = null;
+    inner.material = this.clayMaterial;
+    if (photo) {
+      // A second set of texture coordinates (uv1): grid pixel → photo, per vertex.
+      const g = inner.geometry;
+      const uv = g.getAttribute('uv') as THREE.BufferAttribute;
+      const uv1 = new Float32Array(uv.count * 2);
+      for (let i = 0; i < uv.count; i++) {
+        const [u, v] = applyAffine(photo.uv, [uv.getX(i) * m.window.width, uv.getY(i) * m.window.height]);
+        uv1[2 * i] = u;
+        uv1[2 * i + 1] = v;
+      }
+      g.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2));
+      const tex = new THREE.CanvasTexture(photo.image);
+      tex.flipY = false; // v runs down the photo, row 0 at the top
+      tex.channel = 1;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+      this.photoTexture = tex;
+      // Slightly dimmed: the scene's lights are tuned for the pale clay, and would wash the photo out.
+      inner.material = new THREE.MeshLambertMaterial({ map: tex, color: new THREE.Color(0.82, 0.82, 0.82) });
+    }
+    this.invalidate();
+  }
+
+  /** How opaque the results are over the terrain (lowered to see the photo underneath). */
+  setResultsOpacity(opacity: number) {
+    this.resultsOpacity = opacity;
+    if (this.overlay) (this.overlay.material as THREE.MeshBasicMaterial).opacity = opacity;
     this.invalidate();
   }
 
@@ -321,6 +375,8 @@ export class LotScene {
   }
 
   private clearWorld() {
+    this.photoTexture?.dispose();
+    this.photoTexture = null;
     this.world.traverse((o) => {
       const mesh = o as THREE.Mesh;
       mesh.geometry?.dispose();

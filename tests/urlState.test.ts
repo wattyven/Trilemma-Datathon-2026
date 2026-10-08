@@ -21,6 +21,8 @@ const full: UrlState = {
   shadeEnd: '2027-08-15',
   fromTime: '13:00',
   toTime: '18:30',
+  photo: true,
+  opacity: 0.55,
   source: 'copc',
 };
 
@@ -43,7 +45,7 @@ describe('URL hash state', () => {
   });
 
   it('drops invalid or hostile values instead of trusting them', () => {
-    const s = decodeHash('#m=sideways&p=autumn&y=1850&d=2026-02-30&t=25:00&o=roof&v=vr&cls=yes&full=99&part=-1&lot=abc&a=&elev=s3');
+    const s = decodeHash('#m=sideways&p=autumn&y=1850&d=2026-02-30&t=25:00&o=roof&v=vr&cls=yes&full=99&part=-1&lot=abc&a=&elev=s3&img=yes&op=5');
     expect(s).toEqual({});
     expect(decodeHash('#a=' + 'x'.repeat(500))).toEqual({});
     expect(decodeHash('#d=2028-02-29&t=7:05').date).toBe('2028-02-29'); // leap day is real

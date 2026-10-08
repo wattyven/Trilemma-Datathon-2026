@@ -25,6 +25,9 @@ export interface UrlState {
   shadeEnd?: string;
   fromTime?: string;
   toTime?: string;
+  /** Aerial photo on, and the results' opacity over it (0.2–1). */
+  photo?: boolean;
+  opacity?: number;
   /** Debug: force an elevation surface instead of the best available. */
   source?: Source;
 }
@@ -50,6 +53,8 @@ const KEYS: Record<keyof UrlState, string> = {
   shadeEnd: 'se',
   fromTime: 'wf',
   toTime: 'wt',
+  photo: 'img',
+  opacity: 'op',
   source: 'elev',
 };
 
@@ -99,6 +104,11 @@ export function decodeHash(hash: string): UrlState {
   if (view && VIEWS.has(view)) out.view = view;
   const source = get('source') as Source | null;
   if (source && SOURCES.has(source)) out.source = source;
+  const img = get('photo');
+  if (img === '1' || img === '0') out.photo = img === '1';
+  const op = get('opacity');
+  const opacity = op === null || op === '' ? NaN : Number(op);
+  if (Number.isFinite(opacity) && opacity >= 0.2 && opacity <= 1) out.opacity = Math.round(opacity * 100) / 100;
   const cls = get('classes');
   if (cls === '1' || cls === '0') out.classes = cls === '1';
   for (const k of ['start', 'end', 'date', 'shadeStart', 'shadeEnd'] as const) {

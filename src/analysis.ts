@@ -1,10 +1,14 @@
 // Elevation → horizons → sun results for the selected lot, and everything the view shows about
 // them: the 3D scene (lazy-loaded) and 2D map, the shared timeline, legend, readout, inspector,
 // notices and debug facts.
-import { ELEVATION, OBSERVERS } from './config';
+import { ELEVATION, IMAGERY, OBSERVERS } from './config';
 import { copy } from './copy';
 import type { GeocodeMatch } from './data/geocoder';
 import type { Parcel } from './data/parcels';
+import { displayJurisdiction } from './data/scope';
+import { fetchPhoto, type Photo } from './imagery/fetch';
+import { gridToPhotoUv, photoBox, photoToLocal } from './imagery/georef';
+import { imageryFor } from './imagery/sources';
 import { loadHiresIndex, refinementFor, type SourcePreference } from './elevation/hires';
 import { findMosaicItem } from './elevation/stac';
 import { vintageFor } from './elevation/vintage';
@@ -42,6 +46,10 @@ export interface AnalysisElements {
   resetView: HTMLButtonElement;
   caveatLidar: HTMLElement;
   aboutLidar: HTMLElement;
+  photoToggle: HTMLInputElement;
+  opacityInput: HTMLInputElement;
+  opacityWrap: HTMLElement;
+  photoCredit: HTMLElement;
 }
 
 export class NoCoverageError extends Error {}
@@ -84,8 +92,15 @@ export class Analysis {
   private refineSeq = 0;
   /** Debug: force a surface (URL `elev=`). */
   sourcePreference: SourcePreference = 'auto';
+  private jurisdiction = '';
+  private photoOn = false;
+  private opacity: number = IMAGERY.defaultOpacity;
+  private photo: Photo | null = null;
+  private photoSeq = 0;
   /** Called when the user switches between 3D and map (for the shareable URL). */
   onViewChange: (v: View) => void = () => {};
+  /** Called when the aerial photo or its opacity changes (for the shareable URL). */
+  onPhotoChange: () => void = () => {};
 
   constructor(
     private map: LotCanvas,
@@ -103,6 +118,94 @@ export class Analysis {
     els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(els.shadowsToggle.checked));
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
     els.resetView.addEventListener('click', () => this.scene?.resetView());
+    els.photoToggle.addEventListener('change', () => {
+      this.setPhotoEnabled(els.photoToggle.checked);
+      this.onPhotoChange();
+    });
+    els.opacityInput.addEventListener('input', () => {
+      this.setResultsOpacity(Number(els.opacityInput.value));
+      this.onPhotoChange();
+    });
+  }
+
+  get photoEnabled(): boolean {
+    return this.photoOn;
+  }
+
+  get resultsOpacity(): number {
+    return this.opacity;
+  }
+
+  /** Aerial photo under the results, in both views (also restores a shared link). */
+  setPhotoEnabled(on: boolean) {
+    this.photoOn = on;
+    this.els.photoToggle.checked = on;
+    this.els.opacityWrap.hidden = !on;
+    this.applyOpacity();
+    void this.updatePhoto();
+  }
+
+  setResultsOpacity(opacity: number) {
+    this.opacity = Math.min(1, Math.max(0.2, opacity));
+    this.els.opacityInput.value = String(this.opacity);
+    this.applyOpacity();
+  }
+
+  /** Results are see-through only over the photo; on the plain model they stay solid. */
+  private applyOpacity() {
+    const op = this.photoOn ? this.opacity : 1;
+    this.scene?.setResultsOpacity(op);
+    this.map.setLayerOpacity(op);
+  }
+
+  private clearPhoto() {
+    this.photo = null;
+    this.scene?.setPhoto(null);
+    this.map.setPhoto(null);
+  }
+
+  private async updatePhoto() {
+    const seq = ++this.photoSeq;
+    const credit = this.els.photoCredit;
+    const lot = this.lot;
+    if (!this.photoOn || !this.loaded || !lot) {
+      this.clearPhoto();
+      credit.hidden = true;
+      return;
+    }
+    credit.hidden = false;
+    const source = imageryFor(this.jurisdiction);
+    if (!source) {
+      this.clearPhoto();
+      credit.textContent = copy.imagery.gap(this.jurisdiction);
+      return;
+    }
+    credit.textContent = copy.imagery.loading;
+    try {
+      const photo = await fetchPhoto(source, photoBox(polygonsOf(lot.parcel.geometry), IMAGERY.marginM));
+      if (seq !== this.photoSeq) return;
+      if (!photo) {
+        this.clearPhoto();
+        credit.textContent = copy.imagery.noCoverage(source.owner);
+        return;
+      }
+      this.applyPhoto(photo);
+      credit.textContent = source.credit;
+    } catch {
+      if (seq !== this.photoSeq) return;
+      this.clearPhoto();
+      credit.textContent = copy.imagery.failed;
+    }
+    this.renderDebug();
+  }
+
+  /** Place the photo on the current grid (again after a refinement changes grids). */
+  private applyPhoto(photo: Photo) {
+    const l = this.loaded;
+    if (!l) return;
+    this.photo = photo;
+    this.scene?.setPhoto({ image: photo.image, uv: gridToPhotoUv(l.summary.window, photo.box) });
+    this.map.setPhoto({ image: photo.image, affine: photoToLocal(photo.box, photo.image.width, photo.image.height, this.map.frame) });
   }
 
   /** Run the whole pipeline for a lot already drawn on the map. */
@@ -110,6 +213,10 @@ export class Analysis {
     this.refineSeq++; // abandon the previous lot's refinement
     this.refinement = null;
     this.lot = { parcel, signal };
+    this.jurisdiction = displayJurisdiction(parcel, match);
+    this.photoSeq++;
+    this.clearPhoto();
+    this.els.photoCredit.hidden = true;
     this.loaded = null;
     this.result = null;
     this.els.inspector.hidden = true;
@@ -151,6 +258,7 @@ export class Analysis {
     await scenePromise;
     if (signal.aborted) return;
     this.buildScene(parcel);
+    void this.updatePhoto();
     steps.set('sunlight', 'active');
     this.timeline.setLocation(centre); // positions the sun; emits a change
     await this.compute(signal);
@@ -207,6 +315,7 @@ export class Analysis {
     this.result = null;
     this.adopt(loaded, true);
     this.buildScene(parcel, true);
+    if (this.photo) this.applyPhoto(this.photo);
     this.updateSun();
     if (inspectedAt) {
       this.inspectedCell = this.nearestCell(inspectedAt);
@@ -311,6 +420,7 @@ export class Analysis {
       },
       { keepCamera },
     );
+    this.applyOpacity(); // the scene may not have existed when the opacity was set
   }
 
   get currentView(): View {
@@ -590,6 +700,7 @@ export class Analysis {
       ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.cellSizeM} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
       ['Window', `${s.window.width * s.window.res} × ${s.window.height * s.window.res} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],
+      ['Aerial photo', this.photo ? `${this.photo.source.id}, ${this.photo.image.width} × ${this.photo.image.height} px` : this.photoOn ? 'none' : 'off'],
       ['3D', this.scene ? `WebGL${isLowPower() ? ', low-power settings' : ''}` : this.sceneUnavailable ? 'unavailable' : '…'],
       ['Timings', Object.entries(this.timings).map(([k, v]) => `${k.replace(/Ms$/, '')} ${v} ms`).join(', ') + (this.threads > 1 ? ` (horizon on ${this.threads} threads)` : '')],
     ];

@@ -66,6 +66,12 @@ function hillshade(w: PixelWindow, dsm: Float32Array, gammaDeg: number): ImageDa
   return img;
 }
 
+export interface MapPhoto {
+  image: HTMLCanvasElement;
+  /** Photo pixel → local metres (see imagery/georef.ts). */
+  affine: GridAffine;
+}
+
 export class LotCanvas {
   private outline: OutlineModel | null = null;
   private frameCache: LocalFrame | null = null;
@@ -74,6 +80,8 @@ export class LotCanvas {
   private background: HTMLCanvasElement | null = null;
   private cellsLayer: HTMLCanvasElement | null = null;
   private cellIndex: Int32Array | null = null;
+  private photo: MapPhoto | null = null;
+  private layerOpacity = 1;
   private view = { cx: 0, cy: 0, s: 1, w: 0, h: 0 };
   private ro: ResizeObserver;
 
@@ -124,6 +132,17 @@ export class LotCanvas {
       this.background = bg;
       this.cellIndex = this.buildIndex(model);
     }
+    this.draw();
+  }
+
+  /** An aerial photo under the results (null: the shaded-relief map). */
+  setPhoto(photo: MapPhoto | null) {
+    this.photo = photo;
+    this.draw();
+  }
+
+  setLayerOpacity(opacity: number) {
+    this.layerOpacity = opacity;
     this.draw();
   }
 
@@ -192,20 +211,31 @@ export class LotCanvas {
     this.view = { cx, cy, s, w: cssW, h: cssH };
     const toPx = ([x, y]: Position): Position => [cssW / 2 + (x - cx) * s, cssH / 2 - (y - cy) * s];
 
-    // Rasters: window pixel space → canvas, via the grid → local affine.
-    const m = this.analysis;
-    if (m && this.background) {
-      const a = m.affine;
+    // Rasters: their pixel space → canvas, via an affine into local metres.
+    const withAffine = (a: GridAffine, paint: () => void) => {
       ctx.save();
       ctx.setTransform(
         dpr * a.col[0] * s, -dpr * a.col[1] * s,
         dpr * a.row[0] * s, -dpr * a.row[1] * s,
         dpr * (cssW / 2 + (a.origin[0] - cx) * s), dpr * (cssH / 2 - (a.origin[1] - cy) * s),
       );
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(this.background, 0, 0);
-      if (this.cellsLayer) ctx.drawImage(this.cellsLayer, 0, 0);
+      paint();
       ctx.restore();
+    };
+    const m = this.analysis;
+    if (m && this.background) {
+      withAffine(m.affine, () => {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this.background!, 0, 0);
+      });
+      const photo = this.photo;
+      if (photo) withAffine(photo.affine, () => ctx.drawImage(photo.image, 0, 0));
+      if (this.cellsLayer)
+        withAffine(m.affine, () => {
+          ctx.imageSmoothingEnabled = false;
+          ctx.globalAlpha = this.layerOpacity;
+          ctx.drawImage(this.cellsLayer!, 0, 0);
+        });
     }
 
     const tracePath = (g: AreaGeometry) => {

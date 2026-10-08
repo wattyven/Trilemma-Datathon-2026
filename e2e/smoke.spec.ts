@@ -22,6 +22,14 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#lot-facts dd[data-key="surface"]')).toContainText(/0\.5 m grid from the 2016 LiDAR point cloud|1 m grid from 2025 LidarBC LiDAR/, { timeout: 90_000 });
   await expect(page.locator(RESULT)).toBeVisible();
 
+  // The aerial photo drapes under the results, with its credit line, and goes into the link.
+  await page.locator('#photo-toggle').check();
+  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
+  await expect(page.locator('#opacity-wrap')).toBeVisible();
+  await expect.poll(() => page.url()).toMatch(/img=1/);
+  await page.locator('#photo-toggle').uncheck();
+  await expect(page.locator('#photo-credit')).toBeHidden();
+
   // Keyboard inspector: 12 monthly bars.
   await page.locator('.scene-canvas').focus();
   await page.keyboard.press('Enter');

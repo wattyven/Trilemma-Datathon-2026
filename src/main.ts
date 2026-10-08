@@ -1,11 +1,13 @@
 import './styles.css';
 import { Analysis, errorMessage, type AnalysisElements } from './analysis';
+import { IMAGERY } from './config';
 import { copy } from './copy';
 import { resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
+import { IMAGERY_SOURCES } from './imagery/sources';
 import { initAbout } from './ui/about';
 import { defaultState, initControls, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
@@ -54,6 +56,10 @@ const analysisEls: AnalysisElements = {
   resetView: byId<HTMLButtonElement>('reset-view'),
   caveatLidar: byId('caveat-lidar'),
   aboutLidar: byId('about-lidar'),
+  photoToggle: byId<HTMLInputElement>('photo-toggle'),
+  opacityInput: byId<HTMLInputElement>('results-opacity'),
+  opacityWrap: byId('opacity-wrap'),
+  photoCredit: byId('photo-credit'),
 };
 
 const today = todayInVancouver();
@@ -83,6 +89,8 @@ const timeline = new Timeline(
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
 analysis.onViewChange = () => writeUrl(false);
+analysis.onPhotoChange = () => writeUrl(false);
+byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
 initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
 
@@ -270,6 +278,8 @@ function urlDefaults(): UrlState {
     year: defaults.year,
     observer: defaults.observer,
     view: '3d',
+    photo: false,
+    opacity: IMAGERY.defaultOpacity,
     classes: false,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
@@ -297,6 +307,8 @@ function urlStateNow(): UrlState | null {
     time: minuteLabel(t.minute),
     observer: c.observer,
     view: analysis.currentView,
+    photo: analysis.photoEnabled,
+    opacity: analysis.resultsOpacity,
     classes: c.classes,
     fullSunH: c.fullSunH,
     partSunH: c.partSunH,
@@ -346,6 +358,8 @@ async function applyUrl(hash: string): Promise<boolean> {
     timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
     if (s.view) analysis.setView(s.view);
     analysis.sourcePreference = s.source ?? 'auto';
+    analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
+    analysis.setPhotoEnabled(s.photo ?? false);
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
       const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;

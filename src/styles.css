@@ -98,6 +98,10 @@ button.ghost:hover { border-color: var(--moss); }
 .segmented label:has(input:focus-visible) { outline: 3px solid var(--shade); outline-offset: 1px; }
 .segmented label:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
 .check { display: inline-flex; align-items: center; gap: 6px; }
+.view-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.check.opacity input { width: 96px; accent-color: var(--moss); }
+.view-options input[type='checkbox'] { accent-color: var(--moss); }
+.photo-credit { margin: 6px 0 0; font-size: 0.78rem; color: var(--muted); }
 
 .view-stage { position: relative; height: 520px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--mist); background: var(--panel); }
 #lot-canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }

@@ -57,6 +57,13 @@ export const copy = {
       kind === 'copc' ? `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud` : `${resM} m grid from ${year ? `${year} ` : ''}LidarBC LiDAR`,
   },
   lidarNearLot: (label: string) => `${label}, near the lot`,
+  imagery: {
+    loading: 'Loading the aerial photo…',
+    gap: (jurisdiction: string) => `No open aerial photo is published for ${jurisdiction}, so the view stays plain.`,
+    noCoverage: (owner: string) => `The ${owner} aerial photo doesn't cover this lot.`,
+    failed: "The aerial photo didn't load. Try switching it off and on again in a moment.",
+    about: (items: string[]) => `Aerial photos, when switched on, come from each municipality's open data: ${items.join('; ')}.`,
+  },
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
   legend: {
