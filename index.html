@@ -65,6 +65,7 @@
             </fieldset>
             <div class="view-options">
               <label class="check"><input type="checkbox" id="photo-toggle" /> Aerial photo</label>
+              <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
               <label class="check opacity" id="opacity-wrap" hidden>Results
                 <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.7" aria-label="Results opacity over the photo" /></label>
               <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
@@ -156,6 +157,9 @@
                   <option value="seated">Seated (1.2 m)</option>
                   <option value="surface">Rooftop or deck surface</option>
                 </select>
+              </label>
+              <label id="elevation-wrap" hidden>Elevation data
+                <select id="elevation-choice"></select>
               </label>
               <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full / part sun / shade</label>
             </div>

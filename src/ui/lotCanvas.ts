@@ -81,6 +81,7 @@ export class LotCanvas {
   private cellsLayer: HTMLCanvasElement | null = null;
   private cellIndex: Int32Array | null = null;
   private photo: MapPhoto | null = null;
+  private changeMask: HTMLCanvasElement | null = null;
   private layerOpacity = 1;
   private view = { cx: 0, cy: 0, s: 1, w: 0, h: 0 };
   private ro: ResizeObserver;
@@ -138,6 +139,12 @@ export class LotCanvas {
   /** An aerial photo under the results (null: the shaded-relief map). */
   setPhoto(photo: MapPhoto | null) {
     this.photo = photo;
+    this.draw();
+  }
+
+  /** A window-sized translucent hatch drawn over the relief or photo, under the results. */
+  setChangeMask(image: HTMLCanvasElement | null) {
+    this.changeMask = image;
     this.draw();
   }
 
@@ -230,6 +237,11 @@ export class LotCanvas {
       });
       const photo = this.photo;
       if (photo) withAffine(photo.affine, () => ctx.drawImage(photo.image, 0, 0));
+      if (this.changeMask)
+        withAffine(m.affine, () => {
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(this.changeMask!, 0, 0);
+        });
       if (this.cellsLayer)
         withAffine(m.affine, () => {
           ctx.imageSmoothingEnabled = false;

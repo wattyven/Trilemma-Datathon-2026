@@ -53,6 +53,7 @@ export const copy = {
   surface: {
     base: (resM: number) => `${resM} m grid`,
     refining: (resM: number) => `${resM} m grid; loading finer detail…`,
+    switching: 'Switching elevation data…',
     refined: (kind: 'copc' | 'lidarbc', resM: number, year: string | null) =>
       kind === 'copc' ? `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud` : `${resM} m grid from ${year ? `${year} ` : ''}LidarBC LiDAR`,
   },
@@ -61,6 +62,12 @@ export const copy = {
       ? `0.5 m from ${oldYear} LiDAR, with ${newYear} where things changed (${share < 0.01 ? 'under 1' : Math.round(100 * share)}% of the area near the lot)`
       : `0.5 m from ${oldYear} LiDAR; nothing near the lot changed by more than 2.5 m by ${newYear}`,
   lidarMerged: (oldYear: string, newYear: string) => `${oldYear}, with ${newYear} updates near the lot`,
+  elevationChoice: {
+    best: (oldYear: string, newYear: string) => `Best of both (${oldYear} detail, ${newYear} updates)`,
+    newest: (year: string) => `Newest survey (${year}, 1 m)`,
+    detailed: (year: string) => `Most detailed (${year}, 0.5 m)`,
+  },
+  changesToggle: (oldYear: string) => `Show changes since ${oldYear}`,
   caveatMerged: (oldYear: string, newYear: string) =>
     `Detail comes from ${oldYear} LiDAR, updated with ${newYear} LiDAR wherever something changed by more than 2.5 m; smaller changes, like a few metres of tree growth, may be missing.`,
   aboutMerged: (oldYear: string, newYear: string) =>
@@ -81,6 +88,7 @@ export const copy = {
     sun: 'Sun',
     shade: 'Shade',
     covered: 'Roof or tree overhead',
+    changed: (oldYear: string, newYear: string) => `Changed since ${oldYear} (uses ${newYear} LiDAR)`,
     classes: (t: { fullSunH: number; partSunH: number }) =>
       [`Shade (under ${fmtH(t.partSunH)} h)`, `Part sun (${fmtH(t.partSunH)}–${fmtH(t.fullSunH)} h)`, `Full sun (${fmtH(t.fullSunH)}+ h)`] as const,
     thresholdsNote: 'Thresholds are hours of direct sun a day.',

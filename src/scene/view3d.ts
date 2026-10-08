@@ -15,7 +15,7 @@ import { buildCellIndex, cellAtPixel, layerRgba, paintCellsRgba, type CellGrid, 
 import { SHADE_RGB } from '../ui/colors';
 import { SCENE, TOKENS } from '../ui/tokens';
 import { compassRotationDeg, localToScene, sceneToLocal, sunDirection, sunPathPoints } from './frame';
-import { baseLevel, buildGrid, innerRect, type MeshArrays, type PixelRect, type TerrainColors } from './terrain';
+import { baseLevel, buildGrid, innerRect, type MeshArrays, type PixelRect, type TerrainColors, type TerrainInput } from './terrain';
 
 export interface SceneModel {
   window: PixelWindow;
@@ -78,6 +78,8 @@ export class LotScene {
   private photo: ScenePhoto | null = null;
   private photoTexture: THREE.CanvasTexture | null = null;
   private resultsOpacity = 1;
+  private terrainInput: TerrainInput | null = null;
+  private changeMesh: THREE.Mesh | null = null;
   private overlay: THREE.Mesh | null = null;
   private layerTexture: THREE.CanvasTexture | null = null;
   private compareTexture: THREE.CanvasTexture | null = null;
@@ -152,6 +154,8 @@ export class LotScene {
     this.base = baseLevel(m.dsm);
     const { width, height } = m.window;
     const input = { width, height, dsm: m.dsm, dtm: m.dtm, affine: m.affine, base: this.base };
+    this.terrainInput = input;
+    this.changeMesh = null; // cleared with the world
     const colors: TerrainColors = { ground: rgb(SCENE.ground), water: rgb(SCENE.water) };
 
     // Lot bounds in pixels, from the lot polygon.
@@ -288,6 +292,38 @@ export class LotScene {
       this.photoTexture = tex;
       // Slightly dimmed: the scene's lights are tuned for the pale clay, and would wash the photo out.
       inner.material = new THREE.MeshLambertMaterial({ map: tex, color: new THREE.Color(0.82, 0.82, 0.82) });
+    }
+    this.invalidate();
+  }
+
+  /**
+   * A translucent hatch over parts of the terrain (where the newer survey replaced the older one),
+   * under the results. `image` is window-sized; `rect` bounds the marked pixels.
+   */
+  setChangeMask(mask: { image: HTMLCanvasElement; rect: PixelRect } | null) {
+    if (this.changeMesh) {
+      this.world.remove(this.changeMesh);
+      this.changeMesh.geometry.dispose();
+      const mat = this.changeMesh.material as THREE.MeshBasicMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+      this.changeMesh = null;
+    }
+    const input = this.terrainInput;
+    if (mask && input) {
+      const r = mask.rect;
+      const arrays = buildGrid(input, { c0: Math.max(0, r.c0 - 1), r0: Math.max(0, r.r0 - 1), c1: Math.min(input.width - 1, r.c1), r1: Math.min(input.height - 1, r.r1) }, 1, { ground: [1, 1, 1], water: [1, 1, 1] });
+      for (let i = 1; i < arrays.positions.length; i += 3) arrays.positions[i]! += 0.04;
+      const tex = new THREE.CanvasTexture(mask.image);
+      tex.flipY = false;
+      tex.magFilter = THREE.NearestFilter;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.changeMesh = new THREE.Mesh(
+        toGeometry(arrays),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, toneMapped: false }),
+      );
+      this.changeMesh.renderOrder = 1; // the results overlay (2) draws on top
+      this.world.add(this.changeMesh);
     }
     this.invalidate();
   }

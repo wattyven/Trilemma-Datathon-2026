@@ -18,9 +18,19 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
   // The first result is the 1 m HRDEM surface; a sharper one then swaps in: the 2016 point cloud
-  // at 0.5 m, or LidarBC 2025 at 1 m where the build has the LidarBC proxy configured.
-  await expect(page.locator('#lot-facts dd[data-key="surface"]')).toContainText(/0\.5 m grid from the 2016 LiDAR point cloud|1 m grid from 2025 LidarBC LiDAR/, { timeout: 90_000 });
+  // at 0.5 m, or, where the build has the LidarBC proxy, "best of both" with 2025 LidarBC.
+  const surface = page.locator('#lot-facts dd[data-key="surface"]');
+  await expect(surface).toContainText(/0\.5 m grid from the 2016 LiDAR point cloud|0\.5 m from 2016 LiDAR/, { timeout: 90_000 });
   await expect(page.locator(RESULT)).toBeVisible();
+  // With both surveys, the "Elevation data" choice switches surfaces without reloading the page.
+  if (await page.locator('#elevation-wrap').isVisible()) {
+    await page.locator('#elevation-choice').selectOption('newest');
+    await expect(surface).toContainText('1 m grid from 2025', { timeout: 60_000 });
+    await expect.poll(() => page.url()).toMatch(/elev=newest/);
+    await page.locator('#elevation-choice').selectOption('best');
+    await expect(surface).toContainText('0.5 m from 2016 LiDAR', { timeout: 60_000 });
+    await expect(page.locator(RESULT)).toBeVisible();
+  }
 
   // The aerial photo drapes under the results, with its credit line, and goes into the link.
   await page.locator('#photo-toggle').check();

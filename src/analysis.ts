@@ -9,9 +9,9 @@ import { displayJurisdiction } from './data/scope';
 import { fetchPhoto, type Photo } from './imagery/fetch';
 import { gridToPhotoUv, photoBox, photoToLocal } from './imagery/georef';
 import { imageryFor } from './imagery/sources';
-import { loadHiresIndex, refinementOptions, refinementOrder, type RefinementOptions, type SourcePreference } from './elevation/hires';
+import { loadHiresIndex, refinementOptions, refinementOrder, SOURCE_CHOICES, type RefinementOptions, type SourceChoice, type SourcePreference } from './elevation/hires';
 import { findMosaicItem } from './elevation/stac';
-import { vintageFor } from './elevation/vintage';
+import { vintageFor, type Vintage } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
@@ -19,8 +19,8 @@ import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
 import { isLowPower, webglAvailable } from './scene/webgl';
-import type { CellGrid } from './ui/cellPaint';
-import { CLASS_RGB, SHADE_RGB, SUN_RGB, cividisGradient, css } from './ui/colors';
+import { hatchMaskRgba, maskBounds, type CellGrid } from './ui/cellPaint';
+import { CEDAR_RGB, CLASS_RGB, SHADE_RGB, SUN_RGB, cividisGradient, css } from './ui/colors';
 import { requestFor, type ChangeKind, type ControlState, type Controls } from './ui/controls';
 import { renderInspector } from './ui/inspector';
 import { HOURS_SCALE_MAX, type Layer, type LotCanvas } from './ui/lotCanvas';
@@ -50,6 +50,11 @@ export interface AnalysisElements {
   opacityInput: HTMLInputElement;
   opacityWrap: HTMLElement;
   photoCredit: HTMLElement;
+  elevationWrap: HTMLElement;
+  elevationSelect: HTMLSelectElement;
+  changesWrap: HTMLElement;
+  changesToggle: HTMLInputElement;
+  changesLabel: HTMLElement;
 }
 
 export class NoCoverageError extends Error {}
@@ -94,8 +99,11 @@ export class Analysis {
   private hrdemSpec: HrdemSpec | null = null;
   private options: RefinementOptions | null = null;
   private failedSpecs = new Set<ElevationSpec>();
-  /** Debug: force a surface (URL `elev=`). */
-  sourcePreference: SourcePreference = 'best';
+  /** The "Elevation data" setting (URL `elev=`); set it with chooseSource(). */
+  private preference: SourcePreference = 'best';
+  /** The HRDEM survey at the lot, for the LiDAR facts. */
+  private baseVintage: Vintage | null = null;
+  private changesOn = false;
   private jurisdiction = '';
   private photoOn = false;
   private opacity: number = IMAGERY.defaultOpacity;
@@ -105,6 +113,8 @@ export class Analysis {
   onViewChange: (v: View) => void = () => {};
   /** Called when the aerial photo or its opacity changes (for the shareable URL). */
   onPhotoChange: () => void = () => {};
+  /** Called when the elevation choice or the change overlay changes (for the shareable URL). */
+  onSourceChange: () => void = () => {};
 
   constructor(
     private map: LotCanvas,
@@ -130,6 +140,108 @@ export class Analysis {
       this.setResultsOpacity(Number(els.opacityInput.value));
       this.onPhotoChange();
     });
+    els.elevationSelect.addEventListener('change', () => {
+      this.chooseSource(els.elevationSelect.value as SourceChoice);
+      this.onSourceChange();
+    });
+    els.changesToggle.addEventListener('change', () => {
+      this.setChangesEnabled(els.changesToggle.checked);
+      this.onSourceChange();
+    });
+  }
+
+  get sourcePreference(): SourcePreference {
+    return this.preference;
+  }
+
+  get changesEnabled(): boolean {
+    return this.changesOn;
+  }
+
+  /**
+   * The "Elevation data" setting (also restores a shared link). With a lot loaded, switches its
+   * surface; the worker still has the downloads, so this re-composes rather than re-fetches.
+   */
+  chooseSource(pref: SourcePreference) {
+    if (pref === this.preference) return;
+    this.preference = pref;
+    this.renderSourceChoice();
+    if (!this.options || !this.lot) return;
+    this.refinement = null;
+    void this.refine();
+  }
+
+  /** Hatch the areas where the newer survey replaced the older one ("best of both" only). */
+  setChangesEnabled(on: boolean) {
+    this.changesOn = on;
+    this.els.changesToggle.checked = on;
+    this.applyChanges();
+  }
+
+  private renderSourceChoice() {
+    const o = this.options ?? {};
+    const sel = this.els.elevationSelect;
+    // A choice only exists where "best of both" does (otherwise there's one surface).
+    const choices = o.best?.kind === 'merged' ? SOURCE_CHOICES.filter((c) => o[c]) : [];
+    this.els.elevationWrap.hidden = choices.length < 2;
+    sel.replaceChildren(
+      ...choices.map((c) => {
+        const spec = o[c]!;
+        const label =
+          c === 'best' && spec.kind === 'merged' ? copy.elevationChoice.best(spec.oldYear, spec.year ?? '')
+          : c === 'newest' ? copy.elevationChoice.newest(spec.year ?? '')
+          : copy.elevationChoice.detailed(spec.year ?? '');
+        return Object.assign(document.createElement('option'), { value: c, textContent: label });
+      }),
+    );
+    sel.value = choices.includes(this.preference as SourceChoice) ? this.preference : 'best';
+  }
+
+  /** "LiDAR from", the caveat and the About line, for whichever surface is loaded. */
+  private renderLidarFacts() {
+    const s = this.loaded?.summary.source;
+    const v = this.baseVintage;
+    let fact: string | null = null, caveat: string | null = null, about: string | null = null;
+    if (s?.kind === 'merged' && s.year && s.oldYear) {
+      fact = copy.lidarMerged(s.oldYear, s.year);
+      caveat = copy.caveatMerged(s.oldYear, s.year);
+      about = copy.aboutMerged(s.oldYear, s.year);
+    } else if (s && s.kind !== 'hrdem' && s.year && (!v || !v.date.startsWith(s.year))) {
+      // A survey other than the HRDEM one at the lot.
+      const label = s.kind === 'copc' ? `${s.label} point cloud` : s.label;
+      fact = copy.lidarValue(copy.lidarNearLot(label), s.year);
+      caveat = copy.caveatLidar(s.year);
+      about = copy.aboutLidar(label, s.year);
+    } else if (v) {
+      fact = copy.lidarValue(v.label, v.date);
+      caveat = copy.caveatLidar(v.date.slice(0, 4));
+      about = copy.aboutLidar(v.label, v.date.slice(0, 4));
+    }
+    if (!fact) return;
+    this.vintageText = fact;
+    setFact(this.lotEls, 'lidar', copy.lidarFact, fact);
+    this.els.caveatLidar.textContent = caveat;
+    this.els.aboutLidar.textContent = about;
+  }
+
+  private applyChanges() {
+    const l = this.loaded, s = l?.summary.source;
+    const available = !!l?.changed && s?.kind === 'merged' && (s.changedShare ?? 0) > 0;
+    this.els.changesWrap.hidden = !available;
+    if (available && s.oldYear) this.els.changesLabel.textContent = copy.changesToggle(s.oldYear);
+    const show = available && this.changesOn;
+    let canvas: HTMLCanvasElement | null = null, rect: ReturnType<typeof maskBounds> = null;
+    if (show) {
+      const { width, height } = l.summary.window;
+      rect = maskBounds(l.changed!, width, height);
+      canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.putImageData(new ImageData(hatchMaskRgba(l.changed!, width, height, CEDAR_RGB, 150), width, height), 0, 0);
+    }
+    this.scene?.setChangeMask(canvas && rect ? { image: canvas, rect } : null);
+    this.map.setChangeMask(canvas);
+    if (this.result) this.renderLegend(this.layer());
   }
 
   get photoEnabled(): boolean {
@@ -219,6 +331,9 @@ export class Analysis {
     this.options = null;
     this.failedSpecs.clear();
     this.lot = { parcel, signal };
+    this.baseVintage = null;
+    this.renderSourceChoice();
+    this.map.setChangeMask(null);
     this.jurisdiction = displayJurisdiction(parcel, match);
     this.photoSeq++;
     this.clearPhoto();
@@ -244,10 +359,8 @@ export class Analysis {
 
     void vintageFor(centre, signal).then((v) => {
       if (!v || signal.aborted) return;
-      this.vintageText = copy.lidarValue(v.label, v.date);
-      setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
-      this.els.caveatLidar.textContent = copy.caveatLidar(v.date.slice(0, 4));
-      this.els.aboutLidar.textContent = copy.aboutLidar(v.label, v.date.slice(0, 4));
+      this.baseVintage = v;
+      this.renderLidarFacts();
       this.renderDebug();
     });
 
@@ -285,6 +398,7 @@ export class Analysis {
     const seq = ++this.refineSeq;
     this.options ??= await refinementOptions(hrdem, req.lotLonLat, req.lonLat).catch(() => ({}));
     if (seq !== this.refineSeq || lot.signal.aborted) return;
+    this.renderSourceChoice();
     // Resume an interrupted load, or take the preferred surface that hasn't failed for this lot.
     const resume = this.refinement?.state === 'interrupted' ? this.refinement.spec : null;
     const spec = resume ?? refinementOrder(this.options, this.sourcePreference).find((s) => !this.failedSpecs.has(s));
@@ -335,20 +449,6 @@ export class Analysis {
       this.inspectedCell = this.nearestCell(inspectedAt);
       if (this.inspectedCell !== null) this.scene?.setCursor(this.inspectedCell);
     }
-    const spec = this.refinement?.spec;
-    if (spec?.kind === 'merged' && spec.year) {
-      this.vintageText = copy.lidarMerged(spec.oldYear, spec.year);
-      setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
-      this.els.caveatLidar.textContent = copy.caveatMerged(spec.oldYear, spec.year);
-      this.els.aboutLidar.textContent = copy.aboutMerged(spec.oldYear, spec.year);
-    } else if (spec?.year && spec.kind !== 'hrdem' && !this.vintageText.startsWith(spec.year)) {
-      // A newer survey than the HRDEM one: say so in the facts and caveats.
-      const label = spec.kind === 'copc' ? `${spec.label} point cloud` : spec.label;
-      this.vintageText = copy.lidarValue(copy.lidarNearLot(label), spec.year);
-      setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
-      this.els.caveatLidar.textContent = copy.caveatLidar(spec.year);
-      this.els.aboutLidar.textContent = copy.aboutLidar(label, spec.year);
-    }
     await this.compute(signal);
     await this.updateCompare();
     this.showView(this.view);
@@ -379,7 +479,7 @@ export class Analysis {
     if (!s) return;
     const r = this.refinement;
     const value =
-      r?.state === 'running' ? copy.surface.refining(s.source.resM)
+      r?.state === 'running' ? (s.source.kind === 'hrdem' ? copy.surface.refining(s.source.resM) : copy.surface.switching)
       : s.source.kind === 'merged' ? copy.surfaceMerged(s.source.oldYear ?? '', s.source.year ?? '', s.source.changedShare ?? 0)
       : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.kind, s.source.resM, s.source.year)
       : copy.surface.base(s.source.resM);
@@ -441,6 +541,7 @@ export class Analysis {
       { keepCamera },
     );
     this.applyOpacity(); // the scene may not have existed when the opacity was set
+    this.applyChanges();
   }
 
   get currentView(): View {
@@ -505,6 +606,8 @@ export class Analysis {
     if (s.bufferNodataFrac > ELEVATION.bufferNodataWarn) notices.push(copy.analysisNotices.bufferNodata(Math.max(1, Math.round(100 * s.bufferNodataFrac))));
     setAnalysisNotices(this.lotEls, notices);
     this.renderSurfaceFact();
+    this.renderLidarFacts();
+    this.applyChanges();
   }
 
   /** Controls state with the timeline's date and time folded in. */
@@ -638,6 +741,9 @@ export class Analysis {
       L.append(bar);
     }
     L.append(swatch('repeating-linear-gradient(45deg, #333 0 2px, transparent 2px 5px)', copy.legend.covered, true));
+    const s = this.loaded?.summary.source;
+    if (this.changesOn && !this.els.changesWrap.hidden && s?.oldYear && s.year)
+      L.append(swatch('repeating-linear-gradient(-45deg, var(--cedar) 0 2px, transparent 2px 5px)', copy.legend.changed(s.oldYear, s.year), true));
   }
 
   private renderSummary() {
@@ -717,6 +823,7 @@ export class Analysis {
       ['Grid convergence γ', `${s.gammaDeg.toFixed(2)}°`],
       ['Elevation source', `${s.source.label}${s.source.year ? ` ${s.source.year}` : ''} (${s.window.crs}, ${s.source.resM} m)${s.source.detail ? `; ${s.source.detail}` : ''}`],
       ['Refinement', this.refinement ? `${this.refinement.spec.label}: ${this.refinement.state}${this.refinement.note ? ` (${this.refinement.note})` : ''}` : 'none available'],
+      ['Surfaces', this.options ? SOURCE_CHOICES.filter((c) => this.options![c]).map((c) => `${c} = ${this.options![c]!.kind}`).join(', ') || 'none' : '…'],
       ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.cellSizeM} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
       ['Window', `${s.window.width * s.window.res} × ${s.window.height * s.window.res} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],

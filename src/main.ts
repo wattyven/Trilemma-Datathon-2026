@@ -60,6 +60,11 @@ const analysisEls: AnalysisElements = {
   opacityInput: byId<HTMLInputElement>('results-opacity'),
   opacityWrap: byId('opacity-wrap'),
   photoCredit: byId('photo-credit'),
+  elevationWrap: byId('elevation-wrap'),
+  elevationSelect: byId<HTMLSelectElement>('elevation-choice'),
+  changesWrap: byId('changes-wrap'),
+  changesToggle: byId<HTMLInputElement>('changes-toggle'),
+  changesLabel: byId('changes-label'),
 };
 
 const today = todayInVancouver();
@@ -90,6 +95,7 @@ const timeline = new Timeline(
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
 analysis.onViewChange = () => writeUrl(false);
 analysis.onPhotoChange = () => writeUrl(false);
+analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
 initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
@@ -281,6 +287,7 @@ function urlDefaults(): UrlState {
     photo: false,
     opacity: IMAGERY.defaultOpacity,
     source: 'best',
+    changes: false,
     classes: false,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
@@ -318,6 +325,7 @@ function urlStateNow(): UrlState | null {
     fromTime: c.fromTime,
     toTime: c.toTime,
     source: analysis.sourcePreference,
+    changes: analysis.changesEnabled,
   };
 }
 
@@ -358,7 +366,8 @@ async function applyUrl(hash: string): Promise<boolean> {
     controls.set(patch);
     timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
     if (s.view) analysis.setView(s.view);
-    analysis.sourcePreference = s.source ?? 'best';
+    analysis.chooseSource(s.source ?? 'best');
+    analysis.setChangesEnabled(s.changes ?? false);
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
     analysis.setPhotoEnabled(s.photo ?? false);
     const sameLot = shown && shown.match.fullAddress === s.address;

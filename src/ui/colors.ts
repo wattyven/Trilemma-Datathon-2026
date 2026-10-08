@@ -1,5 +1,11 @@
 // Colour-blind-safe ramp for sun-hours (cividis, after matplotlib) and the debug palette.
+import { TOKENS } from './tokens';
+
 export type Rgb = [number, number, number];
+
+const hexRgb = (hex: string): Rgb => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
+/** The `--cedar` token, for the change hatch (a pattern, so it never reads as a ramp colour). */
+export const CEDAR_RGB = hexRgb(TOKENS.cedar);
 
 const CIVIDIS: Rgb[] = [
   [0x00, 0x22, 0x4e], [0x12, 0x35, 0x70], [0x3b, 0x49, 0x6c], [0x57, 0x5d, 0x6d], [0x70, 0x71, 0x73],

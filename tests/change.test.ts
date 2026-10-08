@@ -87,3 +87,22 @@ describe('grid helpers', () => {
     expect(regionToCoarse({ c0: 3, r0: 2, c1: 9, r1: 10 })).toEqual({ c0: 2, r0: 1, c1: 4, r1: 5 });
   });
 });
+
+describe('drawing the change overlay', () => {
+  it('hatches set cells "\\\\" (the covered hatch runs "/") and finds their bounds', async () => {
+    const { hatchMaskRgba, maskBounds } = await import('../src/ui/cellPaint');
+    const { CEDAR_RGB } = await import('../src/ui/colors');
+    expect(CEDAR_RGB).toEqual([0x1e, 0x2b, 0x25]);
+    const mask = new Uint8Array(8 * 8);
+    for (let r = 2; r < 6; r++) for (let c = 3; c < 7; c++) mask[r * 8 + c] = 1;
+    const rgba = hatchMaskRgba(mask, 8, 8, CEDAR_RGB, 150);
+    const alpha = (c: number, r: number) => rgba[4 * (r * 8 + c) + 3];
+    expect(alpha(0, 0)).toBe(0); // not marked
+    expect(alpha(3, 3)).toBe(150); // on a line: x − y = 0
+    expect(alpha(4, 3)).toBe(150); // x − y = 1, still within the 2-px line
+    expect(alpha(5, 3)).toBe(38); // between lines: faint fill
+    expect(alpha(4, 4)).toBe(150); // the line continues down-right
+    expect(maskBounds(mask, 8, 8)).toEqual({ c0: 3, r0: 2, c1: 7, r1: 6 });
+    expect(maskBounds(new Uint8Array(4), 2, 2)).toBeNull();
+  });
+});

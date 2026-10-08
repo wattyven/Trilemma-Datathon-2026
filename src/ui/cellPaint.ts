@@ -80,3 +80,33 @@ export function paintCellsRgba(g: CellGrid, color: (i: number) => { rgb: Rgb; al
 export function layerRgba(g: CellGrid, layer: Layer, alpha = 235): Uint8ClampedArray<ArrayBuffer> {
   return paintCellsRgba(g, (i) => ({ rgb: layerColor(layer, i), alpha }));
 }
+
+/**
+ * A mask as a translucent hatch: lines running "\" (the covered-cell hatch runs "/"), so the two
+ * never read alike. Window-sized RGBA for a canvas or texture.
+ */
+export function hatchMaskRgba(mask: Uint8Array, width: number, height: number, rgb: Rgb, alpha: number, period = 6): Uint8ClampedArray<ArrayBuffer> {
+  const out = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const k = y * width + x;
+      if (!mask[k]) continue;
+      const line = (((x - y) % period) + period) % period < 2;
+      out.set([rgb[0], rgb[1], rgb[2], line ? alpha : Math.round(alpha * 0.25)], 4 * k);
+    }
+  return out;
+}
+
+/** Pixel bounding box of a mask's set cells (exclusive ends), or null when empty. */
+export function maskBounds(mask: Uint8Array, width: number, height: number): { c0: number; r0: number; c1: number; r1: number } | null {
+  let c0 = width, r0 = height, c1 = -1, r1 = -1;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (mask[y * width + x]) {
+        if (x < c0) c0 = x;
+        if (x > c1) c1 = x;
+        if (y < r0) r0 = y;
+        if (y > r1) r1 = y;
+      }
+  return c1 < 0 ? null : { c0, r0, c1: c1 + 1, r1: r1 + 1 };
+}
