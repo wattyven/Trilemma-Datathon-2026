@@ -13,7 +13,7 @@ const points = pointsJson as unknown as Record<string, [number, number]>;
 
 /** Box shadow length (metres) on a grid with `res` m pixels; box is 4 m × 4 m × 10 m. */
 function shadowLength(res: number, sun: { altDeg: number; azTrueDeg: number; time: number; weightH: number }) {
-  const W = Math.round(100 / res), half = W / 2, b = Math.round(2 / res);
+  const W = Math.round(60 / res), half = W / 2, b = Math.round(2 / res); // the shadow is ~14 m long
   const dsm = flatRaster(W, W, 0);
   for (let y = half - b; y < half + b; y++) for (let x = half - b; x < half + b; x++) dsm.data[y * W + x] = 10;
   const px: number[] = [], py: number[] = [];
@@ -35,16 +35,19 @@ function shadowLength(res: number, sun: { altDeg: number; azTrueDeg: number; tim
   return tip - topEdge;
 }
 
-describe('grid resolution', () => {
+// The 0.5 m case marches ~4× the rays: give slow CI runners room.
+describe('grid resolution', { timeout: 30_000 }, () => {
   const sun = momentSample({ year: 2026, month: 3, day: 20 }, 15 * 60, 49.2613, -123.1139);
   const expected = 10 / Math.tan((sun.altDeg * Math.PI) / 180);
+  const lengths = new Map<number, number>();
+  const length = (res: number) => lengths.get(res) ?? lengths.set(res, shadowLength(res, sun)).get(res)!;
 
   it.each([1, 0.5])('casts a 10 / tan(alt) shadow in metres on a %s m grid (within 1 m)', (res) => {
-    expect(Math.abs(shadowLength(res, sun) - expected)).toBeLessThanOrEqual(1);
+    expect(Math.abs(length(res) - expected)).toBeLessThanOrEqual(1);
   });
 
   it('a 0.5 m grid is at least as close to the exact length as a 1 m grid (within half a metre)', () => {
-    expect(Math.abs(shadowLength(0.5, sun) - expected)).toBeLessThanOrEqual(Math.abs(shadowLength(1, sun) - expected) + 0.5);
+    expect(Math.abs(length(0.5) - expected)).toBeLessThanOrEqual(Math.abs(length(1) - expected) + 0.5);
   });
 });
 
