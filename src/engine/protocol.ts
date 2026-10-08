@@ -10,8 +10,18 @@ export interface HrdemSpec {
   dtmUrl: string;
 }
 
-/** Where elevation comes from for this load (chosen on the main thread; see analysis.ts). */
-export type ElevationSpec = { kind: 'hrdem'; hrdem: HrdemSpec; label: string; year: string | null };
+/** NRCan point-cloud (COPC) files covering the lot + margin, all from one survey. */
+export interface CopcSpec {
+  urls: string[];
+}
+
+/**
+ * Where elevation comes from for this load (chosen on the main thread; see elevation/hires.ts).
+ * The high-resolution kinds still read HRDEM for the ground model and the outer window.
+ */
+export type ElevationSpec =
+  | { kind: 'hrdem'; hrdem: HrdemSpec; label: string; year: string | null }
+  | { kind: 'copc'; hrdem: HrdemSpec; copc: CopcSpec; label: string; year: string | null };
 
 export interface SourceInfo {
   kind: ElevationSpec['kind'];

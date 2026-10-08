@@ -5,13 +5,14 @@ import { ELEVATION, OBSERVERS } from './config';
 import { copy } from './copy';
 import type { GeocodeMatch } from './data/geocoder';
 import type { Parcel } from './data/parcels';
+import { loadHiresIndex, refinementFor, type SourcePreference } from './elevation/hires';
 import { findMosaicItem } from './elevation/stac';
 import { vintageFor } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
-import type { ComputeResult, LoadedMessage } from './engine/protocol';
+import type { ComputeResult, ElevationSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
-import { gridToLocalAffine } from './geo/gridAffine';
-import { mapGeometry, polygonsOf } from './geo/polygon';
+import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
+import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
 import { isLowPower, webglAvailable } from './scene/webgl';
 import type { CellGrid } from './ui/cellPaint';
@@ -75,6 +76,14 @@ export class Analysis {
   private pathCache: { key: string; samples: SunSample[] } | null = null;
   private inspectedCell: number | null = null;
   private threads = 1;
+  private pickSeq = 0;
+  /** The current lot (for restarting a refinement an observer change interrupted). */
+  private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
+  /** The sharper surface loading (or loaded) after the first result. */
+  private refinement: { spec: ElevationSpec; state: 'running' | 'interrupted' | 'done' | 'failed'; note?: string } | null = null;
+  private refineSeq = 0;
+  /** Debug: force a surface (URL `elev=`). */
+  sourcePreference: SourcePreference = 'auto';
   /** Called when the user switches between 3D and map (for the shareable URL). */
   onViewChange: (v: View) => void = () => {};
 
@@ -98,6 +107,9 @@ export class Analysis {
 
   /** Run the whole pipeline for a lot already drawn on the map. */
   async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
+    this.refineSeq++; // abandon the previous lot's refinement
+    this.refinement = null;
+    this.lot = { parcel, signal };
     this.loaded = null;
     this.result = null;
     this.els.inspector.hidden = true;
@@ -145,10 +157,103 @@ export class Analysis {
     steps.set('sunlight', 'done');
     this.controls.show();
     this.showView(this.view);
+    void this.refine();
+  }
+
+  /**
+   * Progressive refinement: with the first (HRDEM 1 m) result on screen, load a sharper surface in
+   * the background and swap it in. Any failure just keeps the first result.
+   */
+  private async refine() {
+    const lot = this.lot, req = this.lotRequest;
+    if (!lot || !req || lot.signal.aborted) return;
+    const seq = ++this.refineSeq;
+    let spec = this.refinement?.state === 'interrupted' ? this.refinement.spec : null;
+    if (!spec && req.elevation.kind === 'hrdem') spec = await refinementFor(req.elevation.hrdem, req.lotLonLat, req.lonLat, this.sourcePreference).catch(() => null);
+    if (!spec || seq !== this.refineSeq || lot.signal.aborted) return;
+    this.refinement = { spec, state: 'running' };
+    this.renderSurfaceFact();
+    try {
+      const refinedReq = { ...req, observer: OBSERVERS[this.controls.get().observer], elevation: spec };
+      const loaded = await engine().load(refinedReq, undefined, lot.signal);
+      if (seq !== this.refineSeq || lot.signal.aborted) return;
+      this.lotRequest = refinedReq; // observer changes now reuse the sharper rasters
+      this.refinement.state = 'done';
+      await this.swapIn(loaded, lot.parcel, lot.signal);
+    } catch (e) {
+      if (seq !== this.refineSeq || !this.refinement) return;
+      // Superseded by an observer reload (onControls restarts it), or a real failure.
+      if ((e as { name?: string }).name === 'AbortError') this.refinement.state = 'interrupted';
+      else this.refinement = { ...this.refinement, state: 'failed', note: e instanceof Error ? e.message : String(e) };
+    } finally {
+      if (seq === this.refineSeq) {
+        this.renderSurfaceFact();
+        this.renderDebug();
+      }
+    }
+  }
+
+  /** Replace the loaded grid with a sharper one for the same lot, keeping the view and inspector. */
+  private async swapIn(loaded: LoadedMessage, parcel: Parcel, signal: AbortSignal) {
+    const inspectedAt = this.inspectedCell !== null ? this.cellLocal(this.inspectedCell) : null;
+    // Synchronously with adopting the new grid, retire results computed on the old one.
+    this.computeSeq++;
+    this.compareSeq++;
+    this.pickSeq++;
+    this.result = null;
+    this.adopt(loaded, true);
+    this.buildScene(parcel, true);
+    this.updateSun();
+    if (inspectedAt) {
+      this.inspectedCell = this.nearestCell(inspectedAt);
+      if (this.inspectedCell !== null) this.scene?.setCursor(this.inspectedCell);
+    }
+    if (this.refinement?.spec.year && this.refinement.spec.kind !== 'hrdem') {
+      const year = this.refinement.spec.year;
+      if (!this.vintageText.startsWith(year)) {
+        this.vintageText = copy.lidarValue(copy.lidarNearLot(this.refinement.spec.label), year);
+        setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
+      }
+    }
+    await this.compute(signal);
+    await this.updateCompare();
+    this.showView(this.view);
+  }
+
+  /** Local position (metres from the lot's origin) of a cell in the loaded grid. */
+  private cellLocal(cell: number): Position | null {
+    const l = this.loaded;
+    if (!l || cell >= l.px.length) return null;
+    return applyAffine(gridToLocalAffine(l.summary.window, this.map.frame), [l.px[cell]!, l.py[cell]!]);
+  }
+
+  private nearestCell(p: Position): number | null {
+    const l = this.loaded;
+    if (!l) return null;
+    const a = gridToLocalAffine(l.summary.window, this.map.frame);
+    let best: number | null = null, bestD = Infinity;
+    for (let i = 0; i < l.px.length; i++) {
+      const [x, y] = applyAffine(a, [l.px[i]!, l.py[i]!]);
+      const d = (x - p[0]) ** 2 + (y - p[1]) ** 2;
+      if (d < bestD) [best, bestD] = [i, d];
+    }
+    return best;
+  }
+
+  private renderSurfaceFact() {
+    const s = this.loaded?.summary;
+    if (!s) return;
+    const r = this.refinement;
+    const value =
+      r?.state === 'running' ? copy.surface.refining(s.source.resM)
+      : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.resM, s.source.year)
+      : copy.surface.base(s.source.resM);
+    setFact(this.lotEls, 'surface', copy.surfaceFact, value);
   }
 
   /** Start the slow parts as soon as the address is known, in parallel with the lot lookup. */
   prefetch(lonLat: [number, number], signal: AbortSignal) {
+    void loadHiresIndex().catch(() => {});
     void findMosaicItem(lonLat, signal)
       .then((item) => item && engine().prefetch(item.dsm, item.dtm))
       .catch(() => {}); // load() reports real failures
@@ -186,17 +291,20 @@ export class Analysis {
     return { width: w.width, height: w.height, px: l.px, py: l.py, covered: l.covered, step: l.summary.step };
   }
 
-  private buildScene(parcel: Parcel) {
+  private buildScene(parcel: Parcel, keepCamera = false) {
     const l = this.loaded, grid = this.cellGrid();
     if (!this.scene || !l || !grid) return;
-    this.scene.setModel({
+    this.scene.setModel(
+      {
       window: l.summary.window,
       dsm: l.dsm,
       dtm: l.dtm,
       affine: gridToLocalAffine(l.summary.window, this.map.frame),
       cells: grid,
       lotLocal: mapGeometry(parcel.geometry, this.map.frame.toLocal),
-    });
+      },
+      { keepCamera },
+    );
   }
 
   get currentView(): View {
@@ -234,6 +342,11 @@ export class Analysis {
       },
       signal,
     );
+    this.adopt(loaded, fresh);
+  }
+
+  /** Take a freshly loaded grid: map model, timings, notices. */
+  private adopt(loaded: LoadedMessage, fresh: boolean) {
     this.loaded = loaded;
     const s = loaded.summary;
     this.timings = { ...this.timings, elevationMs: s.timings.elevationMs, horizonMs: s.timings.horizonMs };
@@ -255,6 +368,7 @@ export class Analysis {
     if (s.dropped > 0) notices.push(copy.analysisNotices.dropped(s.dropped));
     if (s.bufferNodataFrac > ELEVATION.bufferNodataWarn) notices.push(copy.analysisNotices.bufferNodata(Math.max(1, Math.round(100 * s.bufferNodataFrac))));
     setAnalysisNotices(this.lotEls, notices);
+    this.renderSurfaceFact();
   }
 
   /** Controls state with the timeline's date and time folded in. */
@@ -285,6 +399,7 @@ export class Analysis {
       }
       await this.compute();
       await this.updateCompare();
+      if (this.refinement?.state === 'interrupted') void this.refine();
     } catch (e) {
       if ((e as { name?: string }).name !== 'AbortError') this.els.summary.textContent = errorMessage(e);
     }
@@ -423,11 +538,12 @@ export class Analysis {
     const l = this.loaded;
     if (!l) return;
     this.inspectedCell = cell;
+    const seq = ++this.pickSeq;
     const s = this.state();
     const date = this.timeline.localDate();
     try {
       const { result } = await engine().compute({ kind: 'inspect', cell, date, year: s.year });
-      if (result.kind !== 'inspect') return;
+      if (result.kind !== 'inspect' || seq !== this.pickSeq) return;
       renderInspector(this.els.inspector, {
         heading: this.valueText(cell),
         details: [this.contextText(s), l.covered[cell] ? copy.inspector.covered : '', copy.inspector.height(l.z0[cell]!)].filter(Boolean),
@@ -463,9 +579,10 @@ export class Analysis {
     const s = l.summary;
     const rows: [string, string][] = [
       ['Grid convergence γ', `${s.gammaDeg.toFixed(2)}°`],
-      ['Elevation source', `${s.source.label} (${s.window.crs}, ${s.source.resM} m)${s.source.detail ? `; ${s.source.detail}` : ''}`],
+      ['Elevation source', `${s.source.label}${s.source.year ? ` ${s.source.year}` : ''} (${s.window.crs}, ${s.source.resM} m)${s.source.detail ? `; ${s.source.detail}` : ''}`],
+      ['Refinement', this.refinement ? `${this.refinement.spec.label}: ${this.refinement.state}${this.refinement.note ? ` (${this.refinement.note})` : ''}` : 'none available'],
       ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.cellSizeM} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
-      ['Window', `${s.window.width} × ${s.window.height} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
+      ['Window', `${s.window.width * s.window.res} × ${s.window.height * s.window.res} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],
       ['3D', this.scene ? `WebGL${isLowPower() ? ', low-power settings' : ''}` : this.sceneUnavailable ? 'unavailable' : '…'],
       ['Timings', Object.entries(this.timings).map(([k, v]) => `${k.replace(/Ms$/, '')} ${v} ms`).join(', ') + (this.threads > 1 ? ` (horizon on ${this.threads} threads)` : '')],

@@ -25,7 +25,11 @@ export interface UrlState {
   shadeEnd?: string;
   fromTime?: string;
   toTime?: string;
+  /** Debug: force an elevation surface instead of the best available. */
+  source?: Source;
 }
+
+export type Source = 'hrdem' | 'copc';
 
 const KEYS: Record<keyof UrlState, string> = {
   address: 'a',
@@ -46,12 +50,14 @@ const KEYS: Record<keyof UrlState, string> = {
   shadeEnd: 'se',
   fromTime: 'wf',
   toTime: 'wt',
+  source: 'elev',
 };
 
 const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
 const PRESETS = new Set(['growing', 'summer', 'winter', 'year', 'custom']);
 const OBSERVERS = new Set<ObserverId>(['bed', 'seated', 'surface']);
 const VIEWS = new Set<View>(['3d', 'map']);
+const SOURCES = new Set<Source>(['hrdem', 'copc']);
 
 /** A real calendar date, normalised to YYYY-MM-DD. */
 function validDate(s: string | null): string | undefined {
@@ -91,6 +97,8 @@ export function decodeHash(hash: string): UrlState {
   if (observer && OBSERVERS.has(observer)) out.observer = observer;
   const view = get('view') as View | null;
   if (view && VIEWS.has(view)) out.view = view;
+  const source = get('source') as Source | null;
+  if (source && SOURCES.has(source)) out.source = source;
   const cls = get('classes');
   if (cls === '1' || cls === '0') out.classes = cls === '1';
   for (const k of ['start', 'end', 'date', 'shadeStart', 'shadeEnd'] as const) {

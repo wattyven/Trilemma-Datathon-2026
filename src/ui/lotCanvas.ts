@@ -56,8 +56,8 @@ function hillshade(w: PixelWindow, dsm: Float32Array, gammaDeg: number): ImageDa
         continue;
       }
       const l = at(x - 1, y), r = at(x + 1, y), u = at(x, y - 1), d = at(x, y + 1);
-      const dzdx = Number.isNaN(l) || Number.isNaN(r) ? 0 : (r - l) / 2;
-      const dzdn = Number.isNaN(u) || Number.isNaN(d) ? 0 : (u - d) / 2; // +north is −py
+      const dzdx = Number.isNaN(l) || Number.isNaN(r) ? 0 : (r - l) / (2 * w.res);
+      const dzdn = Number.isNaN(u) || Number.isNaN(d) ? 0 : (u - d) / (2 * w.res); // +north is −py
       const s = Math.max(0, (-dzdx * lx - dzdn * ln + lz) / Math.hypot(dzdx, dzdn, 1));
       const g = 70 + 170 * s;
       img.data.set([g, g, g * 0.97, 255], o);

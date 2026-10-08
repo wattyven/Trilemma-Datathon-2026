@@ -135,7 +135,7 @@ export class LotScene {
   }
 
   /** Build terrain, overlay geometry and outline for a newly loaded lot. */
-  setModel(m: SceneModel) {
+  setModel(m: SceneModel, opts: { keepCamera?: boolean } = {}) {
     this.clearWorld();
     this.model = m;
     this.cellIndex = buildCellIndex(m.cells);
@@ -153,10 +153,12 @@ export class LotScene {
       }
     }
     const lotRect: PixelRect = { c0: Math.floor(c0), r0: Math.floor(r0), c1: Math.ceil(c1), r1: Math.ceil(r1) };
-    const inner = innerRect(lotRect, 40, 4, width, height);
-    const outer: PixelRect = { c0: 0, r0: 0, c1: Math.floor((width - 1) / 4) * 4, r1: Math.floor((height - 1) / 4) * 4 };
+    const res = m.window.res;
+    const { innerStep, outerStep, marginPx } = meshSteps(lotRect, res);
+    const inner = innerRect(lotRect, marginPx, outerStep, width, height);
+    const outer: PixelRect = { c0: 0, r0: 0, c1: Math.floor((width - 1) / outerStep) * outerStep, r1: Math.floor((height - 1) / outerStep) * outerStep };
     const material = new THREE.MeshLambertMaterial({ vertexColors: true });
-    for (const arrays of [buildGrid(input, inner, 1, colors, { skirtM: 3 }), buildGrid(input, outer, 4, colors, { hole: inner })]) {
+    for (const arrays of [buildGrid(input, inner, innerStep, colors, { skirtM: 3 }), buildGrid(input, outer, outerStep, colors, { hole: inner })]) {
       const mesh = new THREE.Mesh(toGeometry(arrays), material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -196,15 +198,15 @@ export class LotScene {
 
     // Home view: from the south-south-east, looking at the lot.
     const lotH = medianHeight(m) - this.base;
-    const size = Math.max(Math.hypot(c1 - c0, r1 - r0), 30);
+    const size = Math.max(Math.hypot(c1 - c0, r1 - r0) * res, 30);
     this.home.radius = Math.max(50, size * 1.1);
     this.home.target.set(0, lotH, 0);
     // From the south-south-east and fairly high (~55°), so shadows show beyond what casts them.
     this.home.position.copy(this.home.target).add(new THREE.Vector3(0.3, 1.5, 1).normalize().multiplyScalar(size * 2.2 + 40));
-    this.resetView();
+    if (!opts.keepCamera) this.resetView(); // a sharper surface for the same lot keeps the user's view
 
     // Shadow camera covers the whole window, so far casters still throw shadows onto the lot.
-    const half = Math.hypot(width, height) / 2;
+    const half = (Math.hypot(width, height) * res) / 2;
     const cam = this.sunLight.shadow.camera;
     cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half;
     cam.near = 1; cam.far = 4000;
@@ -296,7 +298,7 @@ export class LotScene {
     const p = applyAffine(m.affine, [m.cells.px[cell]!, m.cells.py[cell]!]);
     const z = bilinear({ width: m.window.width, height: m.window.height, data: m.dsm }, m.cells.px[cell]!, m.cells.py[cell]!);
     this.cursor.position.set(...localToScene(p, (Number.isNaN(z) ? this.base : z) - this.base + 0.35));
-    this.cursor.scale.setScalar(m.cells.step);
+    this.cursor.scale.setScalar(m.cells.step * m.window.res);
     this.cursor.visible = true;
     this.invalidate();
   }
@@ -430,6 +432,18 @@ export class LotScene {
   }
 }
 
+/**
+ * Terrain mesh spacing in grid pixels: native resolution within 40 m of the lot (unless that
+ * would pass ~250k vertices, then 1 m), and 4 m farther out. The outer step aligns the hole.
+ */
+export function meshSteps(lot: PixelRect, res: number): { innerStep: number; outerStep: number; marginPx: number } {
+  const outerStep = Math.max(1, Math.round(4 / res));
+  const marginPx = Math.round(40 / res);
+  const verts = (lot.c1 - lot.c0 + 2 * marginPx) * (lot.r1 - lot.r0 + 2 * marginPx);
+  const innerStep = verts > 250_000 ? Math.max(1, Math.round(1 / res)) : 1;
+  return { innerStep, outerStep, marginPx };
+}
+
 function medianHeight(m: SceneModel): number {
   const v: number[] = [];
   for (let i = 0; i < m.cells.px.length; i += Math.max(1, Math.floor(m.cells.px.length / 500))) {
@@ -454,7 +468,7 @@ export function nearestCellToOrigin(m: Pick<SceneModel, 'affine' | 'cells'>): nu
 /** One cell step in a TRUE direction (east, north), or null if that leaves the lot. */
 export function stepCell(m: Pick<SceneModel, 'affine' | 'cells'>, index: Int32Array, cell: number, [dx, dy]: Position): number | null {
   const here = applyAffine(m.affine, [m.cells.px[cell]!, m.cells.py[cell]!]);
-  const step = m.cells.step;
+  const step = m.cells.step * Math.hypot(m.affine.col[0], m.affine.col[1]); // metres
   for (const k of [1, 1.5]) {
     const target: Position = [here[0] + dx * step * k, here[1] + dy * step * k];
     const [px, py] = invertAffine(m.affine, target);

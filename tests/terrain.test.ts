@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAffine, type GridAffine } from '../src/geo/gridAffine';
 import { baseLevel, buildGrid, innerRect, type TerrainInput } from '../src/scene/terrain';
+import { meshSteps } from '../src/scene/view3d';
 
 // A window rotated 25° like EPSG:3979 at Vancouver: +1 px column = 1 m at bearing 65°, +1 px row = bearing 155°.
 const g = (25 * Math.PI) / 180;
@@ -68,5 +69,14 @@ describe('innerRect and baseLevel', () => {
   it('uses the 5th percentile, ignoring nodata', () => {
     const v = Float32Array.from([...Array.from({ length: 100 }, (_, i) => i), NaN]);
     expect(baseLevel(v)).toBe(5);
+  });
+});
+
+describe('mesh spacing follows the grid resolution', () => {
+  it('keeps 1 m grids as before and densifies 0.5 m grids near the lot', () => {
+    expect(meshSteps({ c0: 200, r0: 200, c1: 240, r1: 240 }, 1)).toEqual({ innerStep: 1, outerStep: 4, marginPx: 40 });
+    expect(meshSteps({ c0: 400, r0: 400, c1: 480, r1: 480 }, 0.5)).toEqual({ innerStep: 1, outerStep: 8, marginPx: 80 });
+    // A 300 m lot at 0.5 m would need ~580k vertices at native resolution: step to 1 m.
+    expect(meshSteps({ c0: 0, r0: 0, c1: 600, r1: 600 }, 0.5).innerStep).toBe(2);
   });
 });

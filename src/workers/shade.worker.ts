@@ -257,6 +257,7 @@ scope.onmessage = async (ev: MessageEvent<ToWorker>) => {
       post({ type: 'result', id: msg.id, result, ms: Math.round(performance.now() - t0) }, transfer);
     }
   } catch (e) {
+    if (errorCode(e) === 'internal') console.warn('VanShade worker:', e);
     post({ type: 'error', id: msg.id, code: errorCode(e), message: e instanceof Error ? e.message : String(e) });
   }
 };

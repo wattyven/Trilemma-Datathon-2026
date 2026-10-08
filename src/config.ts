@@ -58,6 +58,31 @@ export const ELEVATION = {
   dtmMarginM: 44,
 } as const;
 
+/**
+ * Sharper surfaces loaded after the first (HRDEM) result: NRCan point clouds gridded at 0.5 m near
+ * the lot, or LidarBC's newer 1 m rasters. See docs/DATA_SOURCES.md.
+ */
+export const HIRES = {
+  /**
+   * Point-cloud surface covers the lot bbox + this margin (shrunk, down to the minimum, to keep the
+   * area read under copcMaxBoxM2); HRDEM (resampled) fills the rest of the window.
+   */
+  copcRefineM: 60,
+  copcMinRefineM: 20,
+  copcMaxBoxM2: 40_000,
+  copcResM: 0.5,
+  /** Read octree levels until about this many points per m² (2 per 0.5 m cell). */
+  copcTargetDensity: 8,
+  /** Safety cap: stop reading nodes after this many points. */
+  copcMaxPoints: 3_000_000,
+  /** Lots bigger than this (m²) keep the HRDEM result (a big area to read, and coarse cells anyway). */
+  copcMaxLotM2: 40_000,
+  /** A surface needs at least this share of its cells filled from points to replace HRDEM. */
+  minFilled: 0.6,
+  /** A datum offset bigger than this (m) means something is wrong with the file: don't use it. */
+  maxDatumOffsetM: 30,
+} as const;
+
 /** A step of max(0.5 m, 0.02·d) is usual; 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
 export const HORIZON = {
   sectors: 180,

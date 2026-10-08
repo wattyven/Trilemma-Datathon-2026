@@ -18,7 +18,9 @@
     "smoke": "playwright test"
   },
   "dependencies": {
+    "copc": "^0.0.9",
     "geotiff": "^3.0.5",
+    "laz-perf": "^0.0.7",
     "luxon": "^3.7.2",
     "proj4": "^2.22.0",
     "suncalc": "^2.1.1",

@@ -49,6 +49,13 @@ export const copy = {
       `About ${pct}% of the area around this lot has no elevation data (often water). We've assumed nothing there blocks the sun.`,
     dropped: (n: number) => `${n} spot${n === 1 ? '' : 's'} on this lot had no elevation data and ${n === 1 ? 'is' : 'are'} left out.`,
   },
+  surfaceFact: 'Surface detail',
+  surface: {
+    base: (resM: number) => `${resM} m grid`,
+    refining: (resM: number) => `${resM} m grid; loading finer detail…`,
+    refined: (resM: number, year: string | null) => `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud`,
+  },
+  lidarNearLot: (project: string) => `${project} point cloud, near the lot`,
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
   legend: {

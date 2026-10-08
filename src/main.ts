@@ -304,6 +304,7 @@ function urlStateNow(): UrlState | null {
     shadeEnd: c.shadeEnd,
     fromTime: c.fromTime,
     toTime: c.toTime,
+    source: analysis.sourcePreference === 'auto' ? undefined : analysis.sourcePreference,
   };
 }
 
@@ -344,6 +345,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     controls.set(patch);
     timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
     if (s.view) analysis.setView(s.view);
+    analysis.sourcePreference = s.source ?? 'auto';
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
       const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;
