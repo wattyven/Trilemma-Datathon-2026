@@ -272,6 +272,14 @@ Sample: [`stac-mosaic-item.json`](samples/stac-mosaic-item.json).
 
 **In the app (Phase 2, local Chromium):** search to drawn sun results took **2.0–4.8 s** on 9 lots. That covers the geocoder, WFS, STAC, DSM and DTM windows (about 2 s) and horizons for up to 7,000 cells (about 0.5 s). The season average then takes about 25 ms. City Hall (22,248 m²) and Maple Ridge (28,099 m²) were coarsened to a 2 m grid.
 
+**Live on `wattyven.github.io` (build ce3d225):** 3.0–7.4 s, with all 10 UI cases passing and no console errors. That run confirms the worker URL under `/VanShade/` and STAC/S3 CORS from the real origin.
+- **Where the time goes:** the elevation download takes 2.4–5.3 s; horizons take 0.3–1.8 s for 4,800–16,200 cells, and outputs take under 0.1 s.
+- **Why big lots are slower:** a window wider than 512 m touches 3 × 3 COG tiles, about 18 MiB for DSM plus DTM.
+- **Phase 4 options:**
+  - read the outer buffer from an overview
+  - switch to WCS, which crops to the window and so downloads about 4× less
+  - parallelise the horizon precompute
+
 **Coverage.** Centre pixel at each test point. Δ = DSM − DTM, where positive means a roof or canopy:
 
 | id | DSM | DTM | Δ | Notes |
