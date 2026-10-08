@@ -1,6 +1,6 @@
 // horizon lookups agree with direct ray marching ≥ 99% of the time on a synthetic DSM.
 import { describe, expect, it } from 'vitest';
-import { computeHorizons, horizonAt, rayMarchSunlit, sectorLookup } from '../src/engine/horizon';
+import { computeHorizons, horizonAt, rayMarchSunlit, sectorLookup, splitRanges } from '../src/engine/horizon';
 import type { Raster } from '../src/engine/grid';
 import { flatRaster, mulberry32, PARAMS } from './helpers/synthetic';
 
@@ -71,10 +71,28 @@ describe('horizon precompute vs brute-force ray marching', () => {
     expect(fast).toEqual(slow);
   });
 
+  it('a parallel split (as the helper threads do it) equals one pass', () => {
+    const merged = new Float32Array(N * PARAMS.sectors);
+    for (const [a, b] of splitRanges(N, 3)) {
+      const part = new Float32Array((b - a) * PARAMS.sectors);
+      computeHorizons({ dsm, px: px.slice(a, b), py: py.slice(a, b), z0: z0.slice(a, b), count: b - a }, PARAMS, part);
+      merged.set(part, a * PARAMS.sectors);
+    }
+    expect(merged).toEqual(horizons);
+  });
+
   it('chunked computation equals one pass', () => {
     const chunked = new Float32Array(N * PARAMS.sectors);
     for (let s = 0; s < N; s += 37) computeHorizons(input, PARAMS, chunked, s, Math.min(N, s + 37));
     expect(chunked).toEqual(horizons);
+  });
+});
+
+describe('splitRanges', () => {
+  it('covers every cell once in near-equal contiguous slices', () => {
+    expect(splitRanges(10, 3)).toEqual([[0, 3], [3, 6], [6, 10]]);
+    expect(splitRanges(2, 4)).toEqual([[0, 1], [1, 2]]);
+    expect(splitRanges(5, 1)).toEqual([[0, 5]]);
   });
 });
 

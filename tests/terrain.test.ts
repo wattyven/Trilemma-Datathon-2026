@@ -10,7 +10,7 @@ const dsm = new Float32Array(W * H).fill(105);
 const dtm = new Float32Array(W * H).fill(100);
 dsm[5 * W + 5] = NaN; // water
 const input: TerrainInput = { width: W, height: H, dsm, dtm, affine: AFFINE, base: 100 };
-const COLORS = { ground: [1, 0, 0] as [number, number, number], raised: [0, 1, 0] as [number, number, number], water: [0, 0, 1] as [number, number, number] };
+const COLORS = { ground: [1, 0, 0] as [number, number, number], water: [0, 0, 1] as [number, number, number] };
 
 describe('buildGrid', () => {
   const rect = { c0: 8, r0: 8, c1: 16, r1: 16 };
@@ -37,8 +37,8 @@ describe('buildGrid', () => {
     expect(ny).toBeGreaterThan(0);
   });
 
-  it('colours raised surfaces and water, and puts water at base level', () => {
-    expect(Array.from(m.colors.slice(0, 3))).toEqual([0, 1, 0]); // DSM − DTM = 5 m: raised
+  it('colours land one neutral tone, water blue, and puts water at base level', () => {
+    expect(Array.from(m.colors.slice(0, 3))).toEqual([1, 0, 0]);
     const w = buildGrid(input, { c0: 5, r0: 5, c1: 6, r1: 6 }, 1, COLORS);
     expect(Array.from(w.colors.slice(0, 3))).toEqual([0, 0, 1]);
     expect(w.positions[1]).toBeCloseTo(0, 6);

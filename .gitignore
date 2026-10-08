@@ -5,3 +5,5 @@ dist/
 *.tif
 *.tiff
 *.gpkg
+playwright-report/
+test-results/

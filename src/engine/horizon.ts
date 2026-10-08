@@ -109,3 +109,11 @@ export function rayMarchSunlit(dsm: Raster, px: number, py: number, z0: number, 
     if (z === z && (z - z0) / d >= tanAlt) return false;
   }
 }
+
+/** Split `count` cells into up to `threads` contiguous [start, end) ranges of near-equal size. */
+export function splitRanges(count: number, threads: number): [number, number][] {
+  const t = Math.max(1, Math.min(threads, count));
+  const out: [number, number][] = [];
+  for (let i = 0; i < t; i++) out.push([Math.floor((i * count) / t), Math.floor(((i + 1) * count) / t)]);
+  return out.filter(([a, b]) => b > a);
+}

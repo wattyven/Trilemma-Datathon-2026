@@ -32,9 +32,9 @@ export interface MeshArrays {
   skirtStart: number;
 }
 
+/** Land is one quiet "clay model" colour (roofs and canopy read through light and shadow); water is blue. */
 export interface TerrainColors {
   ground: [number, number, number];
-  raised: [number, number, number];
   water: [number, number, number];
 }
 
@@ -69,13 +69,13 @@ export function buildGrid(t: TerrainInput, rect: PixelRect, step: number, colors
   const vertex = (c: number, r: number, drop = 0) => {
     const cc = Math.min(t.width - 1, Math.max(0, c)), rr = Math.min(t.height - 1, Math.max(0, r));
     const k = rr * t.width + cc;
-    const s = t.dsm[k]!, g = t.dtm[k]!;
+    const s = t.dsm[k]!;
     const water = Number.isNaN(s);
     const z = water ? 0 : s - t.base; // water lies flat at the base level
     const px = cc + 0.5, py = rr + 0.5;
     const [x, y, zz] = localToScene(applyAffine(t.affine, [px, py]), z - drop);
     pos.push(x, y, zz);
-    const c3 = water ? colors.water : !Number.isNaN(g) && s - g > 2 ? colors.raised : colors.ground;
+    const c3 = water ? colors.water : colors.ground;
     col.push(...c3);
     uv.push(px / t.width, py / t.height);
     return pos.length / 3 - 1;

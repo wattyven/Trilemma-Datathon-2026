@@ -2,6 +2,7 @@
 import type { ParcelNotice } from './data/parcels';
 
 const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+const fmtH = (h: number) => (Number.isInteger(h) ? String(h) : h.toFixed(1));
 const compass = (azDeg: number) => COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 45) % 8]!;
 
 export const copy = {
@@ -56,7 +57,9 @@ export const copy = {
     sun: 'Sun',
     shade: 'Shade',
     covered: 'Roof or tree overhead',
-    classes: ['Shade (under 3 h)', 'Part sun (3–6 h)', 'Full sun (6+ h)'] as const,
+    classes: (t: { fullSunH: number; partSunH: number }) =>
+      [`Shade (under ${fmtH(t.partSunH)} h)`, `Part sun (${fmtH(t.partSunH)}–${fmtH(t.fullSunH)} h)`, `Full sun (${fmtH(t.fullSunH)}+ h)`] as const,
+    thresholdsNote: 'Thresholds are hours of direct sun a day.',
   },
   readout: {
     hours: (h: number) => `${h.toFixed(1)} h of direct sun a day`,
@@ -82,7 +85,7 @@ export const copy = {
     monthlyAria: (h: number[]) =>
       `Average hours of direct sun a day by month: ${h.map((v, i) => `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i]} ${v.toFixed(1)}`).join(', ')}`,
     barTitle: (month: string, h: number) => `${month}: ${h.toFixed(1)} h of direct sun a day`,
-    fullSunLine: 'full sun, 6 h',
+    fullSunLine: (h: number) => `full sun, ${fmtH(h)} h`,
     stripTitle: (date: string) => `Sun and shade on ${date}, sunrise to sunset`,
     stripAria: (periods: string) => (periods ? `In direct sun ${periods}` : 'No direct sun all day'),
     sunnyAt: (periods: string) => `In direct sun ${periods}.`,
@@ -112,6 +115,16 @@ export const copy = {
     webglMissing: "Your browser can't show the 3D view, so here's the map view instead.",
     keyboard: 'Drag to orbit, right-drag or two fingers to pan, scroll to zoom. Focus the view and use the arrow keys to step across the lot; Enter shows that spot.',
   },
+  tryAgain: 'Try again',
+  offline: "You seem to be offline. VanShade needs the internet to fetch addresses, lot lines and elevation. Try again once you're connected.",
+  workerDown: 'The sun calculator stopped unexpectedly. Try again; if it keeps happening, reload the page.',
+  share: {
+    copied: 'Link copied. Anyone with it sees this lot, mode, date and time.',
+    manual: (url: string) => `Copy this link: ${url}`,
+  },
+  sheet: { show: 'Show details and settings', hide: 'Hide details' },
+  caveatLidar: (year: string) => `The LiDAR is from ${year}, so newer buildings or tree growth may be missing.`,
+  aboutLidar: (label: string, year: string) => `This lot's LiDAR comes from ${label}, flown in ${year}.`,
   switcherBest: 'Best match',
   switcherOther: 'Lot',
   metresAway: (m: number) => `${Math.round(m)} m away`,

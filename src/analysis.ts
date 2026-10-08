@@ -40,6 +40,8 @@ export interface AnalysisElements {
   shadowsToggle: HTMLInputElement;
   compareToggle: HTMLInputElement;
   resetView: HTMLButtonElement;
+  caveatLidar: HTMLElement;
+  aboutLidar: HTMLElement;
 }
 
 export class NoCoverageError extends Error {}
@@ -53,11 +55,12 @@ export function errorMessage(e: unknown): string {
     if (e.code === 'no-lidar') return copy.noLidar;
     if (e.code === 'no-cells') return copy.noCells;
     if (e.code === 'tile-edge') return copy.tileEdge;
+    if (e.code === 'internal') return copy.workerDown;
   }
   return copy.elevationDown;
 }
 
-type View = '3d' | 'map';
+export type View = '3d' | 'map';
 
 export class Analysis {
   private loaded: LoadedMessage | null = null;
@@ -71,6 +74,10 @@ export class Analysis {
   private sceneUnavailable = false;
   private view: View = '3d';
   private pathCache: { key: string; samples: SunSample[] } | null = null;
+  private inspectedCell: number | null = null;
+  private threads = 1;
+  /** Called when the user switches between 3D and map (for the shareable URL). */
+  onViewChange: (v: View) => void = () => {};
 
   constructor(
     private map: LotCanvas,
@@ -79,7 +86,12 @@ export class Analysis {
     private lotEls: LotViewElements,
     private els: AnalysisElements,
   ) {
-    for (const r of els.viewRadios) r.addEventListener('change', () => r.checked && this.setView(r.value as View));
+    for (const r of els.viewRadios)
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        this.setView(r.value as View);
+        this.onViewChange(this.view);
+      });
     els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(els.shadowsToggle.checked));
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
     els.resetView.addEventListener('click', () => this.scene?.resetView());
@@ -90,6 +102,7 @@ export class Analysis {
     this.loaded = null;
     this.result = null;
     this.els.inspector.hidden = true;
+    this.inspectedCell = null;
     this.els.summary.textContent = '';
     this.els.readout.textContent = '';
     this.els.legend.hidden = true;
@@ -100,7 +113,8 @@ export class Analysis {
     const centre = this.map.frame.origin;
     steps.set('elevation', 'active');
     const t0 = performance.now();
-    const item = await findMosaicItem(centre, signal);
+    // Same point as prefetch(), so this is usually a cache hit.
+    const item = await findMosaicItem(match.lonLat, signal);
     if (!item) throw new NoCoverageError();
     this.timings = { stacMs: Math.round(performance.now() - t0) };
 
@@ -108,6 +122,8 @@ export class Analysis {
       if (!v || signal.aborted) return;
       this.vintageText = copy.lidarValue(v.label, v.date);
       setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
+      this.els.caveatLidar.textContent = copy.caveatLidar(v.date.slice(0, 4));
+      this.els.aboutLidar.textContent = copy.aboutLidar(v.label, v.date.slice(0, 4));
       this.renderDebug();
     });
 
@@ -132,6 +148,14 @@ export class Analysis {
     steps.set('sunlight', 'done');
     this.controls.show();
     this.showView(this.view);
+  }
+
+  /** Start the slow parts as soon as the address is known, in parallel with the lot lookup. */
+  prefetch(lonLat: [number, number], signal: AbortSignal) {
+    void findMosaicItem(lonLat, signal)
+      .then((item) => item && engine().prefetch(item.dsm, item.dtm))
+      .catch(() => {}); // load() reports real failures
+    if (!this.sceneUnavailable && webglAvailable()) void import('./scene/view3d').catch(() => {});
   }
 
   private async ensureScene(): Promise<void> {
@@ -178,9 +202,16 @@ export class Analysis {
     });
   }
 
-  private setView(v: View) {
+  get currentView(): View {
+    return this.view;
+  }
+
+  /** Switch views (also used to restore a shared link before a lot loads). */
+  setView(v: View) {
+    if (v === '3d' && this.sceneUnavailable) return;
     this.view = v;
     if (this.loaded) this.showView(v);
+    else this.els.viewRadios.forEach((r) => (r.checked = r.value === v));
   }
 
   private showView(v: View) {
@@ -209,6 +240,7 @@ export class Analysis {
     this.loaded = loaded;
     const s = loaded.summary;
     this.timings = { ...this.timings, elevationMs: s.timings.elevationMs, horizonMs: s.timings.horizonMs };
+    this.threads = s.timings.threads;
     if (fresh) {
       this.map.setAnalysis({
         window: s.window,
@@ -268,6 +300,7 @@ export class Analysis {
     const mode = this.controls.get().mode;
     try {
       if (mode === 'moment' || (mode === 'day' && dateChanged)) await this.compute();
+      else if (dateChanged) this.refreshInspector(); // its day strip follows the date
       await this.updateCompare();
     } catch (e) {
       if ((e as { name?: string }).name !== 'AbortError') this.els.summary.textContent = errorMessage(e);
@@ -301,7 +334,8 @@ export class Analysis {
     const r = this.result;
     if (!r || r.kind === 'inspect') return null;
     const kind = r.kind === 'moment' ? 'moment' : r.kind === 'shade' ? 'percent' : 'hours';
-    return { kind, values: r.values, asClasses: kind === 'hours' && this.controls.get().classes };
+    const c = this.controls.get();
+    return { kind, values: r.values, asClasses: kind === 'hours' && c.classes, thresholds: { fullSunH: c.fullSunH, partSunH: c.partSunH } };
   }
 
   private render() {
@@ -312,6 +346,12 @@ export class Analysis {
     this.renderSummary();
     this.renderDebug();
     this.els.readout.textContent = copy.inspector.hint;
+    this.refreshInspector();
+  }
+
+  /** Keep an open inspector in step with the current mode, dates and thresholds. */
+  private refreshInspector() {
+    if (this.inspectedCell !== null && !this.els.inspector.hidden) void this.pick(this.inspectedCell);
   }
 
   private renderLegend(layer: Layer | null) {
@@ -331,7 +371,7 @@ export class Analysis {
     if (layer.kind === 'moment') {
       L.append(swatch(css(SUN_RGB), copy.legend.sun), swatch(css(SHADE_RGB), copy.legend.shade));
     } else if (layer.asClasses) {
-      copy.legend.classes.forEach((t, i) => L.append(swatch(css(CLASS_RGB[i as 0 | 1 | 2]), t)));
+      copy.legend.classes(layer.thresholds ?? this.controls.get()).forEach((t, i) => L.append(swatch(css(CLASS_RGB[i as 0 | 1 | 2]), t)));
     } else {
       const bar = document.createElement('div');
       bar.className = 'legend-bar';
@@ -385,6 +425,7 @@ export class Analysis {
   async pick(cell: number) {
     const l = this.loaded;
     if (!l) return;
+    this.inspectedCell = cell;
     const s = this.state();
     const date = this.timeline.localDate();
     try {
@@ -397,6 +438,7 @@ export class Analysis {
         strip: result.inspection.strip,
         dateLabel: s.date,
         year: s.year,
+        fullSunH: s.fullSunH,
       });
     } catch (e) {
       this.els.inspector.textContent = errorMessage(e);
@@ -428,7 +470,7 @@ export class Analysis {
       ['Window', `${s.window.width} × ${s.window.height} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],
       ['3D', this.scene ? `WebGL${isLowPower() ? ', low-power settings' : ''}` : this.sceneUnavailable ? 'unavailable' : '…'],
-      ['Timings', Object.entries(this.timings).map(([k, v]) => `${k.replace(/Ms$/, '')} ${v} ms`).join(', ')],
+      ['Timings', Object.entries(this.timings).map(([k, v]) => `${k.replace(/Ms$/, '')} ${v} ms`).join(', ') + (this.threads > 1 ? ` (horizon on ${this.threads} threads)` : '')],
     ];
     this.els.debug.replaceChildren(
       ...rows.flatMap(([k, v]) => [Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: v })]),

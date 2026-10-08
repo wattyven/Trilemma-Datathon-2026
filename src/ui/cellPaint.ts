@@ -1,6 +1,6 @@
 // Per-cell colouring shared by the 2D map and the 3D overlay: values → RGBA in window pixel space,
 // with covered cells (roof or canopy overhead) hatched. Also the pixel → cell lookup for picking.
-import { CLASS_THRESHOLDS } from '../config';
+import { CLASS_THRESHOLDS, type Thresholds } from '../config';
 import { CLASS_RGB, SHADE_RGB, SUN_RGB, WATER_RGB, cividis, type Rgb } from './colors';
 
 export const HOURS_SCALE_MAX = 16;
@@ -11,6 +11,8 @@ export interface Layer {
   kind: LayerKind;
   values: Float32Array | Uint8Array;
   asClasses: boolean;
+  /** Class boundaries when `asClasses` (defaults to 6 h / 3 h). */
+  thresholds?: Thresholds;
 }
 
 export interface CellGrid {
@@ -26,7 +28,10 @@ export function layerColor(layer: Layer, i: number): Rgb {
   const v = layer.values[i]!;
   if (layer.kind === 'moment') return v ? SUN_RGB : SHADE_RGB;
   if (layer.kind === 'percent') return Number.isNaN(v) ? WATER_RGB : cividis(1 - v / 100);
-  if (layer.asClasses) return CLASS_RGB[v >= CLASS_THRESHOLDS.fullSunH ? 2 : v >= CLASS_THRESHOLDS.partSunH ? 1 : 0];
+  if (layer.asClasses) {
+    const t = layer.thresholds ?? CLASS_THRESHOLDS;
+    return CLASS_RGB[v >= t.fullSunH ? 2 : v >= t.partSunH ? 1 : 0];
+  }
   return cividis(v / HOURS_SCALE_MAX);
 }
 

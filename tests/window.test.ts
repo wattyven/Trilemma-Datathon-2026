@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bboxOf, fromPixel, lotWindow, ringsToPixel, TileEdgeError, toPixel, type TileGrid } from '../src/elevation/window';
+import { bboxOf, embedWindow, fromPixel, lotWindow, ringsToPixel, TileEdgeError, toPixel, type TileGrid } from '../src/elevation/window';
 import { applyAffine, gridToLocalAffine, invertAffine } from '../src/geo/gridAffine';
 import { localFrame } from '../src/geo/local';
 import { convergenceDeg, fromLcc, toLcc } from '../src/geo/proj';
@@ -30,6 +30,22 @@ describe('lotWindow', () => {
     const px = ringsToPixel(w, [[[[w.x0, w.y0], [w.x0 + 1, w.y0 - 1]]]]);
     expect(px[0]![0]).toEqual([[0, 0], [1, 1]]);
     expect(bboxOf([[[[1, 2], [3, -4], [0, 0]]]])).toEqual({ minX: 0, minY: -4, maxX: 3, maxY: 2 });
+  });
+});
+
+describe('embedWindow', () => {
+  it('places a smaller window into the outer grid, NaN elsewhere', () => {
+    const outer = lotWindow({ minX: -1_978_400, minY: 473_500, maxX: -1_978_390, maxY: 473_510 }, 5, TILE);
+    const inner = lotWindow({ minX: -1_978_400, minY: 473_500, maxX: -1_978_390, maxY: 473_510 }, 1, TILE);
+    const data = new Float32Array(inner.width * inner.height).map((_, i) => i);
+    const out = embedWindow(outer, inner, data);
+    expect(out.length).toBe(outer.width * outer.height);
+    const dc = inner.col0 - outer.col0, dr = inner.row0 - outer.row0;
+    expect(dc).toBe(4);
+    expect(out[dr * outer.width + dc]).toBe(0);
+    expect(out[(dr + 1) * outer.width + dc + 2]).toBe(inner.width + 2);
+    expect(out[0]).toBeNaN();
+    expect(Array.from(out).filter((v) => !Number.isNaN(v)).length).toBe(data.length);
   });
 });
 

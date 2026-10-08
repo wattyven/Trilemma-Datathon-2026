@@ -142,7 +142,7 @@ export class LotScene {
     this.base = baseLevel(m.dsm);
     const { width, height } = m.window;
     const input = { width, height, dsm: m.dsm, dtm: m.dtm, affine: m.affine, base: this.base };
-    const colors: TerrainColors = { ground: rgb(SCENE.ground), raised: rgb(SCENE.raised), water: rgb(SCENE.water) };
+    const colors: TerrainColors = { ground: rgb(SCENE.ground), water: rgb(SCENE.water) };
 
     // Lot bounds in pixels, from the lot polygon.
     let c0 = Infinity, r0 = Infinity, c1 = -Infinity, r1 = -Infinity;

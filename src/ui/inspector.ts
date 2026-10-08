@@ -88,6 +88,8 @@ export interface InspectorData {
   strip: { time: number; sunlit: boolean }[];
   dateLabel: string;
   year: number;
+  /** Full-sun threshold for the reference line. */
+  fullSunH: number;
 }
 
 export function renderInspector(root: HTMLElement, d: InspectorData) {
@@ -100,7 +102,7 @@ export function renderInspector(root: HTMLElement, d: InspectorData) {
   meta.textContent = d.details.join(' · ');
 
   // Monthly bars.
-  const m = monthlyChartModel(d.monthlyHours);
+  const m = monthlyChartModel(d.monthlyHours, 320, 150, d.fullSunH);
   const title = document.createElement('p');
   title.className = 'chart-title';
   title.textContent = copy.inspector.monthlyTitle(d.year);
@@ -120,7 +122,8 @@ export function renderInspector(root: HTMLElement, d: InspectorData) {
     svg.append(g);
   }
   svg.append(el('line', { x1: m.plot.left, x2: m.plot.left + m.plot.width, y1: m.refY, y2: m.refY, class: 'ref' }));
-  svg.append(el('text', { x: m.plot.left + m.plot.width, y: m.refY - 4, class: 'ref-label', 'text-anchor': 'end' }, copy.inspector.fullSunLine));
+  // Label at the left, above the line: winter bars there are short, so it rarely sits on a bar.
+  svg.append(el('text', { x: m.plot.left + 4, y: m.refY - 4, class: 'ref-label' }, copy.inspector.fullSunLine(d.fullSunH)));
 
   // Day strip.
   const runs = stripRuns(d.strip);

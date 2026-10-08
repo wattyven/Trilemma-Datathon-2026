@@ -54,10 +54,20 @@ export const ELEVATION = {
   lotNodataMax: 0.5,
   /** Warn when more of the buffer than this has no data (water, gaps). */
   bufferNodataWarn: 0.005,
+  /** The DTM (ground) is only needed on and near the lot: read lot bbox + this, not the whole window. */
+  dtmMarginM: 44,
 } as const;
 
 /** A step of max(0.5 m, 0.02·d) is usual; 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
-export const HORIZON = { sectors: 180, minStepM: 0.25, stepFrac: 0.02, chunkCells: 200 } as const;
+export const HORIZON = {
+  sectors: 180,
+  minStepM: 0.25,
+  stepFrac: 0.02,
+  chunkCells: 200,
+  /** Above this many cells, split the precompute across helper threads (up to maxThreads). */
+  parallelAboveCells: 3000,
+  maxThreads: 4,
+} as const;
 
 export type ObserverId = 'bed' | 'seated' | 'surface';
 export const OBSERVERS: Record<ObserverId, { mode: 'ground' | 'surface'; heightM: number }> = {
@@ -74,5 +84,9 @@ export const SUN = {
   shadeStepMin: 15,
 } as const;
 
-/** Full sun ≥ fullSunH hours a day, part sun ≥ partSunH, otherwise shade. */
-export const CLASS_THRESHOLDS = { fullSunH: 6, partSunH: 3 } as const;
+export interface Thresholds {
+  fullSunH: number;
+  partSunH: number;
+}
+/** Defaults: full sun ≥ 6 h a day, part sun ≥ 3 h, otherwise shade. Adjustable in the UI. */
+export const CLASS_THRESHOLDS: Readonly<Thresholds> = { fullSunH: 6, partSunH: 3 };

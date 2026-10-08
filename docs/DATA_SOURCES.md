@@ -280,6 +280,12 @@ Sample: [`stac-mosaic-item.json`](samples/stac-mosaic-item.json).
   - switch to WCS, which crops to the window and so downloads about 4× less
   - parallelise the horizon precompute
 
+**Phase 4 changes, measured** (`spike/10-perf-bytes.ts` and the UI check):
+- **DTM read only for the lot + 44 m.** Across the 8 test lots this saved 24% of bytes (78.6 → 59.3 MiB), ranging from 0% to 41% depending on how the lot lines up with the 512 m tiles. It's 0% when even the small window touches the same tiles.
+- **Prefetch.** STAC and both COG headers now open while the lot is being looked up.
+- **Horizons on up to 4 helper threads** for lots over 3,000 cells: 115–647 ms instead of 297–2,060 ms (3–4× faster).
+- **What's left.** The DSM download for the 200 m buffer now dominates, at about 2–5 s on a home connection. The next lever would be reading the outer buffer from an overview level.
+
 **Coverage.** Centre pixel at each test point. Δ = DSM − DTM, where positive means a roof or canopy:
 
 | id | DSM | DTM | Δ | Notes |

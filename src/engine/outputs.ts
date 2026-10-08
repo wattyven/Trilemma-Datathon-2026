@@ -1,5 +1,5 @@
 // Every output, as table lookups against precomputed horizons.
-import { CLASS_THRESHOLDS } from '../config';
+import { CLASS_THRESHOLDS, type Thresholds } from '../config';
 import { sectorLookup, type SectorLookup } from './horizon';
 import type { SunSample } from './sun';
 
@@ -72,7 +72,7 @@ export const CLASS_SHADE = 0;
 export const CLASS_PART = 1;
 export const CLASS_FULL = 2;
 
-export function classify(hours: Float32Array, t: { fullSunH: number; partSunH: number } = CLASS_THRESHOLDS): Uint8Array {
+export function classify(hours: Float32Array, t: Thresholds = CLASS_THRESHOLDS): Uint8Array {
   const out = new Uint8Array(hours.length);
   for (let i = 0; i < hours.length; i++) {
     const v = hours[i]!;

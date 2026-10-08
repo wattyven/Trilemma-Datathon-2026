@@ -13,10 +13,9 @@ export const TOKENS = {
 /** Chart hue for single-series sun-hours bars: validated for band, chroma and ≥ 3:1 on white. */
 export const CHART_BAR = '#B7791F';
 
-/** Scene materials (not UI tokens): ground, raised surfaces (roofs, canopy) and water. */
+/** Scene materials (not UI tokens): land (a neutral clay-model tone) and water. */
 export const SCENE = {
-  ground: '#E6E0CF',
-  raised: '#B8C1AE',
+  ground: '#E2DCCB',
   water: '#B0CEDE',
   sky: '#EEF2F5',
   horizon: '#8A8270',

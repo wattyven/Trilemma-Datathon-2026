@@ -80,3 +80,21 @@ export function bboxOf(polygons: Ring[][]): Bbox {
   }
   return { minX, minY, maxX, maxY };
 }
+
+/**
+ * Copy a smaller window's raster into an outer window's grid (NaN elsewhere), so code that indexes
+ * the outer window keeps working. Used to read the DTM only around the lot.
+ */
+export function embedWindow(outer: PixelWindow, inner: PixelWindow, data: Float32Array): Float32Array {
+  const out = new Float32Array(outer.width * outer.height).fill(NaN);
+  const dc = inner.col0 - outer.col0, dr = inner.row0 - outer.row0;
+  for (let r = 0; r < inner.height; r++) {
+    const y = r + dr;
+    if (y < 0 || y >= outer.height) continue;
+    for (let c = 0; c < inner.width; c++) {
+      const x = c + dc;
+      if (x >= 0 && x < outer.width) out[y * outer.width + x] = data[r * inner.width + c]!;
+    }
+  }
+  return out;
+}

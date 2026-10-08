@@ -66,6 +66,11 @@ export class ShadeEngine {
     });
   }
 
+  /** Open the elevation files early (no reply); `load` reuses them. */
+  prefetch(dsmUrl: string, dtmUrl: string) {
+    this.worker.postMessage({ type: 'prefetch', id: 0, dsmUrl, dtmUrl } satisfies ToWorker);
+  }
+
   /** Fetch elevation and precompute horizons. Supersedes any load still in progress. */
   async load(request: LoadRequest, onProgress?: (p: Progress) => void, signal?: AbortSignal): Promise<LoadedMessage> {
     const id = ++this.seq;

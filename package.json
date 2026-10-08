@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:tz": "TZ=UTC vitest run && TZ=Asia/Tokyo vitest run"
+    "test:tz": "TZ=UTC vitest run && TZ=Asia/Tokyo vitest run",
+    "smoke": "playwright test"
   },
   "dependencies": {
     "geotiff": "^3.0.5",
@@ -24,6 +25,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/luxon": "^3.7.6",
     "@types/three": "^0.186.0",
     "typescript": "^7.0.2",

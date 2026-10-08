@@ -6,12 +6,15 @@ import { isAbortError } from './data/http';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
-import { defaultState, initControls } from './ui/controls';
-import { Timeline, initialTimeline } from './ui/timeline';
+import { initAbout } from './ui/about';
+import { defaultState, initControls, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
+import { initSheet } from './ui/sheet';
 import { showSteps, type StepId, type Steps } from './ui/status';
+import { Timeline, initialTimeline, minuteLabel } from './ui/timeline';
+import { decodeHash, encodeHash, type UrlState } from './urlState';
 
 const byId = <T extends HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -24,6 +27,7 @@ const input = byId<HTMLInputElement>('address-input');
 const listbox = byId<HTMLUListElement>('address-options');
 const statusList = byId<HTMLOListElement>('status');
 const message = byId<HTMLDivElement>('message');
+const intro = byId('intro');
 const lotEls: LotViewElements = {
   section: byId('lot'),
   heading: byId('lot-heading'),
@@ -48,15 +52,21 @@ const analysisEls: AnalysisElements = {
   shadowsToggle: byId<HTMLInputElement>('shadows-toggle'),
   compareToggle: byId<HTMLInputElement>('compare-toggle'),
   resetView: byId<HTMLButtonElement>('reset-view'),
+  caveatLidar: byId('caveat-lidar'),
+  aboutLidar: byId('about-lidar'),
 };
+
+const today = todayInVancouver();
+const defaults = defaultState(today, nowMinuteInVancouver());
 
 const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
   onHover: (cell) => analysis.hover(cell),
   onPick: (cell) => void analysis.pick(cell),
 });
-const controls = initControls(byId<HTMLFormElement>('sun-controls'), defaultState(todayInVancouver(), nowMinuteInVancouver()), (_s, kind) =>
-  void analysis.onControls(kind),
-);
+const controls = initControls(byId<HTMLFormElement>('sun-controls'), defaults, (_s, kind) => {
+  void analysis.onControls(kind);
+  writeUrl(false);
+});
 const timeline = new Timeline(
   {
     root: byId('timeline'),
@@ -65,20 +75,42 @@ const timeline = new Timeline(
     label: byId<HTMLOutputElement>('tl-time-label'),
     play: byId<HTMLButtonElement>('tl-play'),
   },
-  initialTimeline(todayInVancouver(), nowMinuteInVancouver()),
-  (t, dateChanged) => void analysis.onTimeline(t, dateChanged),
+  initialTimeline(today, nowMinuteInVancouver()),
+  (t, dateChanged) => {
+    void analysis.onTimeline(t, dateChanged);
+    writeUrl(false);
+  },
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
+analysis.onViewChange = () => writeUrl(false);
+initAbout(byId<HTMLDialogElement>('about'));
+initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
+interface LookupOptions {
+  /** Prefer this ParcelMap lot among the candidates (from a shared link or a retry). */
+  preferLot?: number | undefined;
+  /** Opened from a link or Back/Forward: don't push a new history entry. */
+  fromUrl?: boolean;
+}
 
 let current: AbortController | null = null;
+let shown: { match: GeocodeMatch; found: ParcelLookup; selected: number } | null = null;
+let lastLookup: { req: LookupInput; opts: LookupOptions } | null = null;
 
 const search = initSearch(form, input, listbox, {
   fetchSuggestions: suggest,
   onPick: (match) => void lookup({ kind: 'match', match }),
   onSubmitText: (text) => void lookup({ kind: 'text', text }),
 });
+
+for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-example]')) {
+  btn.addEventListener('click', () => {
+    const text = btn.dataset.example!;
+    search.setValue(text);
+    void lookup({ kind: 'text', text });
+  });
+}
 
 function showMessage(text: string, action?: { label: string; run: () => void }) {
   message.replaceChildren(document.createTextNode(text));
@@ -92,6 +124,17 @@ function showMessage(text: string, action?: { label: string; run: () => void }) 
   message.hidden = false;
 }
 
+/** A message with a "Try again" button that reruns the last lookup. */
+function showRetry(text: string) {
+  const last = lastLookup;
+  showMessage(text, last ? { label: copy.tryAgain, run: () => void lookup(last.req, { ...last.opts, preferLot: shown?.found.candidates[shown.selected]?.id ?? last.opts.preferLot }) } : undefined);
+}
+
+/** A function, not an inline check, so TypeScript doesn't narrow `onLine` for the rest of a function. */
+function isOffline(): boolean {
+  return navigator.onLine === false;
+}
+
 function clearMessage() {
   message.hidden = true;
   message.replaceChildren();
@@ -103,14 +146,21 @@ function newRun(): AbortSignal {
   return current.signal;
 }
 
-async function lookup(req: LookupInput) {
+async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   const signal = newRun();
+  lastLookup = { req, opts };
   clearMessage();
   hideLot(lotEls);
   lotCanvas.clear();
+  intro.hidden = true;
+  shown = null;
 
   if (req.kind === 'text' && !req.text) {
     showMessage(copy.emptyQuery);
+    return;
+  }
+  if (isOffline()) {
+    showRetry(copy.offline);
     return;
   }
 
@@ -154,6 +204,7 @@ async function lookup(req: LookupInput) {
 
     stage = 'lot';
     steps.set('lot', 'active');
+    analysis.prefetch(match.lonLat, signal);
     const found = await findParcels(match.lonLat, { signal });
     if (signal.aborted) return;
     const best = found.candidates[0];
@@ -166,12 +217,17 @@ async function lookup(req: LookupInput) {
       return showMessage(copy.outOfArea(match.fullAddress));
     }
     steps.set('lot', 'done');
-    await showLot(match, found, 0, steps, signal);
+    const preferred = opts.preferLot !== undefined ? found.candidates.findIndex((c) => c.id === opts.preferLot) : -1;
+    const selected = Math.max(0, preferred);
+    shown = { match, found, selected };
+    if (!opts.fromUrl) writeUrl(true);
+    await showLot(match, found, selected, steps, signal);
   } catch (e) {
     if (isAbortError(e)) return;
     console.error(e);
     steps.set(stage, 'error');
-    showMessage(e instanceof ParcelAxisError ? copy.lotGlitch : stage === 'address' ? copy.geocoderDown : copy.parcelDown);
+    if (e instanceof ParcelAxisError) showRetry(copy.lotGlitch);
+    else showRetry(isOffline() ? copy.offline : stage === 'address' ? copy.geocoderDown : copy.parcelDown);
   }
 }
 
@@ -179,6 +235,7 @@ async function lookup(req: LookupInput) {
 async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number, steps: Steps, signal: AbortSignal) {
   const parcel = found.candidates[selected];
   if (!parcel) return;
+  shown = { match, found, selected };
   renderLot(lotEls, {
     address: match.fullAddress,
     jurisdiction: displayJurisdiction(parcel, match),
@@ -189,6 +246,7 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
       const s = newRun();
       clearMessage();
       void showLot(match, found, i, showSteps(statusList, ['elevation', 'sunlight']), s);
+      writeUrl(false);
     },
   });
   lotCanvas.setOutline({ candidates: found.candidates.map((c) => c.geometry), selected, point: match.lonLat });
@@ -199,6 +257,126 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
     if (isAbortError(e)) return;
     console.error(e);
     steps.failActive();
-    showMessage(errorMessage(e));
+    showRetry(isOffline() ? copy.offline : errorMessage(e));
   }
 }
+
+// ── Shareable URL ──────────────────────────────────────────────────────
+
+function urlDefaults(): UrlState {
+  return {
+    mode: defaults.mode,
+    preset: defaults.preset,
+    year: defaults.year,
+    observer: defaults.observer,
+    view: '3d',
+    classes: false,
+    fullSunH: defaults.fullSunH,
+    partSunH: defaults.partSunH,
+    shadeStart: defaults.shadeStart,
+    shadeEnd: defaults.shadeEnd,
+    fromTime: defaults.fromTime,
+    toTime: defaults.toTime,
+  };
+}
+
+function urlStateNow(): UrlState | null {
+  if (!shown) return null;
+  const c = controls.get();
+  const t = timeline.get();
+  const lot = shown.found.candidates[shown.selected];
+  return {
+    address: shown.match.fullAddress,
+    lot: shown.selected > 0 ? lot?.id : undefined,
+    mode: c.mode,
+    preset: c.preset,
+    year: c.year,
+    start: c.preset === 'custom' ? c.start : undefined,
+    end: c.preset === 'custom' ? c.end : undefined,
+    date: t.date,
+    time: minuteLabel(t.minute),
+    observer: c.observer,
+    view: analysis.currentView,
+    classes: c.classes,
+    fullSunH: c.fullSunH,
+    partSunH: c.partSunH,
+    shadeStart: c.shadeStart,
+    shadeEnd: c.shadeEnd,
+    fromTime: c.fromTime,
+    toTime: c.toTime,
+  };
+}
+
+let restoring = false;
+let pendingReplace: ReturnType<typeof setTimeout> | undefined;
+
+/** Push for a new lot (Back returns to the previous one); replace, throttled, for everything else. */
+function writeUrl(push: boolean) {
+  if (restoring) return;
+  const apply = () => {
+    const s = urlStateNow();
+    if (!s) return;
+    const hash = encodeHash(s, urlDefaults());
+    if (hash === location.hash) return;
+    if (push) history.pushState(null, '', hash);
+    else history.replaceState(null, '', hash);
+  };
+  clearTimeout(pendingReplace);
+  if (push) apply();
+  else pendingReplace = setTimeout(apply, 300); // browsers rate-limit replaceState; the slider fires often
+}
+
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h! * 60 + m!;
+};
+
+/** Restore a shared link (or a Back/Forward step). Returns false when the hash names no address. */
+async function applyUrl(hash: string): Promise<boolean> {
+  const s = decodeHash(hash);
+  if (!s.address) return false;
+  restoring = true;
+  try {
+    const patch: Partial<ControlState> = {};
+    for (const k of ['mode', 'preset', 'year', 'start', 'end', 'observer', 'classes', 'fullSunH', 'partSunH', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime'] as const) {
+      if (s[k] !== undefined) (patch as Record<string, unknown>)[k] = s[k];
+    }
+    controls.set(patch);
+    timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
+    if (s.view) analysis.setView(s.view);
+    const sameLot = shown && shown.match.fullAddress === s.address;
+    if (sameLot && shown) {
+      const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;
+      if (idx >= 0 && idx !== shown.selected) await showLot(shown.match, shown.found, idx, showSteps(statusList, ['elevation', 'sunlight']), newRun());
+      else {
+        await analysis.onControls('observer'); // reapply observer, mode, dates
+        await analysis.onTimeline(timeline.get(), true);
+      }
+    } else {
+      search.setValue(s.address);
+      await lookup({ kind: 'text', text: s.address }, { preferLot: s.lot, fromUrl: true });
+    }
+  } finally {
+    restoring = false;
+  }
+  return true;
+}
+
+window.addEventListener('popstate', () => void applyUrl(location.hash));
+
+// ── Copy link ────────────────────────────────────────────────────────────────────
+
+const shareStatus = byId('share-status');
+byId<HTMLButtonElement>('share').addEventListener('click', async () => {
+  clearTimeout(pendingReplace);
+  const s = urlStateNow();
+  if (s) history.replaceState(null, '', encodeHash(s, urlDefaults()));
+  try {
+    await navigator.clipboard.writeText(location.href);
+    shareStatus.textContent = copy.share.copied;
+  } catch {
+    shareStatus.textContent = copy.share.manual(location.href);
+  }
+});
+
+void applyUrl(location.hash);

@@ -49,6 +49,8 @@ export class Timeline {
   private location: [number, number] | null = null; // lon, lat
   private timer: ReturnType<typeof setInterval> | null = null;
   private reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  /** True once the time came from the user or a shared link (then we never move it for them). */
+  private explicitTime = false;
 
   constructor(private els: TimelineElements, initial: TimelineState, private onChange: (s: TimelineState, dateChanged: boolean) => void) {
     this.state = { ...initial };
@@ -59,6 +61,7 @@ export class Timeline {
       this.emit(true);
     });
     els.slider.addEventListener('input', () => {
+      this.explicitTime = true;
       this.state.minute = Number(els.slider.value);
       this.writeLabel();
       this.emit(false);
@@ -71,6 +74,16 @@ export class Timeline {
     return { ...this.state };
   }
 
+  /** Restore a saved date and/or time (from a shared link) without emitting a change. */
+  set(date?: string, minute?: number) {
+    if (date && parseIsoDate(date)) this.state.date = date;
+    if (minute !== undefined && Number.isFinite(minute)) {
+      this.state.minute = minute;
+      this.explicitTime = true;
+    }
+    this.syncRange();
+  }
+
   localDate(): LocalDate {
     return parseIsoDate(this.state.date)!;
   }
@@ -78,6 +91,11 @@ export class Timeline {
   /** Call when a lot loads: the slider range depends on where the sun rises and sets. */
   setLocation(lonLat: [number, number]) {
     this.location = lonLat;
+    // Opening the app at night would show a dark lot: start at midday unless a time was chosen.
+    const r = this.range();
+    if (!this.explicitTime && (this.state.minute < r.min || this.state.minute > r.max)) {
+      this.state.minute = Math.round((r.min + r.max) / 2 / SLIDER_STEP_MIN) * SLIDER_STEP_MIN;
+    }
     this.syncRange();
     this.els.root.hidden = false;
     this.emit(true);

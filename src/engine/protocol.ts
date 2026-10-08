@@ -34,7 +34,7 @@ export interface LoadedSummary {
   step: number;
   gammaDeg: number;
   bufferNodataFrac: number;
-  timings: { elevationMs: number; horizonMs: number };
+  timings: { elevationMs: number; horizonMs: number; threads: number };
 }
 
 export interface LoadedMessage {
@@ -45,7 +45,7 @@ export interface LoadedMessage {
   py: Float32Array;
   z0: Float32Array;
   covered: Uint8Array;
-  /** The DSM and DTM windows (NaN = nodata), for the map background and the 3D terrain. */
+  /** The DSM window, and the DTM around the lot (NaN elsewhere and at nodata). */
   dsm: Float32Array;
   dtm: Float32Array;
 }
@@ -60,6 +60,7 @@ export type ComputeResult =
 export type ErrorCode = 'no-lidar' | 'no-cells' | 'tile-edge' | 'fetch' | 'cancelled' | 'not-loaded' | 'internal';
 
 export type ToWorker =
+  | { type: 'prefetch'; id: number; dsmUrl: string; dtmUrl: string }
   | { type: 'load'; id: number; request: LoadRequest }
   | { type: 'compute'; id: number; request: ComputeRequest };
 

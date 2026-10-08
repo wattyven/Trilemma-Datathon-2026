@@ -1,6 +1,6 @@
 // Sun controls: mode, dates and times (always Vancouver local), observer height, display.
 // Dates stay as YYYY-MM-DD strings and minutes-of-day; nothing here builds a JS Date.
-import type { ObserverId } from '../config';
+import { CLASS_THRESHOLDS, type ObserverId, type Thresholds } from '../config';
 import type { ComputeRequest } from '../engine/protocol';
 import { PRESETS, isoDate, parseIsoDate, type LocalDate, type PresetId } from '../engine/sun';
 
@@ -20,6 +20,8 @@ export interface ControlState {
   toTime: string;
   observer: ObserverId;
   classes: boolean;
+  fullSunH: number;
+  partSunH: number;
 }
 
 export type ChangeKind = 'observer' | 'request' | 'display';
@@ -42,7 +44,18 @@ export function defaultState(today: LocalDate, nowMinute: number): ControlState 
     toTime: '18:00',
     observer: 'bed',
     classes: false,
+    fullSunH: CLASS_THRESHOLDS.fullSunH,
+    partSunH: CLASS_THRESHOLDS.partSunH,
   };
+}
+
+/** Clean thresholds: 0–16 h in half hours, part sun strictly below full sun. */
+export function sanitizeThresholds(full: number, part: number): Thresholds {
+  const clean = (v: number, fallback: number) => (Number.isFinite(v) ? Math.min(16, Math.max(0, Math.round(v * 2) / 2)) : fallback);
+  const fullSunH = Math.max(0.5, clean(full, CLASS_THRESHOLDS.fullSunH));
+  let partSunH = clean(part, CLASS_THRESHOLDS.partSunH);
+  if (partSunH >= fullSunH) partSunH = fullSunH - 0.5;
+  return { fullSunH, partSunH };
 }
 
 const minutes = (hhmm: string) => {
@@ -79,6 +92,8 @@ export function requestFor(s: ControlState): ComputeRequest {
 
 export interface Controls {
   get(): ControlState;
+  /** Apply saved state (e.g. from a shared link) without firing change events. */
+  set(next: Partial<ControlState>): void;
   show(): void;
 }
 
@@ -94,7 +109,7 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
       if (el.type === 'checkbox') el.checked = Boolean(state[name]);
       else el.value = String(state[name]);
     };
-    (['preset', 'year', 'start', 'end', 'date', 'time', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime', 'observer', 'classes'] as const).forEach(set);
+    (['preset', 'year', 'start', 'end', 'date', 'time', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime', 'observer', 'classes', 'fullSunH', 'partSunH'] as const).forEach(set);
     syncVisibility();
   }
 
@@ -102,7 +117,8 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
     for (const el of form.querySelectorAll<HTMLElement>('[data-for]')) {
       const modes = el.dataset.for!.split(' ');
       const visible = modes.includes(state.mode) || (modes.includes('custom') && state.mode === 'season' && state.preset === 'custom');
-      el.hidden = !visible;
+      const needsClasses = el.dataset.when === 'classes';
+      el.hidden = !visible || (needsClasses && !state.classes);
     }
   }
 
@@ -123,6 +139,7 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
       toTime: v('toTime'),
       observer: v('observer') as ObserverId,
       classes: field<HTMLInputElement>('classes')?.checked ?? false,
+      ...sanitizeThresholds(Number(v('fullSunH')), Number(v('partSunH'))),
     };
   }
 
@@ -132,13 +149,18 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
     state = read();
     syncVisibility();
     const name = (ev.target as HTMLInputElement).name;
-    const kind: ChangeKind = name === 'observer' ? 'observer' : name === 'classes' ? 'display' : 'request';
+    const kind: ChangeKind = name === 'observer' ? 'observer' : ['classes', 'fullSunH', 'partSunH'].includes(name) ? 'display' : 'request';
+    if (name === 'fullSunH' || name === 'partSunH') write(); // show the cleaned values
     if (JSON.stringify(prev) !== JSON.stringify(state)) onChange(state, kind);
   });
 
   write();
   return {
     get: () => state,
+    set: (next) => {
+      state = { ...state, ...next, ...sanitizeThresholds(next.fullSunH ?? state.fullSunH, next.partSunH ?? state.partSunH) };
+      write();
+    },
     show: () => {
       form.hidden = false;
     },

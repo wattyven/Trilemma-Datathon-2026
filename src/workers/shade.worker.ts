@@ -1,9 +1,10 @@
 // Elevation fetch, horizon precompute and every output, off the main thread.
 import { ELEVATION, HORIZON, SUN } from '../config';
 import { openImage, readWindow, tileGrid } from '../elevation/cog';
-import { bboxOf, lotWindow, ringsToPixel, TileEdgeError, type PixelWindow } from '../elevation/window';
+import { bboxOf, embedWindow, lotWindow, ringsToPixel, TileEdgeError, type PixelWindow } from '../elevation/window';
 import { maxValue, NoLidarError, nodataFraction, selectCells, withObserver, type CellSet, type Observer, type Raster } from '../engine/grid';
-import { computeHorizons, type HorizonParams } from '../engine/horizon';
+import { computeHorizons, splitRanges, type HorizonParams } from '../engine/horizon';
+import type { HorizonJob, HorizonReply } from './horizon.worker';
 import { inspectCell, momentMask, prepareSamples, seasonAverage, shadeFinder, sunHours, type Horizons } from '../engine/outputs';
 import type { ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadRequest, ToWorker } from '../engine/protocol';
 import { dateRange, daySamples, momentSample, type LocalDate } from '../engine/sun';
@@ -42,6 +43,7 @@ const yieldToEvents = () => new Promise<void>((r) => setTimeout(r, 0));
 
 async function load(id: number, req: LoadRequest) {
   latestLoad = id;
+  cancelPool(); // a newer lot stops the helpers working on the old one
   const t0 = performance.now();
   const key = `${req.dsmUrl}|${req.dtmUrl}|${JSON.stringify(req.lot3979)}|${req.bufferM}|${req.cellCap}`;
   let rasters: Pick<State, 'window' | 'dsm' | 'dtm' | 'cells'>;
@@ -54,11 +56,14 @@ async function load(id: number, req: LoadRequest) {
     const tile = tileGrid(dsmImg);
     const dtmTile = tileGrid(dtmImg);
     if (JSON.stringify(tile) !== JSON.stringify(dtmTile)) throw new Error('DSM and DTM grids differ'); // gotcha #6
-    const window = lotWindow(bboxOf(req.lot3979), req.bufferM, tile);
-    const [dsmData, dtmData] = await Promise.all([readWindow(dsmImg, window), readWindow(dtmImg, window)]);
+    const bbox = bboxOf(req.lot3979);
+    const window = lotWindow(bbox, req.bufferM, tile);
+    // Ground heights matter only on and near the lot, so read far fewer DTM tiles than DSM tiles.
+    const dtmWindow = lotWindow(bbox, Math.min(ELEVATION.dtmMarginM, req.bufferM), tile);
+    const [dsmData, dtmNear] = await Promise.all([readWindow(dsmImg, window), readWindow(dtmImg, dtmWindow)]);
     if (id !== latestLoad) throw new Cancelled();
     const dsm: Raster = { width: window.width, height: window.height, data: dsmData };
-    const dtm: Raster = { width: window.width, height: window.height, data: dtmData };
+    const dtm: Raster = { width: window.width, height: window.height, data: embedWindow(window, dtmWindow, dtmNear) };
     const cells = selectCells(dsm, dtm, ringsToPixel(window, req.lot3979), {
       cap: req.cellCap,
       observer: req.observer,
@@ -71,16 +76,9 @@ async function load(id: number, req: LoadRequest) {
   const t1 = performance.now();
 
   const { cells, dsm } = rasters;
-  const data = new Float32Array(cells.count * params.sectors);
   const zmax = maxValue(dsm);
-  const input = { dsm, px: cells.px, py: cells.py, z0: cells.z0, count: cells.count };
-  for (let start = 0; start < cells.count; start += HORIZON.chunkCells) {
-    const end = Math.min(cells.count, start + HORIZON.chunkCells);
-    computeHorizons(input, params, data, start, end, zmax);
-    post({ type: 'progress', id, stage: 'horizon', done: end, total: cells.count });
-    await yieldToEvents();
-    if (id !== latestLoad) throw new Cancelled();
-  }
+  const threads = threadCount(cells.count);
+  const data = threads > 1 ? await parallelHorizons(id, dsm, cells, zmax, threads) : await serialHorizons(id, dsm, cells, zmax);
   const t2 = performance.now();
 
   state = {
@@ -104,7 +102,7 @@ async function load(id: number, req: LoadRequest) {
       step: cells.step,
       gammaDeg: req.gammaDeg,
       bufferNodataFrac: nodataFraction(dsm),
-      timings: { elevationMs: Math.round(t1 - t0), horizonMs: Math.round(t2 - t1) },
+      timings: { elevationMs: Math.round(t1 - t0), horizonMs: Math.round(t2 - t1), threads },
     },
     px: copy(cells.px),
     py: copy(cells.py),
@@ -114,6 +112,84 @@ async function load(id: number, req: LoadRequest) {
     dtm: copy(rasters.dtm.data),
   };
   post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer]);
+}
+
+async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number): Promise<Float32Array> {
+  const data = new Float32Array(cells.count * params.sectors);
+  const input = { dsm, px: cells.px, py: cells.py, z0: cells.z0, count: cells.count };
+  for (let start = 0; start < cells.count; start += HORIZON.chunkCells) {
+    const end = Math.min(cells.count, start + HORIZON.chunkCells);
+    computeHorizons(input, params, data, start, end, zmax);
+    post({ type: 'progress', id, stage: 'horizon', done: end, total: cells.count });
+    await yieldToEvents();
+    if (id !== latestLoad) throw new Cancelled();
+  }
+  return data;
+}
+
+/** Helper threads for big lots; null where nested workers aren't supported. */
+function threadCount(cells: number): number {
+  if (cells <= HORIZON.parallelAboveCells || typeof Worker === 'undefined') return 1;
+  const cores = (self as unknown as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency ?? 2;
+  return Math.max(1, Math.min(HORIZON.maxThreads, cores - 1));
+}
+
+let activePool: { workers: Worker[]; cancel: () => void } | null = null;
+
+function cancelPool() {
+  activePool?.cancel();
+  activePool = null;
+}
+
+async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, threads: number): Promise<Float32Array> {
+  const ranges = splitRanges(cells.count, threads);
+  const done = new Array<number>(ranges.length).fill(0);
+  const out = new Float32Array(cells.count * params.sectors);
+  let workers: Worker[];
+  try {
+    workers = ranges.map(() => new Worker(new URL('./horizon.worker.ts', import.meta.url), { type: 'module' }));
+  } catch {
+    return serialHorizons(id, dsm, cells, zmax); // no nested workers here
+  }
+  return new Promise<Float32Array>((resolve, reject) => {
+    let remaining = ranges.length;
+    const stop = () => workers.forEach((w) => w.terminate());
+    activePool = { workers, cancel: () => (stop(), reject(new Cancelled())) };
+    ranges.forEach(([a, b], k) => {
+      const w = workers[k]!;
+      w.onmessage = (ev: MessageEvent<HorizonReply>) => {
+        const msg = ev.data;
+        if (msg.type === 'progress') {
+          done[k] = msg.done;
+          post({ type: 'progress', id, stage: 'horizon', done: done.reduce((x, y) => x + y, 0), total: cells.count });
+          return;
+        }
+        out.set(msg.horizons, a * params.sectors);
+        w.terminate();
+        if (--remaining === 0) {
+          activePool = null;
+          resolve(out);
+        }
+      };
+      w.onerror = (e) => {
+        stop();
+        activePool = null;
+        reject(new Error(e.message || 'Horizon helper failed'));
+      };
+      const job: HorizonJob = {
+        dsm: dsm.data.slice(),
+        width: dsm.width,
+        height: dsm.height,
+        px: cells.px.slice(a, b),
+        py: cells.py.slice(a, b),
+        z0: cells.z0.slice(a, b),
+        params,
+        zmax,
+        chunk: HORIZON.chunkCells,
+      };
+      w.postMessage(job, [job.dsm.buffer, job.px.buffer, job.py.buffer, job.z0.buffer]);
+    });
+  });
 }
 
 function compute(req: ComputeRequest): ComputeResult {
@@ -168,7 +244,10 @@ function errorCode(e: unknown): ErrorCode {
 scope.onmessage = async (ev: MessageEvent<ToWorker>) => {
   const msg = ev.data;
   try {
-    if (msg.type === 'load') {
+    if (msg.type === 'prefetch') {
+      // Warm the COG headers while the lot is still being looked up; failures surface later in load.
+      await Promise.allSettled([openImage(msg.dsmUrl), openImage(msg.dtmUrl)]);
+    } else if (msg.type === 'load') {
       await load(msg.id, msg.request);
     } else {
       const t0 = performance.now();
