@@ -62,6 +62,40 @@ export function fillHoles(g: PointGrid, region: Region, passes = 2): number {
   return filled;
 }
 
+/**
+ * Replace spikes with the median of their neighbours: a cell at least `riseM` above three-quarters
+ * of its neighbours with data (6 of 8 inside the grid, at least 4). Removes wires, poles and
+ * birds; keeps roof edges and chimneys (a 2 × 2 chimney cell has only 5 of 8 lower neighbours).
+ * Reads a snapshot, so spikes don't cascade.
+ */
+export function removeSpikes(z: Float32Array, width: number, height: number, region: Region, riseM: number): number {
+  const src = z.slice();
+  const nb: number[] = [];
+  let removed = 0;
+  for (let r = Math.max(0, region.r0); r < Math.min(height, region.r1); r++) {
+    for (let c = Math.max(0, region.c0); c < Math.min(width, region.c1); c++) {
+      const v = src[r * width + c]!;
+      if (v !== v) continue;
+      nb.length = 0;
+      let lower = 0;
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          const rr = r + dr, cc = c + dc;
+          if ((dr === 0 && dc === 0) || rr < 0 || cc < 0 || rr >= height || cc >= width) continue;
+          const n = src[rr * width + cc]!;
+          if (n !== n) continue;
+          nb.push(n);
+          if (v - n > riseM) lower++;
+        }
+      if (lower >= Math.max(4, Math.ceil(0.75 * nb.length))) {
+        z[r * width + c] = median(nb)!;
+        removed++;
+      }
+    }
+  }
+  return removed;
+}
+
 /** Median of a sample (NaNs ignored); null when empty. */
 export function median(values: number[]): number | null {
   const v = values.filter((x) => x === x).sort((a, b) => a - b);

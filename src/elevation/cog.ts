@@ -45,7 +45,7 @@ export function openImage(url: string, opts: { blockSize?: number } = {}): Promi
   let p = images.get(url);
   if (!p) {
     // geotiff's types omit the block-cache options that fromUrl passes through to its source.
-    const options = (opts.blockSize ? { blockSize: opts.blockSize, cacheSize: 64 } : {}) as Parameters<typeof fromCustomClient>[1];
+    const options = (opts.blockSize ? { blockSize: opts.blockSize, cacheSize: 128 } : {}) as Parameters<typeof fromCustomClient>[1];
     p = fromCustomClient(new CheckedFetchClient(url), options).then((tiff) => tiff.getImage());
     p.catch(() => images.delete(url));
     images.set(url, p);

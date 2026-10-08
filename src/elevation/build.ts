@@ -6,9 +6,10 @@ import { bilinear, type Raster } from '../engine/grid';
 import type { CopcSpec, ElevationSpec, HrdemSpec, LidarbcSpec, SourceInfo } from '../engine/protocol';
 import type { Position, Ring } from '../geo/polygon';
 import { fromCrs, toCrs, type GridCrs } from '../geo/proj';
+import { LruCache, memo } from './cache';
 import { openImage, readWindow, tileGrid } from './cog';
-import { rasterizeCopc } from './copc';
-import { fillHoles, median } from './pointRaster';
+import { rasterizeCopc, type CopcStats } from './copc';
+import { fillHoles, median, removeSpikes } from './pointRaster';
 import { regionOfBox, resampleInto } from './resample';
 import { alignedWindow, bboxOf, embedWindow, fromPixel, lotWindow, toPixel, type Bbox, type PixelWindow } from './window';
 
@@ -59,25 +60,40 @@ function windowBoxIn(w: PixelWindow, crs: GridCrs): Bbox {
 }
 
 /**
+ * The UTM 10N analysis window for a lot at `res` metres. Edges sit on whole metres whatever the
+ * pixel size, so the 0.5 m and 1 m windows of a lot cover the same ground, cell for 2 × 2 cells.
+ */
+export function utmWindow(lotLonLat: Ring[][], bufferM: number, res: number) {
+  const lot = projectRings(lotLonLat, 'EPSG:3157');
+  const bbox = bboxOf(lot);
+  return { lot, bbox, window: alignedWindow(bbox, bufferM, res, 'EPSG:3157', 1) };
+}
+
+// Downloaded pieces, kept per lot so switching surfaces doesn't fetch again (see cache.ts).
+type UtmBase = ReturnType<typeof utmWindow> & { dsm: Float32Array; dtm: Float32Array };
+const baseCache = new LruCache<UtmBase>(4);
+const copyBase = (b: UtmBase): UtmBase => ({ ...b, dsm: b.dsm.slice(), dtm: b.dtm.slice() });
+
+/**
  * HRDEM resampled into a UTM 10N grid at `res` metres: the base that sharper sources are laid
  * over. Reads enough of the 3979 tile to cover the rotated UTM window, plus a pixel for bilinear.
  */
-async function hrdemOnUtm(spec: HrdemSpec, lotLonLat: Ring[][], bufferM: number, res: number, isCurrent: () => boolean) {
-  const { dsmImg, dtmImg, tile } = await openHrdem(spec);
-  const lot = projectRings(lotLonLat, 'EPSG:3157');
-  const bbox = bboxOf(lot);
-  const window = alignedWindow(bbox, bufferM, res, 'EPSG:3157');
-  const srcWindow = lotWindow(windowBoxIn(window, tile.crs), 2, tile);
-  const dtmWindow = lotWindow(bboxOf(projectRings(lotLonLat, tile.crs)), Math.min(ELEVATION.dtmMarginM, bufferM) + 2, tile);
-  const [dsmSrc, dtmSrc] = await Promise.all([readWindow(dsmImg, srcWindow), readWindow(dtmImg, dtmWindow)]);
-  if (!isCurrent()) throw new CancelledBuild();
-  return {
-    window,
-    lot,
-    bbox,
-    dsm: resampleInto(window, srcWindow, dsmSrc),
-    dtm: resampleInto(window, dtmWindow, dtmSrc),
-  };
+function hrdemOnUtm(spec: HrdemSpec, lotLonLat: Ring[][], bufferM: number, res: number, isCurrent: () => boolean): Promise<UtmBase> {
+  return memo(
+    baseCache,
+    JSON.stringify([spec, lotLonLat, bufferM, res]),
+    async () => {
+      const { dsmImg, dtmImg, tile } = await openHrdem(spec);
+      const w = utmWindow(lotLonLat, bufferM, res);
+      const srcWindow = lotWindow(windowBoxIn(w.window, tile.crs), 2, tile);
+      const dtmWindow = lotWindow(bboxOf(projectRings(lotLonLat, tile.crs)), Math.min(ELEVATION.dtmMarginM, bufferM) + 2, tile);
+      const [dsmSrc, dtmSrc] = await Promise.all([readWindow(dsmImg, srcWindow), readWindow(dtmImg, dtmWindow)]);
+      if (!isCurrent()) throw new CancelledBuild();
+      return { ...w, dsm: resampleInto(w.window, srcWindow, dsmSrc), dtm: resampleInto(w.window, dtmWindow, dtmSrc) };
+    },
+    copyBase,
+    isCurrent,
+  );
 }
 
 /** What a sharper surface patch changed, for the debug panel. */
@@ -161,20 +177,47 @@ export function refineMargin(lot: Bbox): number {
   return Math.max(HIRES.copcMinRefineM, Math.min(HIRES.copcRefineM, Number.isFinite(fit) ? Math.floor(fit) : 0));
 }
 
+/** A lot's point-cloud surface: highest return per cell in `region`, spikes removed, small holes filled (datum not yet corrected). */
+interface CopcPart {
+  box: Bbox;
+  region: Region;
+  zmax: Float32Array;
+  ground: [number, number, number][];
+  stats: CopcStats;
+}
+const copcCache = new LruCache<CopcPart>(4);
+
+function copcPart(spec: CopcSpec, window: PixelWindow, lotBox: Bbox, isCurrent: () => boolean): Promise<CopcPart> {
+  const box = grow(lotBox, refineMargin(lotBox));
+  return memo(
+    copcCache,
+    JSON.stringify([spec.urls, window, box]),
+    async () => {
+      const region = regionOfBox(window, box);
+      const { grid, ground, stats } = await rasterizeCopc(spec.urls, window, box, region, { maxPoints: HIRES.copcMaxPoints, targetDensity: HIRES.copcTargetDensity }, isCurrent);
+      if (!isCurrent()) throw new CancelledBuild();
+      removeSpikes(grid.zmax, window.width, window.height, region, HIRES.spikeRiseM);
+      fillHoles(grid, region, 2);
+      return { box, region, zmax: grid.zmax, ground, stats };
+    },
+    (p) => ({ ...p, zmax: p.zmax.slice() }),
+    isCurrent,
+  );
+}
+
+const copcDetail = (stats: CopcStats) =>
+  `${(stats.points / 1e6).toFixed(1)} M points in ${stats.nodes} nodes${stats.failed ? ` (${stats.failed} skipped)` : ''}, ${(stats.bytes / 1e6).toFixed(1)} MB`;
+
 /**
  * NRCan point cloud: highest return per 0.5 m cell for the lot + `HIRES.copcRefineM`, on top of
  * HRDEM resampled to the same UTM grid. The ground model stays HRDEM's.
  */
 export async function buildCopc(hrdem: HrdemSpec, spec: CopcSpec, lotLonLat: Ring[][], bufferM: number, isCurrent: () => boolean): Promise<Omit<BuiltRasters, 'source'> & { detail: string }> {
-  const base = await hrdemOnUtm(hrdem, lotLonLat, bufferM, HIRES.copcResM, isCurrent);
-  const { window } = base;
-  const box = grow(base.bbox, refineMargin(base.bbox));
-  const region = regionOfBox(window, box);
-  const { grid, ground, stats } = await rasterizeCopc(spec.urls, window, box, region, { maxPoints: HIRES.copcMaxPoints, targetDensity: HIRES.copcTargetDensity }, isCurrent);
+  const { window, bbox } = utmWindow(lotLonLat, bufferM, HIRES.copcResM);
+  const [base, part] = await Promise.all([hrdemOnUtm(hrdem, lotLonLat, bufferM, HIRES.copcResM, isCurrent), copcPart(spec, window, bbox, isCurrent)]);
   if (!isCurrent()) throw new CancelledBuild();
-  fillHoles(grid, region, 2);
-  const patch = patchSurface(window, base, grid.zmax, region, ground);
-  const detail = `${(stats.points / 1e6).toFixed(1)} M points in ${stats.nodes} nodes${stats.failed ? ` (${stats.failed} skipped)` : ''}, ${(stats.bytes / 1e6).toFixed(1)} MB, datum ${fmtOffset(patch.datumOffsetM)} (${patch.datumFrom})`;
+  const patch = patchSurface(window, base, part.zmax, part.region, part.ground);
+  const detail = `${copcDetail(part.stats)}, datum ${fmtOffset(patch.datumOffsetM)} (${patch.datumFrom})`;
   return {
     window,
     lot: base.lot,
@@ -206,30 +249,56 @@ async function pasteLidarbcTile(url: string, window: PixelWindow, box: Bbox, out
   return true;
 }
 
+/** A lot's LidarBC mosaic on its 1 m UTM window: DSM for the whole window (spikes removed), DEM near the lot. */
+interface LidarbcPart {
+  dsm: Float32Array;
+  dem: Float32Array;
+  nearLot: Bbox;
+}
+const lidarbcCache = new LruCache<LidarbcPart>(4);
+
+function lidarbcPart(spec: LidarbcSpec, window: PixelWindow, nearLot: Bbox, isCurrent: () => boolean): Promise<LidarbcPart> {
+  return memo(
+    lidarbcCache,
+    JSON.stringify([spec, window, nearLot]),
+    async () => {
+      const n = window.width * window.height;
+      const dsm = new Float32Array(n).fill(NaN), dem = new Float32Array(n).fill(NaN);
+      const all: Bbox = { minX: window.x0, maxX: window.x0 + window.width * window.res, minY: window.y0 - window.height * window.res, maxY: window.y0 };
+      await Promise.all([...spec.dsm.map((u) => pasteLidarbcTile(u, window, all, dsm)), ...spec.dem.map((u) => pasteLidarbcTile(u, window, nearLot, dem))]);
+      if (!isCurrent()) throw new CancelledBuild();
+      removeSpikes(dsm, window.width, window.height, { c0: 0, r0: 0, c1: window.width, r1: window.height }, HIRES.spikeRiseM);
+      return { dsm, dem, nearLot };
+    },
+    (p) => ({ ...p, dsm: p.dsm.slice(), dem: p.dem.slice() }),
+    isCurrent,
+  );
+}
+
+/** Ground samples for the datum check: a DEM's valid cells near the lot, every third one. */
+function demGround(window: PixelWindow, dem: Float32Array, near: Bbox): [number, number, number][] {
+  const ground: [number, number, number][] = [];
+  const g = regionOfBox(window, near);
+  for (let r = g.r0; r < g.r1; r += 3)
+    for (let c = g.c0; c < g.c1; c += 3) {
+      const z = dem[r * window.width + c]!;
+      if (z === z) ground.push([...fromPixel(window, [c + 0.5, r + 0.5]), z]);
+    }
+  return ground;
+}
+
 /**
  * LidarBC 1 m DSM (and DEM near the lot) from a newer survey, on top of HRDEM resampled to the
  * same UTM grid (it fills any gap between survey tiles). Datum-checked against HRDEM ground.
  */
 export async function buildLidarbc(hrdem: HrdemSpec, spec: LidarbcSpec, lotLonLat: Ring[][], bufferM: number, isCurrent: () => boolean): Promise<Omit<BuiltRasters, 'source'> & { detail: string }> {
-  const base = await hrdemOnUtm(hrdem, lotLonLat, bufferM, 1, isCurrent);
-  const { window } = base;
-  const n = window.width * window.height;
-  const dsm = new Float32Array(n).fill(NaN), dem = new Float32Array(n).fill(NaN);
-  const all: Bbox = { minX: window.x0, maxX: window.x0 + window.width * window.res, minY: window.y0 - window.height * window.res, maxY: window.y0 };
-  const nearLot = grow(base.bbox, Math.min(ELEVATION.dtmMarginM, bufferM));
-  await Promise.all([...spec.dsm.map((u) => pasteLidarbcTile(u, window, all, dsm)), ...spec.dem.map((u) => pasteLidarbcTile(u, window, nearLot, dem))]);
+  const { window, bbox } = utmWindow(lotLonLat, bufferM, 1);
+  const nearLot = grow(bbox, Math.min(ELEVATION.dtmMarginM, bufferM));
+  const [base, { dsm, dem }] = await Promise.all([hrdemOnUtm(hrdem, lotLonLat, bufferM, 1, isCurrent), lidarbcPart(spec, window, nearLot, isCurrent)]);
   if (!isCurrent()) throw new CancelledBuild();
-
-  // Ground samples: the newer DEM against HRDEM's, every third cell near the lot.
-  const ground: [number, number, number][] = [];
-  const dtmRegion = regionOfBox(window, nearLot);
-  for (let r = dtmRegion.r0; r < dtmRegion.r1; r += 3)
-    for (let c = dtmRegion.c0; c < dtmRegion.c1; c += 3) {
-      const z = dem[r * window.width + c]!;
-      if (z === z) ground.push([...fromPixel(window, [c + 0.5, r + 0.5]), z]);
-    }
-  const lotRegion = regionOfBox(window, grow(base.bbox, HIRES.copcRefineM));
-  const d = datumOffset(window, base, dsm, lotRegion, ground);
+  const n = window.width * window.height;
+  const lotRegion = regionOfBox(window, grow(bbox, HIRES.copcRefineM));
+  const d = datumOffset(window, base, dsm, lotRegion, demGround(window, dem, nearLot));
   checkCoverage(window, dsm, lotRegion);
   const full = { c0: 0, r0: 0, c1: window.width, r1: window.height };
   const filled = applyPatch(window.width, base.dsm, dsm, d.datumOffsetM, full);

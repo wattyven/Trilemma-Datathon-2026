@@ -94,3 +94,27 @@ describe('how much of the point cloud to read', () => {
     expect(refineMargin(box(300, 300))).toBe(20); // never below the minimum
   });
 });
+
+describe('spike removal', () => {
+  const W2 = 12, ALL2 = { c0: 0, r0: 0, c1: 12, r1: 12 };
+  const flat = () => new Float32Array(W2 * W2).fill(10);
+  it('removes a wire and a pole', async () => {
+    const { removeSpikes } = await import('../src/elevation/pointRaster');
+    const z = flat();
+    for (let c = 0; c < W2; c++) z[5 * W2 + c] = 18; // a wire across the grid
+    z[9 * W2 + 9] = 20; // a pole
+    expect(removeSpikes(z, W2, W2, ALL2, 2.5)).toBeGreaterThan(W2 - 2);
+    expect(Math.max(...z)).toBeCloseTo(10, 5);
+  });
+
+  it('keeps roof edges, a 2 × 2 chimney and NaN cells', async () => {
+    const { removeSpikes } = await import('../src/elevation/pointRaster');
+    const z = flat();
+    for (let r = 0; r < W2; r++) for (let c = 6; c < W2; c++) z[r * W2 + c] = 20; // a roof
+    z[2 * W2 + 2] = z[2 * W2 + 3] = z[3 * W2 + 2] = z[3 * W2 + 3] = 14; // chimney
+    z[8 * W2 + 2] = NaN;
+    const before = z.slice();
+    expect(removeSpikes(z, W2, W2, ALL2, 2.5)).toBe(0);
+    expect(Array.from(z)).toEqual(Array.from(before));
+  });
+});

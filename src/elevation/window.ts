@@ -60,12 +60,16 @@ export function lotWindow(lot: Bbox, bufferM: number, tile: TileGrid): PixelWind
   };
 }
 
-/** A window snapped to multiples of `res` in its CRS, for grids we build ourselves (no source tile). */
-export function alignedWindow(lot: Bbox, bufferM: number, res: number, crs: GridCrs): PixelWindow {
-  const x0 = Math.floor((lot.minX - bufferM) / res) * res;
-  const x1 = Math.ceil((lot.maxX + bufferM) / res) * res;
-  const y1 = Math.ceil((lot.maxY + bufferM) / res) * res;
-  const y0 = Math.floor((lot.minY - bufferM) / res) * res;
+/**
+ * A window for grids we build ourselves (no source tile): edges snapped outward to multiples of
+ * `snapM` (default: the pixel size). Snapping 0.5 m windows to whole metres lines them up with 1 m
+ * grids, so each 1 m cell is exactly 2 × 2 cells.
+ */
+export function alignedWindow(lot: Bbox, bufferM: number, res: number, crs: GridCrs, snapM = res): PixelWindow {
+  const x0 = Math.floor((lot.minX - bufferM) / snapM) * snapM;
+  const x1 = Math.ceil((lot.maxX + bufferM) / snapM) * snapM;
+  const y1 = Math.ceil((lot.maxY + bufferM) / snapM) * snapM;
+  const y0 = Math.floor((lot.minY - bufferM) / snapM) * snapM;
   return { crs, col0: 0, row0: 0, width: Math.round((x1 - x0) / res), height: Math.round((y1 - y0) / res), x0, y0: y1, res };
 }
 

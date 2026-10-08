@@ -83,6 +83,8 @@ export const HIRES = {
   maxDatumOffsetM: 30,
   /** geotiff block size for LidarBC's strip TIFFs (see elevation/cog.ts). */
   lidarbcBlockSize: 262_144,
+  /** A cell with at least 6 of its 8 neighbours this much lower is a spike (wire, pole, bird). */
+  spikeRiseM: 2.5,
 } as const;
 
 /** Aerial photos cover the lot bbox + this margin: the high-detail terrain around the lot (40 m, snapped to 4 m) and its skirt. */
