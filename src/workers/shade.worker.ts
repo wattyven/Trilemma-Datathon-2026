@@ -1,7 +1,10 @@
 // Elevation fetch, horizon precompute and every output, off the main thread.
 import { ELEVATION, HORIZON, SUN } from '../config';
-import { openImage, readWindow, tileGrid } from '../elevation/cog';
-import { bboxOf, embedWindow, lotWindow, ringsToPixel, TileEdgeError, type PixelWindow } from '../elevation/window';
+import { buildRasters, CancelledBuild } from '../elevation/build';
+import { openImage } from '../elevation/cog';
+import { ringsToPixel, TileEdgeError, type PixelWindow } from '../elevation/window';
+import { convergenceDeg } from '../geo/proj';
+import type { SourceInfo } from '../engine/protocol';
 import { maxValue, NoLidarError, nodataFraction, selectCells, withObserver, type CellSet, type Observer, type Raster } from '../engine/grid';
 import { computeHorizons, splitRanges, type HorizonParams } from '../engine/horizon';
 import type { HorizonJob, HorizonReply } from './horizon.worker';
@@ -26,6 +29,8 @@ interface State {
   horizons: Horizons;
   lonLat: [number, number];
   gammaDeg: number;
+  source: SourceInfo;
+  res: number;
 }
 
 let state: State | null = null;
@@ -45,40 +50,32 @@ async function load(id: number, req: LoadRequest) {
   latestLoad = id;
   cancelPool(); // a newer lot stops the helpers working on the old one
   const t0 = performance.now();
-  const key = `${req.dsmUrl}|${req.dtmUrl}|${JSON.stringify(req.lot3979)}|${req.bufferM}|${req.cellCap}`;
-  let rasters: Pick<State, 'window' | 'dsm' | 'dtm' | 'cells'>;
+  const key = JSON.stringify([req.elevation, req.lotLonLat, req.bufferM, req.cellCap]);
+  let rasters: Pick<State, 'window' | 'dsm' | 'dtm' | 'cells' | 'source'>;
 
   if (state && state.key === key) {
-    rasters = { window: state.window, dsm: state.dsm, dtm: state.dtm, cells: withObserver(state.cells, req.observer) };
+    rasters = { window: state.window, dsm: state.dsm, dtm: state.dtm, cells: withObserver(state.cells, req.observer), source: state.source };
   } else {
     post({ type: 'progress', id, stage: 'elevation', done: 0, total: 2 });
-    const [dsmImg, dtmImg] = await Promise.all([openImage(req.dsmUrl), openImage(req.dtmUrl)]);
-    const tile = tileGrid(dsmImg);
-    const dtmTile = tileGrid(dtmImg);
-    if (JSON.stringify(tile) !== JSON.stringify(dtmTile)) throw new Error('DSM and DTM grids differ'); // gotcha #6
-    const bbox = bboxOf(req.lot3979);
-    const window = lotWindow(bbox, req.bufferM, tile);
-    // Ground heights matter only on and near the lot, so read far fewer DTM tiles than DSM tiles.
-    const dtmWindow = lotWindow(bbox, Math.min(ELEVATION.dtmMarginM, req.bufferM), tile);
-    const [dsmData, dtmNear] = await Promise.all([readWindow(dsmImg, window), readWindow(dtmImg, dtmWindow)]);
+    const built = await buildRasters(req.elevation, req.lotLonLat, req.bufferM, () => id === latestLoad);
     if (id !== latestLoad) throw new Cancelled();
-    const dsm: Raster = { width: window.width, height: window.height, data: dsmData };
-    const dtm: Raster = { width: window.width, height: window.height, data: embedWindow(window, dtmWindow, dtmNear) };
-    const cells = selectCells(dsm, dtm, ringsToPixel(window, req.lot3979), {
+    const cells = selectCells(built.dsm, built.dtm, ringsToPixel(built.window, built.lot), {
       cap: req.cellCap,
       observer: req.observer,
       coveredM: ELEVATION.coveredM,
       lotNodataMax: ELEVATION.lotNodataMax,
     });
-    rasters = { window, dsm, dtm, cells };
+    rasters = { window: built.window, dsm: built.dsm, dtm: built.dtm, cells, source: built.source };
     post({ type: 'progress', id, stage: 'elevation', done: 2, total: 2 });
   }
   const t1 = performance.now();
 
   const { cells, dsm } = rasters;
+  const res = rasters.window.res;
+  const gammaDeg = convergenceDeg(req.lonLat, rasters.window.crs);
   const zmax = maxValue(dsm);
   const threads = threadCount(cells.count);
-  const data = threads > 1 ? await parallelHorizons(id, dsm, cells, zmax, threads) : await serialHorizons(id, dsm, cells, zmax);
+  const data = threads > 1 ? await parallelHorizons(id, dsm, cells, zmax, threads, res) : await serialHorizons(id, dsm, cells, zmax, res);
   const t2 = performance.now();
 
   state = {
@@ -87,7 +84,8 @@ async function load(id: number, req: LoadRequest) {
     observerKey: JSON.stringify(req.observer satisfies Observer),
     horizons: { data, count: cells.count, sectors: params.sectors },
     lonLat: req.lonLat,
-    gammaDeg: req.gammaDeg,
+    gammaDeg,
+    res,
   };
 
   const copy = <T extends Float32Array | Uint8Array>(a: T) => a.slice() as T;
@@ -96,11 +94,13 @@ async function load(id: number, req: LoadRequest) {
     id,
     summary: {
       window: rasters.window,
+      source: rasters.source,
       cells: cells.count,
       candidates: cells.candidates,
       dropped: cells.dropped,
       step: cells.step,
-      gammaDeg: req.gammaDeg,
+      cellSizeM: cells.step * res,
+      gammaDeg,
       bufferNodataFrac: nodataFraction(dsm),
       timings: { elevationMs: Math.round(t1 - t0), horizonMs: Math.round(t2 - t1), threads },
     },
@@ -114,9 +114,9 @@ async function load(id: number, req: LoadRequest) {
   post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer]);
 }
 
-async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number): Promise<Float32Array> {
+async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, res: number): Promise<Float32Array> {
   const data = new Float32Array(cells.count * params.sectors);
-  const input = { dsm, px: cells.px, py: cells.py, z0: cells.z0, count: cells.count };
+  const input = { dsm, px: cells.px, py: cells.py, z0: cells.z0, count: cells.count, res };
   for (let start = 0; start < cells.count; start += HORIZON.chunkCells) {
     const end = Math.min(cells.count, start + HORIZON.chunkCells);
     computeHorizons(input, params, data, start, end, zmax);
@@ -141,7 +141,7 @@ function cancelPool() {
   activePool = null;
 }
 
-async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, threads: number): Promise<Float32Array> {
+async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, threads: number, res: number): Promise<Float32Array> {
   const ranges = splitRanges(cells.count, threads);
   const done = new Array<number>(ranges.length).fill(0);
   const out = new Float32Array(cells.count * params.sectors);
@@ -149,7 +149,7 @@ async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: n
   try {
     workers = ranges.map(() => new Worker(new URL('./horizon.worker.ts', import.meta.url), { type: 'module' }));
   } catch {
-    return serialHorizons(id, dsm, cells, zmax); // no nested workers here
+    return serialHorizons(id, dsm, cells, zmax, res); // no nested workers here
   }
   return new Promise<Float32Array>((resolve, reject) => {
     let remaining = ranges.length;
@@ -185,6 +185,7 @@ async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: n
         z0: cells.z0.slice(a, b),
         params,
         zmax,
+        res,
         chunk: HORIZON.chunkCells,
       };
       w.postMessage(job, [job.dsm.buffer, job.px.buffer, job.py.buffer, job.z0.buffer]);
@@ -232,7 +233,7 @@ function compute(req: ComputeRequest): ComputeResult {
 }
 
 function errorCode(e: unknown): ErrorCode {
-  if (e instanceof Cancelled) return 'cancelled';
+  if (e instanceof Cancelled || e instanceof CancelledBuild) return 'cancelled';
   if (e instanceof TileEdgeError) return 'tile-edge';
   if (e instanceof NoLidarError) return e.reason === 'no-cells' ? 'no-cells' : 'no-lidar';
   const code = (e as { code?: ErrorCode }).code;
@@ -246,7 +247,7 @@ scope.onmessage = async (ev: MessageEvent<ToWorker>) => {
   try {
     if (msg.type === 'prefetch') {
       // Warm the COG headers while the lot is still being looked up; failures surface later in load.
-      await Promise.allSettled([openImage(msg.dsmUrl), openImage(msg.dtmUrl)]);
+      await Promise.allSettled(msg.urls.map((u) => openImage(u)));
     } else if (msg.type === 'load') {
       await load(msg.id, msg.request);
     } else {

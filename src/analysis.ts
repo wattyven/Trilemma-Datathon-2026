@@ -12,7 +12,6 @@ import type { ComputeResult, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
 import { gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf } from './geo/polygon';
-import { convergenceDeg, toLcc } from './geo/proj';
 import type { LotScene } from './scene/view3d';
 import { isLowPower, webglAvailable } from './scene/webgl';
 import type { CellGrid } from './ui/cellPaint';
@@ -128,11 +127,9 @@ export class Analysis {
     });
 
     this.lotRequest = {
-      dsmUrl: item.dsm,
-      dtmUrl: item.dtm,
-      lot3979: polygonsOf(mapGeometry(parcel.geometry, toLcc)),
+      elevation: { kind: 'hrdem', hrdem: { dsmUrl: item.dsm, dtmUrl: item.dtm }, label: 'NRCan HRDEM 1 m', year: null },
+      lotLonLat: polygonsOf(parcel.geometry),
       lonLat: centre,
-      gammaDeg: convergenceDeg(centre),
       observer: OBSERVERS[this.controls.get().observer],
       bufferM: ELEVATION.bufferM,
       cellCap: ELEVATION.cellCap,
@@ -254,7 +251,7 @@ export class Analysis {
       });
     }
     const notices: string[] = [];
-    if (s.step > 1) notices.push(copy.analysisNotices.coarsened(s.step));
+    if (s.cellSizeM > s.source.resM) notices.push(copy.analysisNotices.coarsened(s.cellSizeM));
     if (s.dropped > 0) notices.push(copy.analysisNotices.dropped(s.dropped));
     if (s.bufferNodataFrac > ELEVATION.bufferNodataWarn) notices.push(copy.analysisNotices.bufferNodata(Math.max(1, Math.round(100 * s.bufferNodataFrac))));
     setAnalysisNotices(this.lotEls, notices);
@@ -466,7 +463,8 @@ export class Analysis {
     const s = l.summary;
     const rows: [string, string][] = [
       ['Grid convergence γ', `${s.gammaDeg.toFixed(2)}°`],
-      ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.step} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
+      ['Elevation source', `${s.source.label} (${s.window.crs}, ${s.source.resM} m)${s.source.detail ? `; ${s.source.detail}` : ''}`],
+      ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.cellSizeM} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
       ['Window', `${s.window.width} × ${s.window.height} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],
       ['3D', this.scene ? `WebGL${isLowPower() ? ', low-power settings' : ''}` : this.sceneUnavailable ? 'unavailable' : '…'],

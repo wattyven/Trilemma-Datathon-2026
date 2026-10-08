@@ -1,11 +1,11 @@
 // Affine map from a window's continuous pixel coordinates to the lot's local metric frame
-// (x = east, y = TRUE north). Solved from three projected corners, so it carries the grid
-// convergence (~25° here) and the projection's scale factor. Good to ~cm over a lot window.
+// (x = east, y = TRUE north). Solved from three projected corners in the window's CRS, so it carries
+// the grid convergence (~25° for EPSG:3979) and the projection's scale factor. ~cm over a window.
 import type { PixelWindow } from '../elevation/window';
 import { fromPixel } from '../elevation/window';
 import type { LocalFrame } from './local';
 import type { Position } from './polygon';
-import { fromLcc } from './proj';
+import { fromCrs } from './proj';
 
 export interface GridAffine {
   /** Local position of pixel (0, 0), the window's top-left corner. */
@@ -16,7 +16,7 @@ export interface GridAffine {
 }
 
 export function gridToLocalAffine(w: PixelWindow, frame: LocalFrame): GridAffine {
-  const at = (px: number, py: number) => frame.toLocal(fromLcc(fromPixel(w, [px, py])));
+  const at = (px: number, py: number) => frame.toLocal(fromCrs(w.crs, fromPixel(w, [px, py])));
   const o = at(0, 0);
   const c = at(w.width, 0);
   const r = at(0, w.height);

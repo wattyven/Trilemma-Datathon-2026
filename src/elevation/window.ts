@@ -3,9 +3,11 @@
 // Continuous pixel coordinates inside a window: px = (X − x0) / res, py = (y0 − Y) / res,
 // so pixel (c, r) is centred at (c + 0.5, r + 0.5) and grid north is −py.
 import type { Position, Ring } from '../geo/polygon';
+import type { GridCrs } from '../geo/proj';
 
 /** Tile geometry, read from the COG header (authoritative; STAC's proj:transform order varies). */
 export interface TileGrid {
+  crs: GridCrs;
   originX: number; // 3979 x of the tile's left edge
   originY: number; // 3979 y of the tile's top edge
   res: number; // metres per pixel
@@ -14,6 +16,7 @@ export interface TileGrid {
 }
 
 export interface PixelWindow {
+  crs: GridCrs;
   col0: number;
   row0: number;
   width: number;
@@ -46,6 +49,7 @@ export function lotWindow(lot: Bbox, bufferM: number, tile: TileGrid): PixelWind
   const row1 = Math.ceil((tile.originY - (lot.minY - bufferM)) / tile.res);
   if (col0 < 0 || row0 < 0 || col1 > tile.width || row1 > tile.height) throw new TileEdgeError();
   return {
+    crs: tile.crs,
     col0,
     row0,
     width: col1 - col0,
@@ -54,6 +58,15 @@ export function lotWindow(lot: Bbox, bufferM: number, tile: TileGrid): PixelWind
     y0: tile.originY - row0 * tile.res,
     res: tile.res,
   };
+}
+
+/** A window snapped to multiples of `res` in its CRS, for grids we build ourselves (no source tile). */
+export function alignedWindow(lot: Bbox, bufferM: number, res: number, crs: GridCrs): PixelWindow {
+  const x0 = Math.floor((lot.minX - bufferM) / res) * res;
+  const x1 = Math.ceil((lot.maxX + bufferM) / res) * res;
+  const y1 = Math.ceil((lot.maxY + bufferM) / res) * res;
+  const y0 = Math.floor((lot.minY - bufferM) / res) * res;
+  return { crs, col0: 0, row0: 0, width: Math.round((x1 - x0) / res), height: Math.round((y1 - y0) / res), x0, y0: y1, res };
 }
 
 export function toPixel(w: PixelWindow, [x, y]: Position): Position {

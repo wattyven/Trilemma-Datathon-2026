@@ -44,7 +44,7 @@ export const copy = {
   elevationDown: "We found the lot but couldn't load elevation data from Natural Resources Canada. Try again in a moment.",
   sunlightProgress: (pct: number) => `Calculating sunlight (${pct}%)`,
   analysisNotices: {
-    coarsened: (step: number) => `This is a big lot, so we worked on a ${step} m grid instead of 1 m.`,
+    coarsened: (sizeM: number) => `This is a big lot, so we worked on a ${sizeM} m grid to keep it quick.`,
     bufferNodata: (pct: number) =>
       `About ${pct}% of the area around this lot has no elevation data (often water). We've assumed nothing there blocks the sun.`,
     dropped: (n: number) => `${n} spot${n === 1 ? '' : 's'} on this lot had no elevation data and ${n === 1 ? 'is' : 'are'} left out.`,

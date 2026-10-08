@@ -18,7 +18,8 @@ export function openImage(url: string): Promise<GeoTIFFImage> {
 export function tileGrid(image: GeoTIFFImage): TileGrid {
   const [originX, originY] = image.getOrigin();
   const [resX] = image.getResolution();
-  return { originX: originX!, originY: originY!, res: Math.abs(resX!), width: image.getWidth(), height: image.getHeight() };
+  // HRDEM mosaics are EPSG:3979; other GeoTIFF sources pass their own CRS through tileGridAs().
+  return { crs: 'EPSG:3979', originX: originX!, originY: originY!, res: Math.abs(resX!), width: image.getWidth(), height: image.getHeight() };
 }
 
 /** Reads a window as Float32, with the GDAL nodata value (−32767 for HRDEM) turned into NaN. */

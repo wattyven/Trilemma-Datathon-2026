@@ -23,6 +23,8 @@ export interface HorizonInput {
   py: Float32Array;
   z0: Float32Array;
   count: number;
+  /** Metres per pixel (1 for HRDEM, 0.5 for the point-cloud grid). Default 1. */
+  res?: number;
 }
 
 const DEG = 180 / Math.PI;
@@ -50,14 +52,15 @@ export function computeHorizons(
   const { dx, dy } = sectorDirections(K);
   const { dsm } = input;
   const w = dsm.width, h = dsm.height;
+  const perM = 1 / (input.res ?? 1); // pixels per metre; distances below are metres
   const earlyExit = p.earlyExit !== false;
   for (let i = start; i < end; i++) {
     const x0 = input.px[i]!, y0 = input.py[i]!, z0 = input.z0[i]!;
     const headroom = zmax - z0;
     for (let k = 0; k < K; k++) {
-      const ux = dx[k]!, uy = dy[k]!;
+      const ux = dx[k]! * perM, uy = dy[k]! * perM;
       let maxTan = -Infinity;
-      let d = 1; // start one cell away
+      let d = 1; // start one metre away
       for (;;) {
         const x = x0 + ux * d, y = y0 + uy * d;
         if (x < 0 || y < 0 || x > w || y > h) break;
@@ -97,11 +100,11 @@ export function horizonAt(h: Float32Array, i: number, sectors: number, s: Sector
  * Reference ray march along the exact sun direction with a fine fixed step (no horizon
  * table). Used by tests and, in Phase 3, the debug overlay. Same "start one cell away" rule.
  */
-export function rayMarchSunlit(dsm: Raster, px: number, py: number, z0: number, altDeg: number, gridAzDeg: number, stepM = 0.25): boolean {
+export function rayMarchSunlit(dsm: Raster, px: number, py: number, z0: number, altDeg: number, gridAzDeg: number, stepM = 0.25, res = 1): boolean {
   if (altDeg <= 0) return false;
   const tanAlt = Math.tan(altDeg / DEG);
   const a = gridAzDeg / DEG;
-  const ux = Math.sin(a), uy = -Math.cos(a);
+  const ux = Math.sin(a) / res, uy = -Math.cos(a) / res;
   for (let d = 1; ; d += stepM) {
     const x = px + ux * d, y = py + uy * d;
     if (x < 0 || y < 0 || x > dsm.width || y > dsm.height) return true;

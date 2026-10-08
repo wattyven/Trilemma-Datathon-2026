@@ -5,7 +5,7 @@ import { localFrame } from '../src/geo/local';
 import { convergenceDeg, fromLcc, toLcc } from '../src/geo/proj';
 import pointsJson from './fixtures/points.json';
 
-const TILE: TileGrid = { originX: -2_000_000, originY: 500_000, res: 1, width: 500_000, height: 500_000 };
+const TILE: TileGrid = { crs: 'EPSG:3979', originX: -2_000_000, originY: 500_000, res: 1, width: 500_000, height: 500_000 };
 
 describe('lotWindow', () => {
   it('adds the buffer and snaps outward to whole pixels', () => {

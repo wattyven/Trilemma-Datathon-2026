@@ -11,6 +11,7 @@ export interface HorizonJob {
   z0: Float32Array;
   params: HorizonParams;
   zmax: number;
+  res: number;
   chunk: number;
 }
 
@@ -26,7 +27,7 @@ scope.onmessage = async (ev) => {
   const j = ev.data;
   const n = j.px.length;
   const out = new Float32Array(n * j.params.sectors);
-  const input = { dsm: { width: j.width, height: j.height, data: j.dsm }, px: j.px, py: j.py, z0: j.z0, count: n };
+  const input = { dsm: { width: j.width, height: j.height, data: j.dsm }, px: j.px, py: j.py, z0: j.z0, count: n, res: j.res };
   for (let start = 0; start < n; start += j.chunk) {
     const end = Math.min(n, start + j.chunk);
     computeHorizons(input, j.params, out, start, end, j.zmax);

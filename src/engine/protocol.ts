@@ -5,15 +5,29 @@ import type { CellInspection } from './outputs';
 import type { Observer } from './grid';
 import type { DayWindow, LocalDate } from './sun';
 
-export interface LoadRequest {
+export interface HrdemSpec {
   dsmUrl: string;
   dtmUrl: string;
-  /** Lot polygons in EPSG:3979 metres. */
-  lot3979: Ring[][];
-  /** Lot centroid, lon/lat (for sun positions). */
+}
+
+/** Where elevation comes from for this load (chosen on the main thread; see analysis.ts). */
+export type ElevationSpec = { kind: 'hrdem'; hrdem: HrdemSpec; label: string; year: string | null };
+
+export interface SourceInfo {
+  kind: ElevationSpec['kind'];
+  label: string;
+  year: string | null;
+  /** Metres per pixel of the analysis grid. */
+  resM: number;
+  detail?: string;
+}
+
+export interface LoadRequest {
+  elevation: ElevationSpec;
+  /** Lot polygons, lon/lat. The worker projects them into the grid's CRS. */
+  lotLonLat: Ring[][];
+  /** Lot centroid, lon/lat (for sun positions and grid convergence). */
   lonLat: [number, number];
-  /** Grid convergence at the centroid, degrees (grid azimuth = true azimuth + γ). */
-  gammaDeg: number;
   observer: Observer;
   bufferM: number;
   cellCap: number;
@@ -28,10 +42,14 @@ export type ComputeRequest =
 
 export interface LoadedSummary {
   window: PixelWindow;
+  source: SourceInfo;
   cells: number;
   candidates: number;
   dropped: number;
+  /** Cell spacing in grid pixels, and in metres. */
   step: number;
+  cellSizeM: number;
+  /** Grid convergence of the window's CRS at the lot (grid azimuth = true azimuth + γ). */
   gammaDeg: number;
   bufferNodataFrac: number;
   timings: { elevationMs: number; horizonMs: number; threads: number };
@@ -60,7 +78,7 @@ export type ComputeResult =
 export type ErrorCode = 'no-lidar' | 'no-cells' | 'tile-edge' | 'fetch' | 'cancelled' | 'not-loaded' | 'internal';
 
 export type ToWorker =
-  | { type: 'prefetch'; id: number; dsmUrl: string; dtmUrl: string }
+  | { type: 'prefetch'; id: number; urls: string[] }
   | { type: 'load'; id: number; request: LoadRequest }
   | { type: 'compute'; id: number; request: ComputeRequest };
 
