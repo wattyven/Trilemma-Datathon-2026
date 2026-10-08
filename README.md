@@ -30,5 +30,7 @@ By providing both the average range of sunlight and the locations of the sunnies
 ## Data Sources
 
 LiDAR: https://open-data-portal-metrovancouver.hub.arcgis.com/search?q=lidar
+
 Geocoder: https://www2.gov.bc.ca/gov/content/data/geographic-data-services/location-services/geocoder
+
 SunCalc: https://github.com/mourner/suncalc
