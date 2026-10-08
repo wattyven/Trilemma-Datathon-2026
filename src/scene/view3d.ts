@@ -15,7 +15,8 @@ import { buildCellIndex, cellAtPixel, layerRgba, paintCellsRgba, type CellGrid, 
 import { SHADE_RGB } from '../ui/colors';
 import { SCENE, TOKENS } from '../ui/tokens';
 import { compassRotationDeg, localToScene, sceneToLocal, sunDirection, sunPathPoints } from './frame';
-import { baseLevel, buildGrid, innerRect, type MeshArrays, type PixelRect, type TerrainColors, type TerrainInput } from './terrain';
+import { MESH } from '../config';
+import { baseLevel, buildGrid, buildTerraced, innerRect, type MeshArrays, type PixelRect, type TerrainColors, type TerrainInput } from './terrain';
 
 export interface SceneModel {
   window: PixelWindow;
@@ -174,7 +175,8 @@ export class LotScene {
     const material = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.clayMaterial = material;
     this.photo = null; // its texture coordinates belong to the previous grid; the caller re-applies it
-    for (const arrays of [buildGrid(input, inner, innerStep, colors, { skirtM: 3 }), buildGrid(input, outer, outerStep, colors, { hole: inner })]) {
+    // Near the lot: true cell footprints with vertical walls. Farther out: a smooth 4 m mesh.
+    for (const arrays of [buildTerraced(input, inner, innerStep, colors, { wallM: MESH.wallM, skirtM: 3 }), buildGrid(input, outer, outerStep, colors, { hole: inner })]) {
       const mesh = new THREE.Mesh(toGeometry(arrays), material);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
@@ -183,7 +185,7 @@ export class LotScene {
     }
 
     // Results overlay: same surface over the lot, nudged up, unlit so colours match the legend.
-    const lotGrid = buildGrid(input, { c0: Math.max(0, lotRect.c0 - 1), r0: Math.max(0, lotRect.r0 - 1), c1: Math.min(width - 1, lotRect.c1 + 1), r1: Math.min(height - 1, lotRect.r1 + 1) }, 1, colors);
+    const lotGrid = buildTerraced(input, { c0: Math.max(0, lotRect.c0 - 1), r0: Math.max(0, lotRect.r0 - 1), c1: Math.min(width - 1, lotRect.c1 + 1), r1: Math.min(height - 1, lotRect.r1 + 1) }, 1, colors, { wallM: MESH.wallM, walls: false });
     for (let i = 1; i < lotGrid.positions.length; i += 3) lotGrid.positions[i]! += 0.06;
     this.overlay = new THREE.Mesh(
       toGeometry(lotGrid),
@@ -312,7 +314,7 @@ export class LotScene {
     const input = this.terrainInput;
     if (mask && input) {
       const r = mask.rect;
-      const arrays = buildGrid(input, { c0: Math.max(0, r.c0 - 1), r0: Math.max(0, r.r0 - 1), c1: Math.min(input.width - 1, r.c1), r1: Math.min(input.height - 1, r.r1) }, 1, { ground: [1, 1, 1], water: [1, 1, 1] });
+      const arrays = buildTerraced(input, { c0: Math.max(0, r.c0 - 1), r0: Math.max(0, r.r0 - 1), c1: Math.min(input.width - 1, r.c1), r1: Math.min(input.height - 1, r.r1) }, 1, { ground: [1, 1, 1], water: [1, 1, 1] }, { wallM: MESH.wallM, walls: false });
       for (let i = 1; i < arrays.positions.length; i += 3) arrays.positions[i]! += 0.04;
       const tex = new THREE.CanvasTexture(mask.image);
       tex.flipY = false;
@@ -526,13 +528,13 @@ export class LotScene {
 
 /**
  * Terrain mesh spacing in grid pixels: native resolution within 40 m of the lot (unless that
- * would pass ~250k vertices, then 1 m), and 4 m farther out. The outer step aligns the hole.
+ * would pass MESH.innerMaxCells cells, then 1 m), and 4 m farther out. The outer step aligns the hole.
  */
 export function meshSteps(lot: PixelRect, res: number): { innerStep: number; outerStep: number; marginPx: number } {
   const outerStep = Math.max(1, Math.round(4 / res));
   const marginPx = Math.round(40 / res);
   const verts = (lot.c1 - lot.c0 + 2 * marginPx) * (lot.r1 - lot.r0 + 2 * marginPx);
-  const innerStep = verts > 250_000 ? Math.max(1, Math.round(1 / res)) : 1;
+  const innerStep = verts > MESH.innerMaxCells ? Math.max(1, Math.round(1 / res)) : 1;
   return { innerStep, outerStep, marginPx };
 }
 

@@ -92,6 +92,12 @@ export const HIRES = {
   changeGrowM: 2,
 } as const;
 
+/**
+ * 3D terrain near the lot: neighbouring cells more than `wallM` apart get a vertical wall; above
+ * `innerMaxCells` cells the detailed mesh steps up to 1 m (walls can add as many vertices again).
+ */
+export const MESH = { wallM: 2, innerMaxCells: 150_000 } as const;
+
 /** Aerial photos cover the lot bbox + this margin: the high-detail terrain around the lot (40 m, snapped to 4 m) and its skirt. */
 export const IMAGERY = { marginM: 48, defaultOpacity: 0.7 } as const;
 
