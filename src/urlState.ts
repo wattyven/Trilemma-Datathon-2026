@@ -28,11 +28,14 @@ export interface UrlState {
   /** Aerial photo on, and the results' opacity over it (0.2–1). */
   photo?: boolean;
   opacity?: number;
-  /** Debug: force an elevation surface instead of the best available. */
+  /** Which elevation surface to use (default "best of both"). */
   source?: Source;
+  /** Show where the newer survey replaced the older one. */
+  changes?: boolean;
 }
 
-export type Source = 'hrdem' | 'copc' | 'lidarbc';
+/** The "Elevation data" setting; `hrdem` is a debug value. */
+export type Source = 'best' | 'newest' | 'detailed' | 'hrdem';
 
 const KEYS: Record<keyof UrlState, string> = {
   address: 'a',
@@ -56,13 +59,16 @@ const KEYS: Record<keyof UrlState, string> = {
   photo: 'img',
   opacity: 'op',
   source: 'elev',
+  changes: 'chg',
 };
 
 const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
 const PRESETS = new Set(['growing', 'summer', 'winter', 'year', 'custom']);
 const OBSERVERS = new Set<ObserverId>(['bed', 'seated', 'surface']);
 const VIEWS = new Set<View>(['3d', 'map']);
-const SOURCES = new Set<Source>(['hrdem', 'copc', 'lidarbc']);
+const SOURCES = new Set<Source>(['best', 'newest', 'detailed', 'hrdem']);
+/** Links from before the setting existed used the debug names. */
+const LEGACY_SOURCES: Record<string, Source> = { copc: 'detailed', lidarbc: 'newest' };
 
 /** A real calendar date, normalised to YYYY-MM-DD. */
 function validDate(s: string | null): string | undefined {
@@ -102,8 +108,11 @@ export function decodeHash(hash: string): UrlState {
   if (observer && OBSERVERS.has(observer)) out.observer = observer;
   const view = get('view') as View | null;
   if (view && VIEWS.has(view)) out.view = view;
-  const source = get('source') as Source | null;
-  if (source && SOURCES.has(source)) out.source = source;
+  const rawSource = get('source');
+  const source = rawSource ? (LEGACY_SOURCES[rawSource] ?? rawSource) : null;
+  if (source && SOURCES.has(source as Source)) out.source = source as Source;
+  const chg = get('changes');
+  if (chg === '1' || chg === '0') out.changes = chg === '1';
   const img = get('photo');
   if (img === '1' || img === '0') out.photo = img === '1';
   const op = get('opacity');

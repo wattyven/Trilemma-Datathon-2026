@@ -9,11 +9,11 @@ import { displayJurisdiction } from './data/scope';
 import { fetchPhoto, type Photo } from './imagery/fetch';
 import { gridToPhotoUv, photoBox, photoToLocal } from './imagery/georef';
 import { imageryFor } from './imagery/sources';
-import { loadHiresIndex, refinementFor, type SourcePreference } from './elevation/hires';
+import { loadHiresIndex, refinementOptions, refinementOrder, type RefinementOptions, type SourcePreference } from './elevation/hires';
 import { findMosaicItem } from './elevation/stac';
 import { vintageFor } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
-import type { ComputeResult, ElevationSpec, LoadedMessage } from './engine/protocol';
+import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
 import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
@@ -90,8 +90,12 @@ export class Analysis {
   /** The sharper surface loading (or loaded) after the first result. */
   private refinement: { spec: ElevationSpec; state: 'running' | 'interrupted' | 'done' | 'failed'; note?: string } | null = null;
   private refineSeq = 0;
+  /** The lot's HRDEM tile, its sharper surfaces (looked up once per lot) and any that failed to load. */
+  private hrdemSpec: HrdemSpec | null = null;
+  private options: RefinementOptions | null = null;
+  private failedSpecs = new Set<ElevationSpec>();
   /** Debug: force a surface (URL `elev=`). */
-  sourcePreference: SourcePreference = 'auto';
+  sourcePreference: SourcePreference = 'best';
   private jurisdiction = '';
   private photoOn = false;
   private opacity: number = IMAGERY.defaultOpacity;
@@ -212,6 +216,8 @@ export class Analysis {
   async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
     this.refineSeq++; // abandon the previous lot's refinement
     this.refinement = null;
+    this.options = null;
+    this.failedSpecs.clear();
     this.lot = { parcel, signal };
     this.jurisdiction = displayJurisdiction(parcel, match);
     this.photoSeq++;
@@ -245,8 +251,9 @@ export class Analysis {
       this.renderDebug();
     });
 
+    this.hrdemSpec = { dsmUrl: item.dsm, dtmUrl: item.dtm };
     this.lotRequest = {
-      elevation: { kind: 'hrdem', hrdem: { dsmUrl: item.dsm, dtmUrl: item.dtm }, label: 'NRCan HRDEM 1 m', year: null },
+      elevation: { kind: 'hrdem', hrdem: this.hrdemSpec, label: 'NRCan HRDEM 1 m', year: null },
       lotLonLat: polygonsOf(parcel.geometry),
       lonLat: centre,
       observer: OBSERVERS[this.controls.get().observer],
@@ -273,12 +280,15 @@ export class Analysis {
    * the background and swap it in. Any failure just keeps the first result.
    */
   private async refine(attempt = 0) {
-    const lot = this.lot, req = this.lotRequest;
-    if (!lot || !req || lot.signal.aborted) return;
+    const lot = this.lot, req = this.lotRequest, hrdem = this.hrdemSpec;
+    if (!lot || !req || !hrdem || lot.signal.aborted) return;
     const seq = ++this.refineSeq;
-    let spec = this.refinement?.state === 'interrupted' ? this.refinement.spec : null;
-    if (!spec && req.elevation.kind === 'hrdem') spec = await refinementFor(req.elevation.hrdem, req.lotLonLat, req.lonLat, this.sourcePreference).catch(() => null);
-    if (!spec || seq !== this.refineSeq || lot.signal.aborted) return;
+    this.options ??= await refinementOptions(hrdem, req.lotLonLat, req.lonLat).catch(() => ({}));
+    if (seq !== this.refineSeq || lot.signal.aborted) return;
+    // Resume an interrupted load, or take the preferred surface that hasn't failed for this lot.
+    const resume = this.refinement?.state === 'interrupted' ? this.refinement.spec : null;
+    const spec = resume ?? refinementOrder(this.options, this.sourcePreference).find((s) => !this.failedSpecs.has(s));
+    if (!spec || spec === req.elevation) return;
     this.refinement = { spec, state: 'running' };
     this.renderSurfaceFact();
     try {
@@ -291,11 +301,15 @@ export class Analysis {
     } catch (e) {
       if (seq !== this.refineSeq || !this.refinement) return;
       // Superseded by an observer reload (onControls restarts it), or a real failure: those are
-      // occasionally transient (a garbled range read), so try once more before giving up.
+      // occasionally transient (a garbled range read), so try once more, then the next surface.
       if ((e as { name?: string }).name === 'AbortError') this.refinement.state = 'interrupted';
       else {
         this.refinement = { ...this.refinement, state: attempt === 0 ? 'interrupted' : 'failed', note: e instanceof Error ? e.message : String(e) };
         if (attempt === 0) setTimeout(() => seq === this.refineSeq && void this.refine(1), 2000);
+        else {
+          this.failedSpecs.add(spec);
+          setTimeout(() => seq === this.refineSeq && void this.refine(), 0);
+        }
       }
     } finally {
       if (seq === this.refineSeq) {
@@ -322,7 +336,12 @@ export class Analysis {
       if (this.inspectedCell !== null) this.scene?.setCursor(this.inspectedCell);
     }
     const spec = this.refinement?.spec;
-    if (spec?.year && spec.kind !== 'hrdem' && !this.vintageText.startsWith(spec.year)) {
+    if (spec?.kind === 'merged' && spec.year) {
+      this.vintageText = copy.lidarMerged(spec.oldYear, spec.year);
+      setFact(this.lotEls, 'lidar', copy.lidarFact, this.vintageText);
+      this.els.caveatLidar.textContent = copy.caveatMerged(spec.oldYear, spec.year);
+      this.els.aboutLidar.textContent = copy.aboutMerged(spec.oldYear, spec.year);
+    } else if (spec?.year && spec.kind !== 'hrdem' && !this.vintageText.startsWith(spec.year)) {
       // A newer survey than the HRDEM one: say so in the facts and caveats.
       const label = spec.kind === 'copc' ? `${spec.label} point cloud` : spec.label;
       this.vintageText = copy.lidarValue(copy.lidarNearLot(label), spec.year);
@@ -361,6 +380,7 @@ export class Analysis {
     const r = this.refinement;
     const value =
       r?.state === 'running' ? copy.surface.refining(s.source.resM)
+      : s.source.kind === 'merged' ? copy.surfaceMerged(s.source.oldYear ?? '', s.source.year ?? '', s.source.changedShare ?? 0)
       : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.kind, s.source.resM, s.source.year)
       : copy.surface.base(s.source.resM);
     setFact(this.lotEls, 'surface', copy.surfaceFact, value);

@@ -23,7 +23,8 @@ const full: UrlState = {
   toTime: '18:30',
   photo: true,
   opacity: 0.55,
-  source: 'copc',
+  source: 'detailed',
+  changes: true,
 };
 
 describe('URL hash state', () => {
@@ -50,6 +51,13 @@ describe('URL hash state', () => {
     expect(decodeHash('#a=' + 'x'.repeat(500))).toEqual({});
     expect(decodeHash('#d=2028-02-29&t=7:05').date).toBe('2028-02-29'); // leap day is real
     expect(decodeHash('#t=7:05').time).toBe('07:05');
+  });
+
+  it('reads elevation choices from older links', () => {
+    expect(decodeHash('#elev=copc').source).toBe('detailed');
+    expect(decodeHash('#elev=lidarbc').source).toBe('newest');
+    expect(decodeHash('#elev=best&chg=1')).toEqual({ source: 'best', changes: true });
+    expect(decodeHash('#elev=everything&chg=maybe')).toEqual({});
   });
 
   it('tolerates a missing or junk hash', () => {

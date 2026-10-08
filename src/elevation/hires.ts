@@ -148,25 +148,47 @@ export function selectLidarbc(index: HiresIndex, lotLonLat: Ring[][], afterYear:
   return { lidarbc: { dsm, dem }, year };
 }
 
-/** Debug override for which surface to use (URL `elev=`); `auto` picks the best available. */
-export type SourcePreference = 'auto' | 'hrdem' | 'copc' | 'lidarbc';
+/** Which sharper surface a person wants (the "Elevation data" setting; URL `elev=`). `hrdem` is debug-only. */
+export type SourceChoice = 'best' | 'newest' | 'detailed';
+export type SourcePreference = SourceChoice | 'hrdem';
+export const SOURCE_CHOICES: readonly SourceChoice[] = ['best', 'newest', 'detailed'];
+
+/** The surfaces available for a lot. `best` is whichever exists when only one does. */
+export type RefinementOptions = Partial<Record<SourceChoice, ElevationSpec>>;
 
 /**
- * The sharper surface to load after the first HRDEM result, or null to keep HRDEM. Newer data
- * wins: LidarBC (through the proxy, when configured) if it's newer than both the HRDEM survey and
- * the best point cloud; else the point cloud, if it's no older than the HRDEM survey.
+ * What can refine a lot's first (HRDEM) result:
+ * - `detailed`: the point cloud (0.5 m), if it's no older than the HRDEM survey at the lot;
+ * - `newest`: LidarBC (1 m, through the proxy), if it's newer than both;
+ * - `best`: both together ("best of both", change.ts), or whichever one exists.
+ * Very big lots get none.
  */
-export async function refinementFor(hrdem: HrdemSpec, lotLonLat: Ring[][], lonLat: Position, pref: SourcePreference = 'auto', proxy: string = LIDARBC_PROXY): Promise<ElevationSpec | null> {
-  if (pref === 'hrdem' || lotAreaM2(lotLonLat) > HIRES.copcMaxLotM2) return null;
+export async function refinementOptions(hrdem: HrdemSpec, lotLonLat: Ring[][], lonLat: Position, proxy: string = LIDARBC_PROXY): Promise<RefinementOptions> {
+  if (lotAreaM2(lotLonLat) > HIRES.copcMaxLotM2) return {};
   const index = await loadHiresIndex();
   const vintage = vintageAt(lonLat);
   const hrdemYear = vintage ? Number(vintage.date.slice(0, 4)) : null;
-  const copc = pref === 'lidarbc' ? null : selectCopc(index, lotLonLat, pref === 'copc' ? null : hrdemYear);
-  if (proxy && pref !== 'copc') {
-    const after = pref === 'lidarbc' ? 0 : Math.max(hrdemYear ?? 0, copc?.year ?? 0);
-    const lb = selectLidarbc(index, lotLonLat, after, proxy);
-    if (lb) return { kind: 'lidarbc', hrdem, lidarbc: lb.lidarbc, label: `LidarBC ${lb.year}`, year: String(lb.year) };
-  }
-  if (!copc) return null;
-  return { kind: 'copc', hrdem, copc: copc.copc, label: copc.project, year: String(copc.year) };
+  const copc = selectCopc(index, lotLonLat, hrdemYear);
+  const lb = proxy ? selectLidarbc(index, lotLonLat, Math.max(hrdemYear ?? 0, copc?.year ?? 0), proxy) : null;
+  const out: RefinementOptions = {};
+  if (copc) out.detailed = { kind: 'copc', hrdem, copc: copc.copc, label: copc.project, year: String(copc.year) };
+  if (lb) out.newest = { kind: 'lidarbc', hrdem, lidarbc: lb.lidarbc, label: `LidarBC ${lb.year}`, year: String(lb.year) };
+  if (copc && lb)
+    out.best = { kind: 'merged', hrdem, copc: copc.copc, lidarbc: lb.lidarbc, label: `${copc.project} + LidarBC ${lb.year}`, year: String(lb.year), oldYear: String(copc.year) };
+  else out.best = out.newest ?? out.detailed;
+  if (!out.best) delete out.best;
+  return out;
+}
+
+/** The order to try surfaces in for a preference: the preferred one, then best, detailed, newest. */
+export function refinementOrder(options: RefinementOptions, pref: SourcePreference): ElevationSpec[] {
+  if (pref === 'hrdem') return [];
+  const order: SourceChoice[] = [pref, 'best', 'detailed', 'newest'];
+  const specs = order.map((c) => options[c]).filter((s): s is ElevationSpec => !!s);
+  return specs.filter((s, i) => specs.indexOf(s) === i);
+}
+
+/** The surface to load for a preference, or null to keep HRDEM. */
+export async function refinementFor(hrdem: HrdemSpec, lotLonLat: Ring[][], lonLat: Position, pref: SourcePreference = 'best', proxy: string = LIDARBC_PROXY): Promise<ElevationSpec | null> {
+  return refinementOrder(await refinementOptions(hrdem, lotLonLat, lonLat, proxy), pref)[0] ?? null;
 }

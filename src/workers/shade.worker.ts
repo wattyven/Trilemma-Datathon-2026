@@ -31,6 +31,7 @@ interface State {
   gammaDeg: number;
   source: SourceInfo;
   res: number;
+  changed?: Uint8Array;
 }
 
 let state: State | null = null;
@@ -51,10 +52,10 @@ async function load(id: number, req: LoadRequest) {
   cancelPool(); // a newer lot stops the helpers working on the old one
   const t0 = performance.now();
   const key = JSON.stringify([req.elevation, req.lotLonLat, req.bufferM, req.cellCap]);
-  let rasters: Pick<State, 'window' | 'dsm' | 'dtm' | 'cells' | 'source'>;
+  let rasters: Pick<State, 'window' | 'dsm' | 'dtm' | 'cells' | 'source' | 'changed'>;
 
   if (state && state.key === key) {
-    rasters = { window: state.window, dsm: state.dsm, dtm: state.dtm, cells: withObserver(state.cells, req.observer), source: state.source };
+    rasters = { window: state.window, dsm: state.dsm, dtm: state.dtm, cells: withObserver(state.cells, req.observer), source: state.source, changed: state.changed };
   } else {
     post({ type: 'progress', id, stage: 'elevation', done: 0, total: 2 });
     const built = await buildRasters(req.elevation, req.lotLonLat, req.bufferM, () => id === latestLoad);
@@ -65,7 +66,7 @@ async function load(id: number, req: LoadRequest) {
       coveredM: ELEVATION.coveredM,
       lotNodataMax: ELEVATION.lotNodataMax,
     });
-    rasters = { window: built.window, dsm: built.dsm, dtm: built.dtm, cells, source: built.source };
+    rasters = { window: built.window, dsm: built.dsm, dtm: built.dtm, cells, source: built.source, changed: built.changed };
     post({ type: 'progress', id, stage: 'elevation', done: 2, total: 2 });
   }
   const t1 = performance.now();
@@ -110,8 +111,9 @@ async function load(id: number, req: LoadRequest) {
     covered: copy(cells.covered),
     dsm: copy(dsm.data),
     dtm: copy(rasters.dtm.data),
+    ...(rasters.changed ? { changed: copy(rasters.changed) } : {}),
   };
-  post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer]);
+  post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer, ...(msg.changed ? [msg.changed.buffer] : [])]);
 }
 
 async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, res: number): Promise<Float32Array> {

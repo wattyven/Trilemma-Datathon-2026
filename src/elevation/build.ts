@@ -8,6 +8,7 @@ import type { Position, Ring } from '../geo/polygon';
 import { fromCrs, toCrs, type GridCrs } from '../geo/proj';
 import { LruCache, memo } from './cache';
 import { openImage, readWindow, tileGrid } from './cog';
+import { changeMask, composeSurface, maxPool2, regionToCoarse, upsampleNearest } from './change';
 import { rasterizeCopc, type CopcStats } from './copc';
 import { fillHoles, median, removeSpikes } from './pointRaster';
 import { regionOfBox, resampleInto } from './resample';
@@ -20,6 +21,8 @@ export interface BuiltRasters {
   /** Lot polygons in the window's CRS. */
   lot: Ring[][];
   source: SourceInfo;
+  /** "Best of both": 1 where the newer survey replaced the older one. */
+  changed?: Uint8Array;
 }
 
 export function projectRings(rings: Ring[][], crs: GridCrs): Ring[][] {
@@ -312,6 +315,62 @@ export async function buildLidarbc(hrdem: HrdemSpec, spec: LidarbcSpec, lotLonLa
   };
 }
 
+/**
+ * "Best of both": the point cloud at 0.5 m wherever it agrees with the newer LidarBC survey, and
+ * LidarBC wherever something changed (change.ts), plus LidarBC beyond the point cloud's area and
+ * its newer ground model near the lot. Each survey is datum-checked against HRDEM ground first.
+ */
+export async function buildMerged(
+  hrdem: HrdemSpec,
+  copc: CopcSpec,
+  lidarbc: LidarbcSpec,
+  lotLonLat: Ring[][],
+  bufferM: number,
+  isCurrent: () => boolean,
+): Promise<Omit<BuiltRasters, 'source'> & { detail: string; changedShare: number }> {
+  const fine = utmWindow(lotLonLat, bufferM, HIRES.copcResM), coarse = utmWindow(lotLonLat, bufferM, 1);
+  const w05 = fine.window, w1 = coarse.window;
+  const nearLot = grow(coarse.bbox, Math.min(ELEVATION.dtmMarginM, bufferM));
+  const [base, old, newer] = await Promise.all([
+    hrdemOnUtm(hrdem, lotLonLat, bufferM, HIRES.copcResM, isCurrent),
+    copcPart(copc, w05, fine.bbox, isCurrent),
+    lidarbcPart(lidarbc, w1, nearLot, isCurrent),
+  ]);
+  if (!isCurrent()) throw new CancelledBuild();
+
+  const newer05 = upsampleNearest(newer.dsm, w1.width, w1.height);
+  const lotRegion = regionOfBox(w05, grow(fine.bbox, HIRES.copcRefineM));
+  const dOld = datumOffset(w05, base, old.zmax, old.region, old.ground);
+  const dNew = datumOffset(w05, base, newer05, lotRegion, demGround(w1, newer.dem, nearLot));
+  checkCoverage(w05, old.zmax, old.region);
+  checkCoverage(w05, newer05, lotRegion);
+  const old05 = old.zmax.map((v) => v - dOld.datumOffsetM);
+  const new1 = newer.dsm.map((v) => v - dNew.datumOffsetM);
+
+  const region1 = regionToCoarse(old.region);
+  const { mask, areas } = changeMask(maxPool2(old05, w1.width, w1.height), new1, w1.width, w1.height, region1, {
+    thresholdM: HIRES.changeThresholdM,
+    minAreaCells: Math.round(HIRES.changeMinAreaM2 / (w1.res * w1.res)),
+    growCells: Math.round(HIRES.changeGrowM / w1.res),
+  });
+  const { dsm, changed, changedShare } = composeSurface({ w1: w1.width, h1: w1.height, region05: old.region, old05, new1, mask1: mask, base05: base.dsm });
+  // Ground near the lot from the newer survey.
+  const dem05 = upsampleNearest(newer.dem, w1.width, w1.height);
+  for (let k = 0; k < dem05.length; k++) if (dem05[k] === dem05[k]) base.dtm[k] = dem05[k]! - dNew.datumOffsetM;
+
+  return {
+    window: w05,
+    lot: fine.lot,
+    dsm: { width: w05.width, height: w05.height, data: dsm },
+    dtm: { width: w05.width, height: w05.height, data: base.dtm },
+    changed,
+    changedShare,
+    detail:
+      `older: ${copcDetail(old.stats)}, datum ${fmtOffset(dOld.datumOffsetM)}; newer: ${lidarbc.dsm.length} DSM + ${lidarbc.dem.length} DEM tiles, datum ${fmtOffset(dNew.datumOffsetM)}; ` +
+      `${(100 * changedShare).toFixed(1)}% changed in ${areas} area${areas === 1 ? '' : 's'}`,
+  };
+}
+
 export class CancelledBuild extends Error {}
 
 export async function buildRasters(spec: ElevationSpec, lotLonLat: Ring[][], bufferM: number, isCurrent: () => boolean): Promise<BuiltRasters> {
@@ -327,6 +386,10 @@ export async function buildRasters(spec: ElevationSpec, lotLonLat: Ring[][], buf
     case 'lidarbc': {
       const { detail, ...r } = await buildLidarbc(spec.hrdem, spec.lidarbc, lotLonLat, bufferM, isCurrent);
       return { ...r, source: { kind: 'lidarbc', label: spec.label, year: spec.year, resM: r.window.res, detail } };
+    }
+    case 'merged': {
+      const { detail, changedShare, ...r } = await buildMerged(spec.hrdem, spec.copc, spec.lidarbc, lotLonLat, bufferM, isCurrent);
+      return { ...r, source: { kind: 'merged', label: spec.label, year: spec.year, oldYear: spec.oldYear, resM: r.window.res, detail, changedShare } };
     }
   }
 }

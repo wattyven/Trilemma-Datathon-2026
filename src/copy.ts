@@ -56,6 +56,15 @@ export const copy = {
     refined: (kind: 'copc' | 'lidarbc', resM: number, year: string | null) =>
       kind === 'copc' ? `${resM} m grid from the ${year ? `${year} ` : ''}LiDAR point cloud` : `${resM} m grid from ${year ? `${year} ` : ''}LidarBC LiDAR`,
   },
+  surfaceMerged: (oldYear: string, newYear: string, share: number) =>
+    share > 0
+      ? `0.5 m from ${oldYear} LiDAR, with ${newYear} where things changed (${share < 0.01 ? 'under 1' : Math.round(100 * share)}% of the area near the lot)`
+      : `0.5 m from ${oldYear} LiDAR; nothing near the lot changed by more than 2.5 m by ${newYear}`,
+  lidarMerged: (oldYear: string, newYear: string) => `${oldYear}, with ${newYear} updates near the lot`,
+  caveatMerged: (oldYear: string, newYear: string) =>
+    `Detail comes from ${oldYear} LiDAR, updated with ${newYear} LiDAR wherever something changed by more than 2.5 m; smaller changes, like a few metres of tree growth, may be missing.`,
+  aboutMerged: (oldYear: string, newYear: string) =>
+    `This lot's elevation combines ${oldYear} LiDAR (0.5 m detail) with ${newYear} LiDAR wherever something changed by more than 2.5 m since.`,
   lidarNearLot: (label: string) => `${label}, near the lot`,
   imagery: {
     loading: 'Loading the aerial photo…',

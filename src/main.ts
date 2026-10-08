@@ -280,6 +280,7 @@ function urlDefaults(): UrlState {
     view: '3d',
     photo: false,
     opacity: IMAGERY.defaultOpacity,
+    source: 'best',
     classes: false,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
@@ -316,7 +317,7 @@ function urlStateNow(): UrlState | null {
     shadeEnd: c.shadeEnd,
     fromTime: c.fromTime,
     toTime: c.toTime,
-    source: analysis.sourcePreference === 'auto' ? undefined : analysis.sourcePreference,
+    source: analysis.sourcePreference,
   };
 }
 
@@ -357,7 +358,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     controls.set(patch);
     timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
     if (s.view) analysis.setView(s.view);
-    analysis.sourcePreference = s.source ?? 'auto';
+    analysis.sourcePreference = s.source ?? 'best';
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
     analysis.setPhotoEnabled(s.photo ?? false);
     const sameLot = shown && shown.match.fullAddress === s.address;

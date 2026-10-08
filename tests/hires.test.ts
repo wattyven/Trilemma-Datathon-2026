@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import index from '../src/elevation/hires-index.json';
-import { lotAreaM2, projectLabel, refinementFor, selectCopc, selectLidarbc, type HiresIndex } from '../src/elevation/hires';
+import { lotAreaM2, projectLabel, refinementFor, refinementOptions, refinementOrder, selectCopc, selectLidarbc, type HiresIndex } from '../src/elevation/hires';
 import type { Ring } from '../src/geo/polygon';
 
 const idx = index as unknown as HiresIndex;
@@ -65,22 +65,35 @@ describe('LidarBC tile selection', () => {
   });
 });
 
-describe('which sharper surface refines a lot', () => {
+describe('which sharper surfaces a lot can use', () => {
   const hrdem = { dsmUrl: 'dsm.tif', dtmUrl: 'dtm.tif' };
-  it('prefers the newer LidarBC survey when the proxy is configured', async () => {
-    const spec = await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'auto', PROXY);
-    expect(spec?.kind).toBe('lidarbc');
-    expect(spec?.year).toBe('2025');
+  const MAPLE_RIDGE: [number, number] = [-122.5999606, 49.2193815];
+
+  it('offers all three where a point cloud and a newer LidarBC survey both exist', async () => {
+    for (const [where, newYear, oldYear] of [[CITY_HALL, '2025', '2016'], [SURREY, '2024', '2016'], [MAPLE_RIDGE, '2025', '2023']] as const) {
+      const o = await refinementOptions(hrdem, lot(where), where, PROXY);
+      expect(o.best?.kind).toBe('merged');
+      expect(o.newest?.kind).toBe('lidarbc');
+      expect(o.detailed?.kind).toBe('copc');
+      expect(o.best?.year).toBe(newYear);
+      expect(o.best?.kind === 'merged' && o.best.oldYear).toBe(oldYear);
+    }
   });
 
-  it('falls back to the point cloud without a proxy, and honours the debug override', async () => {
-    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'auto', ''))?.kind).toBe('copc');
-    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'copc', PROXY))?.kind).toBe('copc');
+  it('offers only the point cloud without the proxy, and nothing for very big lots', async () => {
+    const o = await refinementOptions(hrdem, lot(CITY_HALL), CITY_HALL, '');
+    expect(Object.keys(o).sort()).toEqual(['best', 'detailed']);
+    expect(o.best).toBe(o.detailed);
+    expect(await refinementOptions(hrdem, lot(CITY_HALL, 250), CITY_HALL, PROXY)).toEqual({});
+  });
+
+  it('follows the preference, falling back in order', async () => {
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'best', PROXY))?.kind).toBe('merged');
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'newest', PROXY))?.kind).toBe('lidarbc');
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'detailed', PROXY))?.kind).toBe('copc');
+    expect((await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'newest', ''))?.kind).toBe('copc'); // no proxy: the point cloud
     expect(await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'hrdem', PROXY)).toBeNull();
-    expect(await refinementFor(hrdem, lot(CITY_HALL), CITY_HALL, 'lidarbc', '')).toBeNull();
-  });
-
-  it('leaves very big lots on HRDEM', async () => {
-    expect(await refinementFor(hrdem, lot(CITY_HALL, 250), CITY_HALL, 'auto', PROXY)).toBeNull();
+    const o = await refinementOptions(hrdem, lot(CITY_HALL), CITY_HALL, PROXY);
+    expect(refinementOrder(o, 'newest').map((s) => s.kind)).toEqual(['lidarbc', 'merged', 'copc']);
   });
 });

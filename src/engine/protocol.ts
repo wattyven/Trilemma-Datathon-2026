@@ -29,7 +29,9 @@ export interface LidarbcSpec {
 export type ElevationSpec =
   | { kind: 'hrdem'; hrdem: HrdemSpec; label: string; year: string | null }
   | { kind: 'copc'; hrdem: HrdemSpec; copc: CopcSpec; label: string; year: string | null }
-  | { kind: 'lidarbc'; hrdem: HrdemSpec; lidarbc: LidarbcSpec; label: string; year: string | null };
+  | { kind: 'lidarbc'; hrdem: HrdemSpec; lidarbc: LidarbcSpec; label: string; year: string | null }
+  /** "Best of both": the point cloud's detail where nothing changed, LidarBC where something did. `year` is LidarBC's. */
+  | { kind: 'merged'; hrdem: HrdemSpec; copc: CopcSpec; lidarbc: LidarbcSpec; label: string; year: string | null; oldYear: string };
 
 export interface SourceInfo {
   kind: ElevationSpec['kind'];
@@ -38,6 +40,9 @@ export interface SourceInfo {
   /** Metres per pixel of the analysis grid. */
   resM: number;
   detail?: string;
+  /** "Best of both": share of the area near the lot that uses the newer survey, and the older survey's year. */
+  changedShare?: number;
+  oldYear?: string;
 }
 
 export interface LoadRequest {
@@ -84,6 +89,8 @@ export interface LoadedMessage {
   /** The DSM window, and the DTM around the lot (NaN elsewhere and at nodata). */
   dsm: Float32Array;
   dtm: Float32Array;
+  /** "Best of both": 1 where the newer survey replaced the older one (window-sized). */
+  changed?: Uint8Array;
 }
 
 export type ComputeResult =
