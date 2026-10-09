@@ -242,6 +242,26 @@
             <dl id="debug-facts" class="facts"></dl>
           </details>
         </div>
+        <div class="analysis">
+          <button type="button" id="analysis-open" class="analysis-open" hidden aria-expanded="false" aria-controls="analysis-dialog">Analysis</button>
+          <button type="button" id="heatmap-toggle" class="analysis-open" hidden aria-pressed="false">Heat map</button>
+          <p id="heatmap-note" class="hint" hidden></p>
+          <section id="analysis-dialog" class="analysis-panel" hidden aria-labelledby="analysis-heading">
+            <div class="analysis-head">
+              <h2 id="analysis-heading">Analysis</h2>
+              <button type="button" id="analysis-close" class="ghost">Close</button>
+            </div>
+            <p id="analysis-status" class="hint" aria-live="polite"></p>
+            <div id="analysis-log" class="analysis-log" role="log"></div>
+            <div id="analysis-chips" class="analysis-chips"></div>
+            <form id="analysis-form" class="analysis-form">
+              <label class="visually-hidden" for="analysis-input">Ask about this lot</label>
+              <input id="analysis-input" type="text" maxlength="2000" autocomplete="off" placeholder="Ask about this lot's sun and shade" />
+              <button type="submit">Ask</button>
+            </form>
+            <p class="hint analysis-footnote">Answers use this lot's sun and shade numbers. The key stays on this computer.</p>
+          </section>
+        </div>
       </section>
     </main>
 
@@ -267,7 +287,8 @@
         square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
         keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
         the newer survey wherever something did. "3D data" under More options lets you pick either survey on its own. It then follows the sun across the day or season
-        to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests.
+        to count hours of direct sun. The sun and shade are worked out in your browser, and map data is requested from the public sources below.
+        Opening Analysis also sends a short written summary of the lot to Gemini so it can answer questions; the 3D model stays on your computer.
       </p>
       <h3>How to use VanShade</h3>
       <ol>

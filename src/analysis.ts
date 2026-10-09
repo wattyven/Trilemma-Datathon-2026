@@ -13,6 +13,7 @@ import { loadHiresIndex, refinementOptions, refinementOrder, SOURCE_CHOICES, typ
 import { findMosaicItem } from './elevation/stac';
 import { vintageFor, type Vintage } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
+import { heatmapStep } from './engine/grid';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
 import { MOSTLY_COVERED, summarizeLot } from './engine/lotSummary';
@@ -21,7 +22,7 @@ import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
 import { isLowPower, webglAvailable } from './scene/webgl';
-import { hatchMaskRgba, maskBounds, type CellGrid } from './ui/cellPaint';
+import { hatchMaskRgba, layerColor, maskBounds, paintCellsRgba, type CellGrid } from './ui/cellPaint';
 import { CEDAR_RGB, CLASS_RGB, SHADE_RGB, SUN_RGB, cividisGradient, css } from './ui/colors';
 import { requestFor, type ChangeKind, type ControlState, type Controls } from './ui/controls';
 import { renderInspector } from './ui/inspector';
@@ -29,6 +30,7 @@ import { HOURS_SCALE_MAX, type Layer, type LotCanvas } from './ui/lotCanvas';
 import { setAnalysisNotices, setFact, setRichText, type LotViewElements } from './ui/lotView';
 import { SpotPins, type PinSpec } from './ui/spotPins';
 import type { Steps } from './ui/status';
+import type { InsightFacts } from './insight';
 import { minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
 
 export interface AnalysisElements {
@@ -87,6 +89,14 @@ export class Analysis {
   private result: ComputeResult | null = null;
   private lotRequest: Parameters<ShadeEngine['load']>[0] | null = null;
   private computeSeq = 0;
+  private heatOn = false;
+  /** Bumped when a click is cancelled, so a slow Play the day cannot turn the colouring back on. */
+  private heatTurn = 0;
+  /** While Play the day is switching modes, skip the extra colouring pass render() would start. */
+  private heatHold = false;
+  private heatSeq = 0;
+  private heatBtn: HTMLButtonElement | null = null;
+  private heatNote: HTMLElement | null = null;
   private compareSeq = 0;
   private timings: Record<string, number> = {};
   private vintageText = '';
@@ -129,6 +139,8 @@ export class Analysis {
   onPhotoChange: () => void = () => {};
   /** Called when the elevation choice or the change overlay changes (for the shareable URL). */
   onSourceChange: () => void = () => {};
+  /** Called when a sun result is on screen (the Analysis button). */
+  onResult: () => void = () => {};
 
   constructor(
     private map: LotCanvas,
@@ -346,6 +358,7 @@ export class Analysis {
 
   /** Run the whole pipeline for a lot already drawn on the map. */
   async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
+    this.clearHeatmap();
     this.refineSeq++; // abandon the previous lot's refinement
     this.refinement = null;
     this.options = null;
@@ -749,6 +762,156 @@ export class Analysis {
     this.renderDebug();
     this.els.readout.textContent = copy.inspector.hint;
     this.refreshInspector();
+    if (this.result && this.result.kind !== 'inspect') this.onResult();
+    if (this.heatOn && !this.heatHold) void this.refreshHeatmap();
+  }
+
+  /** The Heat map button next to Analysis. */
+  bindHeatmap(button: HTMLButtonElement, note: HTMLElement) {
+    this.heatBtn = button;
+    this.heatNote = note;
+    button.addEventListener('click', () => {
+      void this.onHeatmapClick();
+    });
+  }
+
+  /**
+   * Play that day's sun across the 3D view, and colour the whole landscape with the day's direct-sun hours.
+   */
+  private async onHeatmapClick() {
+    const button = this.heatBtn;
+    const note = this.heatNote;
+    if (this.heatOn) {
+      this.heatOn = false;
+      this.heatTurn++;
+      button?.setAttribute('aria-pressed', 'false');
+      if (note) note.hidden = true;
+      this.scene?.setHeatmap(null);
+      return;
+    }
+    const turn = ++this.heatTurn;
+    this.heatOn = true;
+    button?.setAttribute('aria-pressed', 'true');
+    this.setView('3d');
+    this.onViewChange(this.view);
+    if (button) {
+      button.disabled = true;
+      button.textContent = copy.heatmap.working;
+    }
+    this.heatHold = true;
+    try {
+      await this.playDay();
+    } finally {
+      this.heatHold = false;
+    }
+    if (turn !== this.heatTurn || !this.heatOn) return;
+    await this.refreshHeatmap(true);
+    // Colouring the whole view can outlast one pass of the sun. Play again so the day runs over the map.
+    if (turn === this.heatTurn && this.heatOn) this.timeline.play();
+  }
+
+  /** A new search drops the colouring. The button comes back when the next lot has a result. */
+  clearHeatmap() {
+    this.heatOn = false;
+    this.heatHold = false;
+    this.heatTurn++;
+    this.heatSeq++;
+    this.scene?.setHeatmap(null);
+    if (this.heatBtn) {
+      this.heatBtn.hidden = true;
+      this.heatBtn.disabled = false;
+      this.heatBtn.textContent = copy.heatmap.button;
+      this.heatBtn.setAttribute('aria-pressed', 'false');
+    }
+    if (this.heatNote) this.heatNote.hidden = true;
+  }
+
+  private async refreshHeatmap(busy = false) {
+    if (!this.heatOn || !this.loaded) return;
+    const seq = ++this.heatSeq;
+    const button = this.heatBtn;
+    const note = this.heatNote;
+    if (!this.scene) {
+      if (note) {
+        note.hidden = false;
+        note.textContent = copy.view.webglMissing;
+      }
+      return;
+    }
+    if (busy && button) {
+      button.disabled = true;
+      button.textContent = copy.heatmap.working;
+    }
+    try {
+      const w = this.loaded.summary.window;
+      const area = await engine().area(heatmapStep(w.width, w.height, w.res), requestFor(this.state()));
+      if (seq !== this.heatSeq || !this.heatOn) return;
+      if (!area.px.length) {
+        this.scene.setHeatmap(null);
+        if (note) {
+          note.hidden = false;
+          note.textContent = copy.heatmap.empty;
+        }
+        return;
+      }
+      const grid: CellGrid = { width: w.width, height: w.height, px: area.px, py: area.py, covered: area.covered, step: area.step };
+      const kind = area.valueKind === 'moment' ? 'moment' : area.valueKind === 'shade' ? 'percent' : 'hours';
+      const layer = { kind, values: area.values, asClasses: false };
+      this.scene.setHeatmap(paintCellsRgba(grid, (i) => ({ rgb: layerColor(layer, i), alpha: 230 }), false));
+      if (note) {
+        note.hidden = false;
+        note.textContent = kind === 'moment' ? copy.heatmap.moment : kind === 'percent' ? copy.heatmap.percent : copy.heatmap.hours;
+      }
+    } catch (e) {
+      if (seq !== this.heatSeq || (e as { name?: string }).name === 'AbortError') return;
+      this.scene?.setHeatmap(null);
+      if (note) {
+        note.hidden = false;
+        note.textContent = copy.heatmap.failed;
+      }
+    } finally {
+      if (button && seq === this.heatSeq) {
+        button.disabled = false;
+        button.textContent = copy.heatmap.button;
+      }
+    }
+  }
+
+  /**
+   * Analysis reads one whole day: the hours of sun on the date under the view, while Play the day
+   * moves the sun across it. One moment is too thin for that reading.
+   */
+  async playDay() {
+    if (!this.loaded) return;
+    if (this.controls.get().mode !== 'day') {
+      this.controls.set({ mode: 'day' });
+      await this.onControls('request');
+    }
+    this.timeline.play();
+  }
+
+  /** The current lot, in words, for the Analysis chat. Null until a sun result exists. */
+  insight(): InsightFacts | null {
+    const r = this.result;
+    if (!r || r.kind === 'inspect') return null;
+    const s = this.state();
+    const fact = (key: string) => this.lotEls.facts.querySelector(`dd[data-key="${key}"]`)?.textContent ?? '';
+    const thresholds =
+      s.mode === 'season' || s.mode === 'day'
+        ? `Full sun is ${s.fullSunH} hours a day or more. Part sun starts at ${s.partSunH} hours. Under that is shade.`
+        : '';
+    return {
+      address: this.lotEls.heading.textContent ?? '',
+      jurisdiction: fact('jurisdiction'),
+      area: fact('area'),
+      showing: this.contextText(s),
+      measuredAt: copy.analysis.measuredAt[s.observer],
+      headline: this.headlineText().replaceAll('**', ''),
+      summary: this.els.summary.textContent?.trim() ?? '',
+      lidar: this.vintageText,
+      thresholds,
+      notices: [...this.lotEls.notices.querySelectorAll('li')].map((li) => li.textContent?.trim() ?? '').filter((t) => t.length > 0),
+    };
   }
 
   /** Keep an open inspector in step with the current mode, dates and thresholds. */

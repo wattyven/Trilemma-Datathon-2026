@@ -101,6 +101,9 @@ export const HIRES = {
  */
 export const MESH = { wallM: 2, innerMaxCells: 150_000 } as const;
 
+/** Heat map over the whole loaded landscape: about 8 m cells, and never more than `cap` samples. */
+export const HEATMAP = { minM: 8, cap: 4096 } as const;
+
 /** Aerial photos cover the lot bbox + this margin: the high-detail terrain around the lot (40 m, snapped to 4 m) and its skirt. */
 export const IMAGERY = { marginM: 48, defaultOpacity: 0.5 } as const;
 

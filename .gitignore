@@ -7,3 +7,6 @@ dist/
 *.gpkg
 playwright-report/
 test-results/
+# Local secrets for the Analysis chat. .env is the public site address, not a secret.
+.env.local
+.env.*.local

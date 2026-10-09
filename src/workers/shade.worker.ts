@@ -5,11 +5,11 @@ import { openImage } from '../elevation/cog';
 import { ringsToPixel, TileEdgeError, type PixelWindow } from '../elevation/window';
 import { convergenceDeg } from '../geo/proj';
 import type { SourceInfo } from '../engine/protocol';
-import { maxValue, NoLidarError, nodataFraction, selectCells, withObserver, type CellSet, type Observer, type Raster } from '../engine/grid';
+import { heatmapStep, maxValue, NoLidarError, nodataFraction, selectCells, selectWindowCells, withObserver, type CellSet, type Observer, type Raster } from '../engine/grid';
 import { computeHorizons, splitRanges, type HorizonParams } from '../engine/horizon';
 import type { HorizonJob, HorizonReply } from './horizon.worker';
 import { inspectCell, momentMask, prepareSamples, seasonAverage, shadeFinder, sunHours, type Horizons } from '../engine/outputs';
-import type { ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadRequest, ToWorker } from '../engine/protocol';
+import type { AreaMessage, ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadRequest, ToWorker } from '../engine/protocol';
 import { dateRange, daySamples, momentSample, type LocalDate } from '../engine/sun';
 
 // The project compiles against the DOM lib; describe just the worker-scope bits we use.
@@ -37,6 +37,18 @@ interface State {
 let state: State | null = null;
 /** The newest load wins; older loads stop at their next chunk boundary. */
 let latestLoad = 0;
+/** The newest heat-map request. A newer click drops the one still marching. */
+let latestArea = 0;
+
+interface AreaCache {
+  generation: number;
+  step: number;
+  observerKey: string;
+  cells: CellSet;
+  horizons: Horizons;
+}
+
+let areaCache: AreaCache | null = null;
 
 const params: HorizonParams = { sectors: HORIZON.sectors, minStepM: HORIZON.minStepM, stepFrac: HORIZON.stepFrac };
 
@@ -49,6 +61,7 @@ const yieldToEvents = () => new Promise<void>((r) => setTimeout(r, 0));
 
 async function load(id: number, req: LoadRequest) {
   latestLoad = id;
+  areaCache = null;
   cancelPool(); // a newer lot stops the helpers working on the old one
   const t0 = performance.now();
   const key = JSON.stringify([req.elevation, req.lotLonLat, req.bufferM, req.cellCap]);
@@ -76,7 +89,7 @@ async function load(id: number, req: LoadRequest) {
   const gammaDeg = convergenceDeg(req.lonLat, rasters.window.crs);
   const zmax = maxValue(dsm);
   const threads = threadCount(cells.count);
-  const data = threads > 1 ? await parallelHorizons(id, dsm, cells, zmax, threads, res) : await serialHorizons(id, dsm, cells, zmax, res);
+  const data = threads > 1 ? await parallelHorizons(id, dsm, cells, zmax, threads, res) : await serialHorizons(id, dsm, cells, zmax, res, () => id === latestLoad);
   const t2 = performance.now();
 
   state = {
@@ -116,7 +129,7 @@ async function load(id: number, req: LoadRequest) {
   post(msg, [msg.px.buffer, msg.py.buffer, msg.z0.buffer, msg.covered.buffer, msg.dsm.buffer, msg.dtm.buffer, ...(msg.changed ? [msg.changed.buffer] : [])]);
 }
 
-async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, res: number): Promise<Float32Array> {
+async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: number, res: number, keep: () => boolean): Promise<Float32Array> {
   const data = new Float32Array(cells.count * params.sectors);
   const input = { dsm, px: cells.px, py: cells.py, z0: cells.z0, count: cells.count, res };
   for (let start = 0; start < cells.count; start += HORIZON.chunkCells) {
@@ -124,7 +137,7 @@ async function serialHorizons(id: number, dsm: Raster, cells: CellSet, zmax: num
     computeHorizons(input, params, data, start, end, zmax);
     post({ type: 'progress', id, stage: 'horizon', done: end, total: cells.count });
     await yieldToEvents();
-    if (id !== latestLoad) throw new Cancelled();
+    if (!keep()) throw new Cancelled();
   }
   return data;
 }
@@ -151,7 +164,7 @@ async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: n
   try {
     workers = ranges.map(() => new Worker(new URL('./horizon.worker.ts', import.meta.url), { type: 'module' }));
   } catch {
-    return serialHorizons(id, dsm, cells, zmax, res); // no nested workers here
+    return serialHorizons(id, dsm, cells, zmax, res, () => id === latestLoad); // no nested workers here
   }
   return new Promise<Float32Array>((resolve, reject) => {
     let remaining = ranges.length;
@@ -195,9 +208,10 @@ async function parallelHorizons(id: number, dsm: Raster, cells: CellSet, zmax: n
   });
 }
 
-function compute(req: ComputeRequest): ComputeResult {
+function compute(req: ComputeRequest, horizons?: Horizons): ComputeResult {
   if (!state) throw Object.assign(new Error('Nothing loaded'), { code: 'not-loaded' as ErrorCode });
-  const { horizons: h, gammaDeg, lonLat } = state;
+  const h = horizons ?? state.horizons;
+  const { gammaDeg, lonLat } = state;
   const [lon, lat] = lonLat;
   const K = h.sectors;
   const prep = (d: LocalDate, stepMin: number) => prepareSamples(daySamples(d, lat, lon, stepMin), gammaDeg, K);
@@ -234,6 +248,42 @@ function compute(req: ComputeRequest): ComputeResult {
   }
 }
 
+function observerFromKey(key: string): Observer {
+  const o = JSON.parse(key) as Observer;
+  if (o.mode !== 'ground' && o.mode !== 'surface') throw new Error('Bad observer');
+  return o;
+}
+
+async function area(id: number, step: number, req: ComputeRequest) {
+  if (!state) throw Object.assign(new Error('Nothing loaded'), { code: 'not-loaded' as ErrorCode });
+  latestArea = id;
+  const generation = latestLoad;
+  const size = heatmapStep(state.dsm.width, state.dsm.height, state.res);
+  const used = Math.max(size, Math.round(step));
+  if (!areaCache || areaCache.generation !== generation || areaCache.step !== used || areaCache.observerKey !== state.observerKey) {
+    const cells = selectWindowCells(state.dsm, state.dtm, used, observerFromKey(state.observerKey), ELEVATION.coveredM);
+    const data = cells.count
+      ? await serialHorizons(id, state.dsm, cells, maxValue(state.dsm), state.res, () => id === latestArea && generation === latestLoad)
+      : new Float32Array(0);
+    if (id !== latestArea || generation !== latestLoad) throw new Cancelled();
+    areaCache = { generation, step: used, observerKey: state.observerKey, cells, horizons: { data, count: cells.count, sectors: params.sectors } };
+  }
+  const result = compute(req, areaCache.horizons);
+  if (result.kind === 'inspect') throw new Error('Heat map has no single cell to inspect');
+  const cells = areaCache.cells;
+  const msg: AreaMessage = {
+    type: 'area',
+    id,
+    step: cells.step,
+    px: cells.px.slice(),
+    py: cells.py.slice(),
+    covered: cells.covered.slice(),
+    values: result.values.slice(),
+    valueKind: result.kind,
+  };
+  post(msg, [msg.px.buffer, msg.py.buffer, msg.covered.buffer, msg.values.buffer]);
+}
+
 function errorCode(e: unknown): ErrorCode {
   if (e instanceof Cancelled || e instanceof CancelledBuild) return 'cancelled';
   if (e instanceof TileEdgeError) return 'tile-edge';
@@ -252,6 +302,8 @@ scope.onmessage = async (ev: MessageEvent<ToWorker>) => {
       await Promise.allSettled(msg.urls.map((u) => openImage(u)));
     } else if (msg.type === 'load') {
       await load(msg.id, msg.request);
+    } else if (msg.type === 'area') {
+      await area(msg.id, msg.step, msg.request);
     } else {
       const t0 = performance.now();
       const result = compute(msg.request);

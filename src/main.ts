@@ -10,6 +10,7 @@ import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
 import { IMAGERY_SOURCES } from './imagery/sources';
 import { initAbout } from './ui/about';
+import { initAnalysisChat } from './ui/analysisChat';
 import { defaultState, initControls, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
@@ -117,6 +118,28 @@ const timeline = new Timeline(
   () => initialTimeline(todayInVancouver(), nowMinuteInVancouver()),
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
+const analysisOpen = byId<HTMLButtonElement>('analysis-open');
+const analysisChat = initAnalysisChat(
+  {
+    open: analysisOpen,
+    panel: byId('analysis-dialog'),
+    log: byId('analysis-log'),
+    status: byId('analysis-status'),
+    form: byId('analysis-form'),
+    input: byId('analysis-input'),
+    chips: byId('analysis-chips'),
+  },
+  () => analysis.insight(),
+  async () => {
+    await analysis.playDay();
+    writeUrl(false);
+  },
+);
+analysis.bindHeatmap(byId<HTMLButtonElement>('heatmap-toggle'), byId('heatmap-note'));
+analysis.onResult = () => {
+  analysisOpen.hidden = false;
+  byId('heatmap-toggle').hidden = false;
+};
 analysis.onViewChange = () => writeUrl(false);
 analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
@@ -219,6 +242,9 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   lastLookup = { req, opts };
   clearMessage();
   hideLot(lotEls);
+  analysisOpen.hidden = true;
+  analysis.clearHeatmap();
+  analysisChat.reset();
   lotCanvas.clear();
   intro.hidden = true;
   shown = null;
@@ -301,6 +327,9 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
 
 /** Draw the chosen lot, then run elevation and sun for it. */
 async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number, steps: Steps, signal: AbortSignal) {
+  analysisOpen.hidden = true;
+  analysis.clearHeatmap();
+  analysisChat.reset();
   const parcel = found.candidates[selected];
   if (!parcel) return;
   shown = { match, found, selected };

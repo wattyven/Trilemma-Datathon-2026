@@ -153,6 +153,7 @@ export class Timeline {
   }
 
   play() {
+    if (this.timer) return;
     this.movedFromNight = false;
     const range = this.range();
     if (this.state.minute >= range.max) this.state.minute = range.min;
