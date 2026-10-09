@@ -16,7 +16,7 @@ afternoon.
 
 ## Using it
 
-- **Search** for an address (Metro Vancouver only). VanShade finds the lot, loads the LiDAR around it and colours the lot by
+- **Search** for an address (Metro Vancouver only), or tap **Use my location** to start from where you're standing. VanShade finds the lot, loads the LiDAR around it and colours the lot by
   hours of direct sun. A sentence at the top sums it up, e.g. "Most of the open ground here gets 4.5–7.5 hours of direct
   sun a day (part sun) from April to September. The sunniest part is toward the east…". First-time visitors get a short
   "How to read this" card, and the About panel explains the terms.
@@ -26,7 +26,8 @@ afternoon.
   - *One moment* shows sun or shade at a time you pick.
   - *Shade finder* shows how often each spot is shaded in a daily time window (say 1–6 pm through summer).
 - **Measure at** garden-bed height (0.3 m), seated (1.2 m) or on a roof or deck surface.
-- **Full / part sun / shade:** classes with adjustable thresholds (6 h and 3 h by default).
+- **Full / part sun / shade:** the default view, with adjustable thresholds (6 h and 3 h); untick it for exact hours. The
+  aerial photo is on by default where the municipality publishes one.
 - **Time slider and Play the day:** move the sun and its real-time shadows.
 - **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
   and its sun/shade through the day.
