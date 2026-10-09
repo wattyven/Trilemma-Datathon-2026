@@ -80,6 +80,8 @@ describe('headline wording', async () => {
     expect(h.sides('spread', 4, 'spread')).toBe('Sun is fairly even across the lot.');
     expect(h.sides('spread', 4, 'west')).toBe('The **west** side is shadiest.');
     expect(h.moment(0.35, '16:40', '2026-10-08')).toBe('At 4:40 pm on 8 October, **35% of the open ground** is in direct sun.');
+    expect(h.momentSide('east')).toBe('The sunny part is toward the **east**.');
+    expect(h.momentSide('spread')).toBe('The sunny spots are scattered across the lot.');
     expect(h.shade('south', 82, '13:00', '18:00', '2026-06-01', '2026-08-31')).toBe(
       'Between 1:00 pm and 6:00 pm, 1 June to 31 August, the shadiest part is toward the **south**, in shade about **82% of the time**.',
     );

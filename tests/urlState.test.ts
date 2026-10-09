@@ -65,8 +65,17 @@ describe('URL hash state', () => {
     expect(encodeHash({ photo: true, classes: true }, { photo: true, classes: true })).toBe('');
   });
 
-  it('starts new visitors on full / part sun / shade', () => {
-    expect(defaultState({ year: 2026, month: 10, day: 8 }, 600).classes).toBe(true);
+  it('starts new visitors on the sun right now, with full / part sun / shade for days and seasons', () => {
+    const d = defaultState({ year: 2026, month: 10, day: 8 }, 600);
+    expect(d.mode).toBe('moment');
+    expect(d.time).toBe('10:00');
+    expect(d.classes).toBe(true);
+  });
+
+  it('always writes the mode, so a link without one still means Season (the old default)', () => {
+    const linkDefaults: UrlState = { mode: 'season' };
+    expect(encodeHash({ mode: 'moment' }, linkDefaults)).toBe('#m=moment');
+    expect(encodeHash({ mode: 'season' }, linkDefaults)).toBe('');
   });
 
   it('tolerates a missing or junk hash', () => {

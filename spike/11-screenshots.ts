@@ -26,6 +26,8 @@ try {
   await desk.goto(base);
   await desk.screenshot({ path: join(OUT_DIR, 'review-intro.png') });
   await search(desk, '453 W 12th Ave, Vancouver');
+  await desk.locator('input[name="mode"][value="season"]').check(); // the default is One moment
+  await desk.locator(RESULT).waitFor();
   await desk.locator('#tl-date').fill('2026-06-21');
   await desk.locator('#tl-date').dispatchEvent('change');
   await desk.locator('#tl-time').evaluate((el: HTMLInputElement) => {

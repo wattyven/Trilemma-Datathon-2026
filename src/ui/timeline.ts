@@ -27,6 +27,11 @@ export function dayMinuteRange(date: LocalDate, lat: number, lon: number): { min
   };
 }
 
+/** Halfway between sunrise and sunset, on the slider step. */
+export function middayMinute(r: { min: number; max: number }): number {
+  return Math.round((r.min + r.max) / 2 / SLIDER_STEP_MIN) * SLIDER_STEP_MIN;
+}
+
 export function clampMinute(m: number, r: { min: number; max: number }): number {
   return Math.min(r.max, Math.max(r.min, Math.round(m / SLIDER_STEP_MIN) * SLIDER_STEP_MIN));
 }
@@ -51,17 +56,21 @@ export class Timeline {
   private reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   /** True once the time came from the user or a shared link (then we never move it for them). */
   private explicitTime = false;
+  /** True while the time shown is midday because it was dark when the lot opened. */
+  private movedFromNight = false;
 
   constructor(private els: TimelineElements, initial: TimelineState, private onChange: (s: TimelineState, dateChanged: boolean) => void) {
     this.state = { ...initial };
     els.date.addEventListener('change', () => {
       if (!parseIsoDate(els.date.value)) return;
       this.state.date = els.date.value;
+      this.movedFromNight = false;
       this.syncRange();
       this.emit(true);
     });
     els.slider.addEventListener('input', () => {
       this.explicitTime = true;
+      this.movedFromNight = false;
       this.state.minute = Number(els.slider.value);
       this.writeLabel();
       this.emit(false);
@@ -74,12 +83,18 @@ export class Timeline {
     return { ...this.state };
   }
 
+  /** Whether the time shown is midday only because it was dark when the lot opened. */
+  get showingMiddayForNight(): boolean {
+    return this.movedFromNight;
+  }
+
   /** Restore a saved date and/or time (from a shared link) without emitting a change. */
   set(date?: string, minute?: number) {
     if (date && parseIsoDate(date)) this.state.date = date;
     if (minute !== undefined && Number.isFinite(minute)) {
       this.state.minute = minute;
       this.explicitTime = true;
+      this.movedFromNight = false;
     }
     this.syncRange();
   }
@@ -94,7 +109,8 @@ export class Timeline {
     // Opening the app at night would show a dark lot: start at midday unless a time was chosen.
     const r = this.range();
     if (!this.explicitTime && (this.state.minute < r.min || this.state.minute > r.max)) {
-      this.state.minute = Math.round((r.min + r.max) / 2 / SLIDER_STEP_MIN) * SLIDER_STEP_MIN;
+      this.state.minute = middayMinute(r);
+      this.movedFromNight = true;
     }
     this.syncRange();
     this.els.root.hidden = false;
@@ -102,6 +118,7 @@ export class Timeline {
   }
 
   play() {
+    this.movedFromNight = false;
     const range = this.range();
     if (this.state.minute >= range.max) this.state.minute = range.min;
     const stepMin = this.reduceMotion ? 30 : 10;

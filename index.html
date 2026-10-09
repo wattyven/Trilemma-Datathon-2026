@@ -78,14 +78,14 @@
               <label class="check"><input type="checkbox" id="photo-toggle" /> Aerial photo</label>
               <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
               <label class="check opacity" id="opacity-wrap" hidden>Results
-                <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.7" aria-label="Results opacity over the photo" /></label>
+                <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Results opacity over the photo" /></label>
               <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
             </div>
           </div>
           <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
             <h2 id="tips-heading">How to read this</h2>
             <ul>
-              <li><strong>Colours</strong> on the lot: yellow is full sun, grey part sun and dark blue shade (in the hours view, yellow is the most sun). They're drawn over the aerial photo where there is one.</li>
+              <li><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
               <li><strong>Hatched spots</strong> are under a roof or tree.</li>
               <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
               <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
@@ -260,7 +260,7 @@
         <dt>Laser scans (LiDAR)</dt>
         <dd>Measurements of the ground, buildings and trees taken from an aircraft. VanShade uses scans from 2016 and, where they exist, 2024–2025.</dd>
         <dt>Full sun, part sun, shade</dt>
-        <dd>How the lot is coloured at first: full sun is 6 or more hours of direct sun a day, part sun 3 to 6 hours, shade under 3. You can change these numbers, or untick the option to see exact hours.</dd>
+        <dd>How the lot is coloured for a whole day or season: full sun is 6 or more hours of direct sun a day, part sun 3 to 6 hours, shade under 3. You can change these numbers, or untick the option to see exact hours.</dd>
         <dt>Season average</dt>
         <dd>The average number of hours of direct sun a day over the months you choose.</dd>
       </dl>

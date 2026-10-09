@@ -131,8 +131,8 @@ export const copy = {
   legend: {
     hours: 'Hours of direct sun a day',
     percent: 'Share of the time in shade',
-    sun: 'Sun',
-    shade: 'Shade',
+    sun: 'In direct sun',
+    shade: 'In shade',
     covered: 'Roof or tree overhead',
     changed: (oldYear: string, newYear: string) => `Changed since ${oldYear} (uses ${newYear} LiDAR)`,
     classes: (t: { fullSunH: number; partSunH: number }) =>
@@ -181,8 +181,9 @@ export const copy = {
     covered: (share: number) => `About ${Math.round(100 * share)}% of the lot is under a roof or trees and isn't counted.`,
     moment: (share: number, time: string, date: string, onSurface = false) =>
       `At ${fmtTime(time)} on ${fmtDate(date)}, **${Math.round(100 * share)}% of ${onSurface ? "the lot's surfaces" : 'the open ground'}** is in direct sun.`,
-    momentSide: (side: Side) => `The sunny part is toward the **${side}**.`,
+    momentSide: (side: Side) => (side === 'spread' ? 'The sunny spots are scattered across the lot.' : `The sunny part is toward the **${side}**.`),
     momentNight: (time: string, date: string) => `At ${fmtTime(time)} on ${fmtDate(date)}, the sun is down.`,
+    darkNow: "It's dark out now, so this shows midday.",
     shade: (side: Side, pct: number, from: string, to: string, start: string, end: string) => {
       const when = `Between ${fmtTime(from)} and ${fmtTime(to)}, ${fmtDate(start)} to ${fmtDate(end)}`;
       return side === 'spread'

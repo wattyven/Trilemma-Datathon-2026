@@ -31,7 +31,7 @@ export function defaultState(today: LocalDate, nowMinute: number): ControlState 
   const growing = PRESETS.growing(today.year);
   const rounded = Math.round(nowMinute / 10) * 10;
   return {
-    mode: 'season',
+    mode: 'moment', // the sun right now: the quickest thing to understand
     preset: 'growing',
     year: today.year,
     start: isoDate(growing.start),

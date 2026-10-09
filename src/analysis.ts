@@ -816,6 +816,7 @@ export class Analysis {
     if (sum.coveredShare >= MOSTLY_COVERED) return h.mostlyCovered;
     const parts: string[] = [];
     if (mode === 'moment') {
+      if (this.timeline.showingMiddayForNight) parts.push(h.darkNow);
       if (r.altDeg <= 0) parts.push(h.momentNight(s.time, s.date));
       else {
         parts.push(h.moment(sum.sunShare, s.time, s.date, onSurface));

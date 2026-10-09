@@ -312,9 +312,12 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
 
 // ── Shareable URL ────────────────────────────────────────────────────────────────
 
+/** Links from before "One moment" became the default left out `m` for Season, so links always carry the mode. */
+const LINK_DEFAULT_MODE = 'season';
+
 function urlDefaults(): UrlState {
   return {
-    mode: defaults.mode,
+    mode: LINK_DEFAULT_MODE,
     preset: defaults.preset,
     year: defaults.year,
     observer: defaults.observer,
@@ -398,6 +401,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     for (const k of ['mode', 'preset', 'year', 'start', 'end', 'observer', 'classes', 'fullSunH', 'partSunH', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime'] as const) {
       if (s[k] !== undefined) (patch as Record<string, unknown>)[k] = s[k];
     }
+    patch.mode ??= LINK_DEFAULT_MODE;
     controls.set(patch);
     timeline.set(s.date, s.time ? minutesOf(s.time) : undefined);
     if (s.view) analysis.setView(s.view);

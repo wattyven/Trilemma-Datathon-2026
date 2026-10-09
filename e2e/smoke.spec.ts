@@ -13,14 +13,20 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   // Results, legend, caveats and attribution.
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
-  // Full sun / part sun / shade is the default view.
-  await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
+  // "One moment" (now, or midday after dark) is the default view, and the link says so.
+  await expect(page.locator('input[name="mode"][value="moment"]')).toBeChecked();
+  await expect(page.locator('#legend')).toContainText('In direct sun');
+  await expect.poll(() => page.url()).toMatch(/m=moment/);
   // A first visit explains how to read the view, once.
   await expect(page.locator('#tips')).toBeVisible();
   await page.locator('#tips-close').click();
   await expect(page.locator('#tips')).toBeHidden();
 
   // The result in plain words, first thing in the panel.
+  await expect(page.locator('#result-headline')).toContainText(/is in direct sun/);
+  // Season shows full / part sun / shade.
+  await page.locator('input[name="mode"][value="season"]').check();
+  await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
@@ -65,6 +71,12 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(shared.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(shared.locator('input[name="mode"][value="day"]')).toBeChecked();
   await expect(shared.locator('#tips')).toBeHidden(); // already dismissed in this browser
+  // Links from before "One moment" became the default have no m=; they meant Season.
+  const legacy = await context.newPage();
+  await legacy.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC');
+  await expect(legacy.locator(RESULT)).toBeVisible();
+  await expect(legacy.locator('input[name="mode"][value="season"]')).toBeChecked();
+  await legacy.close();
 
   // About accuracy opens and closes.
   await shared.locator('#caveats [data-open-about]').click();
