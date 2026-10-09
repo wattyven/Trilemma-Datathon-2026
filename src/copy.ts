@@ -154,7 +154,8 @@ export const copy = {
   },
   // A second, quieter line under the headline: what the numbers compare with.
   summary: {
-    season: (_days: number, meanH: number) => `For comparison, open ground with nothing around it would get ${meanH.toFixed(1)} hours of sun a day.`,
+    season: (_days: number, meanH: number, typicalH?: number) =>
+      `For comparison, open ground with nothing around it would get ${meanH.toFixed(1)} hours of sun a day${typicalH !== undefined ? ` (about ${typicalH.toFixed(1)} with typical weather)` : ''}.`,
     day: (daylightH: number) => `There are ${daylightH.toFixed(1)} hours between sunrise and sunset that day.`,
     moment: (alt: number, az: number) =>
       alt <= 0 ? 'The sun is below the horizon.' : `The sun is ${Math.round(alt)}° above the horizon, in the ${compass(az)}.`,
@@ -223,6 +224,16 @@ export const copy = {
     legend: 'Hours of direct sun a day',
     spotSize: 'The maximum and minimum are for patches of open ground about 2 m × 2 m, the size of a small garden bed.',
   },
+  /** Typical weather: the clear-day hours scaled by how often the sun actually shines (an extra line, never the main number). */
+  weather: {
+    hours: (h: number) => `about ${tenth(h)} hours with typical weather`,
+    short: (h: number) => `about ${tenth(h)} h a day with typical weather`,
+    range: (low: number, high: number) => {
+      const lo = half(low), hi = half(high);
+      return hi - lo < 0.75 ? `With typical weather, expect about ${fmtH(half((low + high) / 2))} hours.` : `With typical weather, expect about ${fmtH(lo)}–${fmtH(hi)} hours.`;
+    },
+    source: (station: string, period: string) => `Typical weather: sunshine records at ${station} (${period}), adjusted for local cloud with Open-Meteo.`,
+  },
   inspector: {
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,
     monthlyTitle: (year: number) => `Average hours of direct sun a day, by month (${year})`,
@@ -237,6 +248,7 @@ export const copy = {
     asText: 'Show the months as a table',
     monthHeader: 'Month',
     hoursHeader: 'Hours of sun a day',
+    typicalHeader: 'With typical weather',
     covered: 'Roof or tree overhead',
     height: (z: number) => `Measured at ${z.toFixed(1)} m above sea level`,
     context: {
@@ -247,7 +259,7 @@ export const copy = {
       shade: (from: string, to: string, start: string, end: string) => `Shade finder: ${from}–${to}, ${start} to ${end}`,
     },
     presets: { growing: 'Growing season', summer: 'Summer', winter: 'Winter', year: 'Whole year' } as Record<string, string>,
-    hint: 'Click a spot on the lot (or focus the view and use the arrow keys, then Enter) to see its sun month by month.',
+    hint: 'Click a spot on the lot to see its sun month by month.',
   },
   timeline: {
     play: 'Play the day',

@@ -1,19 +1,19 @@
 # VanShade
 
 **Where does the sun fall on your lot?** Type a Metro Vancouver address and VanShade shows your lot in 3D, with its real
-neighbours, trees and buildings, and works out how many hours of direct sun each square metre gets: right now, on any day, or
-averaged over a season. Gardeners use it to find full-sun spots for vegetables; anyone can use it to find shade for a summer
-afternoon.
+neighbours, trees and buildings, and works out how many hours of direct sun each square metre gets over the dates you choose,
+on clear days and with typical weather. Gardeners use it to find full-sun spots for vegetables; Advanced mode adds any day,
+any moment and a shade finder for a summer patio.
 
 **Live:** https://vanshade.ca
 
 VanShade is our entry for the **Trilemma Datathon 2026**. The original proposal is below, under [Why we built it](#why-we-built-it).
 
-![VanShade showing Vancouver City Hall's lot in 3D over its aerial photo, coloured by full sun, part sun and shade over the growing season, with the day's sun path](docs/screenshots/desktop.png)
+![VanShade in Basic mode at Vancouver City Hall: the maximum and minimum hours of direct sun from April to September, with typical weather, above a full-width 3D view of the lot over its aerial photo](docs/screenshots/desktop.png)
 
 <p>
   <img src="docs/screenshots/inspector.png" alt="The spot inspector: average sun-hours by month and the sun/shade strip for one day" width="480">
-  <img src="docs/screenshots/mobile.png" alt="VanShade on a phone: the 3D view, with the result in a bottom sheet" width="220">
+  <img src="docs/screenshots/mobile.png" alt="VanShade on a phone: the maximum and minimum hours and the dates above the 3D view" width="220">
 </p>
 
 ## Why we built it
@@ -60,56 +60,50 @@ how VanShade follows it:
 - **LiDAR:** instead of the Metro Vancouver portal, VanShade reads NRCan's 1 m elevation model and 0.5 m point clouds, and
   the Province's 2024–2025 LidarBC surveys, straight from the browser, so trees, fences and roof shapes all cast shade.
 - **SunCalc:** gives the sun's position for every step of the period.
-- **Averages over a period:** *Season* averages any range of dates (the growing season by default); *One day*, *One
-  moment* and the *Shade finder* go beyond the proposal.
-- **The range of hours:** the headline gives the hours most of the open ground gets, and any spot's month-by-month hours
-  are a click away.
-- **Sunniest and shadiest spots:** pins mark them. They're the largest patches of the sunniest and shadiest ground, not a
-  single square metre, which is often a sliver at a lot edge.
-- **Weather:** not modelled. The hours are direct sun on clear days (see [Accuracy, in short](#accuracy-in-short)).
+- **Averages over a period:** Basic mode averages any range of dates (the growing season by default); Advanced mode's *One
+  day*, *One moment* and *Shade finder* go beyond the proposal.
+- **Minimum and maximum hours, and where:** Basic mode's summary gives both, with the direction of each spot on the lot.
+- **Sunniest and shadiest spots:** pins mark them. They're patches about 2 m × 2 m (a small garden bed) rather than a single
+  square metre, which is often a sliver against a wall.
+- **Weather:** each figure also comes "with typical weather", from Environment Canada's measured sunshine records adjusted for
+  local cloud. Clear-day hours stay the main figure, because that's how plant labels count full sun.
 
 ## Using it
 
 - **Search** for an address (Metro Vancouver only), or tap **Use my location** to start from where you're standing. VanShade
-  finds the lot, loads the LiDAR around it and shows where the sun is falling right now. A sentence at the top sums it up,
-  e.g. "At 3:30 pm on 21 June, 78% of the open ground is in direct sun." After dark it shows midday instead, and says so.
-  First-time visitors get a short "How to read this" card, and the About panel explains the terms.
-- **Show:**
-  - *One moment* (the default) shows sun or shade now, or at a time you pick.
-  - *One day* gives the sun-hours for a single day.
-  - *Season* averages daily sun over a preset or custom range (the growing season by default), e.g. "Most of the open
-    ground here gets 4.5–7.5 hours of direct sun a day (part sun) from April to September."
-  - *Shade finder* shows how often each spot is shaded in a daily time window (say 1–6 pm through summer).
-- **Measure at** garden-bed height (0.3 m), seated (1.2 m) or on a roof or deck surface.
-- **Full / part sun / shade:** how One day and Season are coloured, with adjustable thresholds (6 h and 3 h); untick it
-  for exact hours. The aerial photo is on by default where the municipality publishes one, with the colours at half
-  strength over it.
-- **Sunniest and shadiest spots:** in One day, Season and Shade finder, pins mark the largest patch of the sunniest and of
-  the shadiest ground, and the headline describes the same two places. Click a pin for that spot's sun month by month.
-- **Time slider, Now and Play the day:** move the sun and its shadows between sunrise and sunset (both shown).
-- **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
-  and its sun/shade through the day.
-- **Elevation data:** where both surveys exist, choose *Best of both* (2016 detail, updated wherever something changed by
-  2025; the default), *Newest survey* (2025, 1 m) or *Most detailed* (2016, 0.5 m). *Show changes since 2016* hatches what
-  changed.
+  finds the lot and loads the LiDAR around it; the address bar then moves up beside the name, and the VanShade title takes
+  you back to the start. First-time visitors get a short "How to read this" card, and the About panel explains the terms.
+- **Basic mode** (the default) has one setting, the dates (1 April to 30 September unless you change them), and a summary:
+  - **Maximum** and **minimum** average hours of direct sun a day, for patches of open ground about 2 m × 2 m, and where they
+    are: "Maximum: 11.6 hours, in the east". Click the direction to find its pin.
+  - Under each, the hours to expect **with typical weather** (see [How it works](#how-it-works)).
+  - The view spans the page, coloured from the lot's own fewest to most hours. **Max** and **Min** pins mark the two spots.
+- **Advanced mode** (the switch at the top right) is the full toolkit:
+  - *One moment* (now, or a time you pick), *One day*, *Season* and *Shade finder* (how often each spot is shaded in a daily
+    time window, say 1–6 pm through summer).
+  - **Measure at** garden-bed height (0.3 m), seated (1.2 m) or on a roof or deck surface.
+  - **Full / part sun / shade** colours with adjustable thresholds (6 h and 3 h), or exact hours.
+  - **Time slider, Now and Play the day**, with sunrise and sunset; real-time 3D shadows.
+  - **3D data:** *Best of both* (2016 detail, updated wherever something changed by 2025; the default), *Newest survey*
+    (2025, 1 m) or *Most detailed* (2016, 0.5 m); *Show changes since 2016* hatches what changed.
+- **Click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's sun month by
+  month (with a typical-weather column in the table view) and through the day.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
-  North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), drape the photo under the results, with a
-  slider for the colours' strength.
-- **Copy link:** the address, lot, mode, dates, time and photo setting are all in the URL. Shared links show a preview
-  card in chat apps and social media.
-- **Copy embed code:** an `<iframe>` for the current lot and time, for a blog or a garden club page. The embedded view is
-  compact (the 3D view, the result, the modes and the time slider) with a link to the full site.
+  North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), the photo sits under the results.
+- **Copy link:** the address, lot, dates and settings are in the URL (`adv=1` for Advanced mode). Shared links show a
+  preview card in chat apps and social media.
+- **Copy embed code:** an `<iframe>` for the current lot, for a blog or a garden club page, with a link to the full site.
 
 ## Embed it
 
-Put a live VanShade view on your own page, such as a blog post or a garden club site. Open a lot, choose the mode, date and
-time, then press **Copy embed code**. You get an iframe like this one:
+Put a live VanShade view on your own page, such as a blog post or a garden club site. Open a lot, choose the dates (or a
+mode in Advanced), then press **Copy embed code**. You get an iframe like this one:
 
 ```html
-<iframe src="https://vanshade.ca/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;m=moment&amp;d=2026-06-21&amp;t=15%3A30&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
+<iframe src="https://vanshade.ca/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
 ```
 
-The embed keeps the 3D view, the result, the modes and the time slider, credits the data, and links to the full site.
+The embed keeps the 3D view and the result, credits the data, and links to the full site.
 
 ## How it works
 
@@ -133,7 +127,11 @@ address ─▶ BC Address Geocoder (parcel point) ─▶ ParcelMap BC WFS (lot p
    and grids the highest return per 0.5 m. The other is the Province's 2024/2025 LidarBC surveys at 1 m. By default it
    combines them: the 2016 detail wherever the two surveys agree, and 2025 wherever something changed by more than 2.5 m
    (a new tower, a demolished house, trees removed). The heights are checked against NRCan's ground model before use.
-5. **Grid north isn't true north.** The elevation grid (EPSG:3979) is rotated about 25° from true north in Vancouver.
+5. **Typical weather.** Each sampled day's clear-day hours are scaled by the share of daylight the sun usually shines that
+   time of year: Environment Canada's measured sunshine at Vancouver or Abbotsford airport (about 22% in January, 60% in
+   July), adjusted for local cloud with Open-Meteo's weather model (the North Shore and the eastern valley are 4–11% less
+   sunny). Long periods weight sunny and cloudy months by their days.
+6. **Grid north isn't true north.** The elevation grid (EPSG:3979) is rotated about 25° from true north in Vancouver.
    VanShade computes that per lot and applies it everywhere, from sun directions to drawing.
 
 The engine is covered by tests for:
@@ -149,7 +147,8 @@ The engine is covered by tests for:
 - The LiDAR has a date. Most of Metro Vancouver is 2016 in the first result. Where the newer LidarBC surveys are available
   (2024–2025), they replace it. Anything built or grown since isn't in it.
 - Trees count as solid all year. Deciduous trees let more winter sun through.
-- It's potential direct sun on clear days, not adjusted for weather.
+- The main numbers are potential direct sun on clear days. "With typical weather" is an average from sunshine records, not a
+  forecast; fog and mountain cloud vary more than it shows.
 - Only things within about 200 m cast shadows, so distant hills aren't included.
 
 The app's **About accuracy** panel has the details.
@@ -163,6 +162,7 @@ The app's **About accuracy** panel has the details.
 | Elevation | NRCan High Resolution Digital Elevation Model (HRDEM) 1 m mosaic, and CanElevation LiDAR point clouds | Open Government Licence – Canada |
 | Newer elevation | LidarBC 1 m surface and ground models (2024, 2025), read through [a small CORS proxy](proxy/lidarbc) | Open Government Licence – British Columbia |
 | Aerial photos | Each municipality's orthophoto service (list in the app's About panel) | Each municipality's Open Government Licence |
+| Typical weather | Environment and Climate Change Canada climate normals (hours of bright sunshine, Vancouver and Abbotsford airports), adjusted with [Open-Meteo](https://open-meteo.com/) historical weather (ECMWF, Copernicus ERA5) | Open Government Licence – Canada; CC BY 4.0 |
 
 Built with [three.js](https://threejs.org/), [SunCalc](https://github.com/mourner/suncalc),
 [geotiff.js](https://geotiffjs.github.io/), [proj4js](https://github.com/proj4js/proj4js),
@@ -204,6 +204,7 @@ The app is a static Vite + TypeScript site with no backend. The one optional exc
 | `src/data/` | geocoder, ParcelMap BC, scope rules (Metro Vancouver jurisdictions) |
 | `src/elevation/` | STAC lookup, pixel windows, COG reads, LiDAR vintage, point clouds and LidarBC (the sharper surfaces) |
 | `src/imagery/` | municipal aerial photos: sources, fetching, placement |
+| `src/weather/` | typical weather: airport sunshine normals and the local cloud pattern |
 | `proxy/lidarbc/` | the Cloudflare Worker that adds CORS headers to LidarBC |
 | `src/engine/` | cells, horizons, sun sampling, outputs; the worker protocol and client |
 | `src/workers/` | the shade worker and its horizon helper threads |

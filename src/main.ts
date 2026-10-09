@@ -9,7 +9,7 @@ import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from '
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver } from './engine/sun';
 import { IMAGERY_SOURCES } from './imagery/sources';
-import { initAbout } from './ui/about';
+import { initAbout, initDialog } from './ui/about';
 import { defaultState, initControls, seasonRange, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
@@ -73,6 +73,9 @@ const analysisEls: AnalysisElements = {
   changesLabel: byId('changes-label'),
   spotLayer: byId('spot-layer'),
   basicSummary: byId('basic-summary'),
+  basicPeriod: byId('basic-period'),
+  numbersOpen: byId<HTMLButtonElement>('numbers-open'),
+  numbersBody: byId('numbers-body'),
 };
 
 const today = todayInVancouver();
@@ -123,6 +126,14 @@ analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
+initDialog(byId<HTMLDialogElement>('numbers-info'), [byId('numbers-open')]);
+
+// Basic lists the aerial photo's credit as a bullet under the lot notices; Advanced keeps it under the view.
+const photoCredit = byId('photo-credit'), photoCreditItem = byId('photo-credit-item');
+new MutationObserver(() => {
+  photoCreditItem.textContent = photoCredit.textContent;
+  photoCreditItem.hidden = photoCredit.hidden || !photoCredit.textContent;
+}).observe(photoCredit, { attributes: true, attributeFilter: ['hidden'], childList: true, characterData: true, subtree: true });
 const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId('lot-heading'));
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
@@ -136,6 +147,38 @@ new ResizeObserver(setPageWidth).observe(document.documentElement);
 setPageWidth();
 
 // ── Basic and Advanced ───────────────────────────────────────────────────────────
+
+// Basic puts the 3D / Map toolbar and the legend inside the map, and sizes the map to fit the
+// window (on screens wider than a phone); Advanced keeps them above and below it.
+const stage = document.querySelector<HTMLElement>('.view-stage')!;
+const toolbar = document.querySelector<HTMLElement>('.view-toolbar')!;
+const legend = byId('legend');
+const toolbarHome = document.createComment('toolbar'), legendHome = document.createComment('legend');
+toolbar.before(toolbarHome);
+legend.before(legendHome);
+const wide = window.matchMedia('(min-width: 721px)');
+
+function placeOverlays(basic: boolean) {
+  if (basic) stage.append(toolbar, legend);
+  else {
+    toolbarHome.after(toolbar);
+    legendHome.after(legend);
+  }
+}
+
+/** Basic on a laptop or desktop: the whole map within the window, below the summary. */
+function fitView() {
+  if (advanced || !wide.matches || byId('lot').hidden) {
+    stage.style.height = '';
+    return;
+  }
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  stage.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
+}
+window.addEventListener('resize', fitView);
+const refit = new ResizeObserver(fitView);
+for (const id of ['basic-summary', 'basic-head', 'basic-dates', 'lot-heading']) refit.observe(byId(id));
+refit.observe(document.querySelector('.site-header')!);
 
 const advancedToggle = byId<HTMLButtonElement>('advanced-toggle');
 const basicFrom = byId<HTMLInputElement>('basic-from');
@@ -157,6 +200,8 @@ function setAdvanced(on: boolean, recompute = true) {
   advanced = on;
   advancedToggle.setAttribute('aria-checked', String(on));
   document.documentElement.classList.toggle('basic', !on);
+  placeOverlays(!on);
+  queueMicrotask(fitView);
   if (on) sheet?.collapse();
   else lotInfo.dataset.sheet = 'expanded'; // no bottom sheet in Basic
   if (on) return analysis.setBasic(false);
@@ -282,6 +327,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   hideLot(lotEls);
   lotCanvas.clear();
   intro.hidden = true;
+  document.documentElement.classList.add('has-lot'); // the address bar tucks into the header
   shown = null;
 
   if (req.kind === 'text' && !req.text) {
@@ -533,7 +579,33 @@ async function applyUrl(hash: string): Promise<boolean> {
   return true;
 }
 
-window.addEventListener('popstate', () => void applyUrl(location.hash));
+/** Back to the start page: no lot, the intro, an empty address bar (the VanShade title, or Back to it). */
+function goHome(push: boolean) {
+  current?.abort();
+  current = null;
+  shown = null;
+  lastLookup = null;
+  clearMessage();
+  statusList.hidden = true;
+  hideLot(lotEls);
+  lotCanvas.clear();
+  intro.hidden = false;
+  document.documentElement.classList.remove('has-lot');
+  search.setValue('');
+  if (push && location.hash) history.pushState(null, '', location.pathname + location.search);
+  window.scrollTo(0, 0);
+  input.focus();
+}
+
+byId<HTMLAnchorElement>('home-link').addEventListener('click', (e) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // a new tab or window: let the link work
+  e.preventDefault();
+  goHome(true);
+});
+
+window.addEventListener('popstate', async () => {
+  if (!(await applyUrl(location.hash))) goHome(false);
+});
 
 // ── Copy link ────────────────────────────────────────────────────────────────────
 

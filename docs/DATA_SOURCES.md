@@ -550,3 +550,34 @@ switching between the three choices afterwards takes 0.3–1.9 s, because the wo
 data (wires, poles, birds), replacing them with the neighbours' median. Roof edges and 2 × 2 chimneys stay.
 
 **Vertical walls** are a rendering change only (`scene/terrain.ts` `buildTerraced`); see [`DEVELOPMENT.md`](DEVELOPMENT.md).
+
+## 8. Typical weather (2026-10-09)
+
+**Measured sunshine: Environment Canada's climate normals.**
+- `api.weather.gc.ca/collections/climate-normals/items` (OGC API, `Access-Control-Allow-Origin: *`, Open Government Licence – Canada).
+- The element is named `Total hours bright sunshine`; `MONTH` 1–12, plus 13 for the year.
+- Within the region only two stations have it:
+
+| Station | Climate ID | Record | Annual hours |
+|---|---|---|---|
+| Vancouver Int'l A | 1108447 | 1981–2000 (recorder retired) | 1,938 |
+| Abbotsford A | 1100030 | 1981–2001 | 1,887 |
+
+- Haney UBC RF Admin (1103332) has 1981–89 only (1,332 h a year), and isn't used.
+- As a share of sunrise-to-sunset hours, Vancouver's is about 22% in January and 60% in July (April–September about 53%).
+
+**Other sources checked:**
+
+| Source | What it gives | Verdict |
+|---|---|---|
+| Open-Meteo historical weather (`archive-api.open-meteo.com`, CORS `*`, CC BY 4.0) | Daily modelled `sunshine_duration` at roughly 9–25 km | Its levels run high (January 43% at the airport vs about 22% measured), so it supplies only the **ratio** between a place and its nearer airport. The North Shore is about 3–4 points below the airport, the eastern valley 4–11%. 4-year daily requests hit 429 without a pause; 1.2 s between requests is fine. |
+| Iowa Environmental Mesonet METAR archive | Hourly cloud reports | Only CYVR and CYXX (the same two airports); Pitt Meadows, Boundary Bay, Langley and Vancouver Harbour aren't archived. |
+| NASA POWER climatology (CORS `*`) | Cloud amount and clearness index | One cell of about 0.5° × 0.625° covers the whole region: no local detail. |
+| WeatherCAN | Environment Canada's app | No public feed of its own; this API is the open source of the same data. |
+
+**As built.** `spike/25-weather.ts` writes `src/weather/sunshine.json` (about 6 KB): both stations' monthly hours and a 9 × 6
+grid (0.15° × 0.1°) of Open-Meteo ratios for 2021–2024, each relative to its nearer airport. At run time:
+- A lot's monthly share is blended from its four surrounding grid points.
+- Each sampled day's factor interpolates between mid-month shares.
+- Typical hours are the average of clear-day hours × factor.
+

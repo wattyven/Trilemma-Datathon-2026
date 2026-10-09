@@ -18,9 +18,22 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   // Basic is the default: the lot's maximum and minimum average daily hours, and one setting, the dates.
   await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
   const summary = page.locator('#basic-summary');
-  await expect(summary).toContainText(/Average hours of direct sun a day, 1 April to 30 September/);
+  await expect(page.locator('#basic-period')).toHaveText(/Average hours of direct sun a day, 1 April to 30 September/);
   await expect(summary).toContainText(/Maximum:\s*([\d.]+) hours, in the/);
   await expect(summary).toContainText(/Minimum:\s*([\d.]+) hours, (in|near) the/);
+  // Typical weather as an extra line; its source and the other fine print in the "About these numbers" pop-up.
+  await expect(summary).toContainText(/about ([\d.]+) hours with typical weather/);
+  const numbers = page.locator('#numbers-info');
+  await expect(numbers).toBeHidden();
+  await page.locator('#numbers-open').click();
+  await expect(numbers).toBeVisible();
+  await expect(numbers).toContainText('Typical weather: sunshine records at Vancouver airport');
+  await expect(numbers).toContainText('about 2 m × 2 m');
+  await page.keyboard.press('Escape');
+  await expect(numbers).toBeHidden();
+  // In Basic the 3D / Map switch and the legend sit inside the map, and the map fits the window.
+  await expect(page.locator('.view-stage .view-toolbar')).toBeVisible();
+  await expect(page.locator('.view-stage #legend')).toBeVisible();
   await expect(page.locator('#basic-from')).toHaveValue(/^\d{4}-04-01$/);
   await expect(page.locator('#sun-controls')).toBeHidden(); // modes, Measure at, 3D data: Advanced only
   await expect(page.locator('#timeline')).toBeHidden();
@@ -43,7 +56,7 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await page.locator('#basic-from').fill('2026-06-01');
   await page.locator('#basic-to').fill('2026-06-30');
   await page.locator('#basic-to').dispatchEvent('change');
-  await expect(summary).toContainText('1 June to 30 June');
+  await expect(page.locator('#basic-period')).toContainText('1 June to 30 June');
   await expect.poll(() => page.url()).toMatch(/cs=2026-06-01&ce=2026-06-30/);
   expect(page.url()).not.toMatch(/[#&](adv|t|m)=/);
 
@@ -61,7 +74,7 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   const shared = await context.newPage();
   await shared.goto(page.url());
   await expect(shared.locator(RESULT)).toBeVisible();
-  await expect(shared.locator('#basic-summary')).toContainText('1 June to 30 June');
+  await expect(shared.locator('#basic-period')).toContainText('1 June to 30 June');
   await expect(shared.locator('#tips')).toBeHidden(); // already dismissed in this browser
   // Links that use a setting only Advanced has (like older links with a mode) open in Advanced.
   const older = await context.newPage();
@@ -76,6 +89,20 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect(shared.locator('#about')).toBeVisible();
   await shared.keyboard.press('Escape');
   await expect(shared.locator('#about')).toBeHidden();
+
+  // With a lot showing, the address bar sits in the header row beside the name, still usable.
+  await expect(page.locator('html')).toHaveClass(/\bhas-lot\b/);
+  const bar = (await page.locator('#address-input').boundingBox())!, name = (await page.locator('#home-link').boundingBox())!;
+  expect(Math.abs(bar.y + bar.height / 2 - (name.y + name.height / 2))).toBeLessThan(20);
+  await expect(page.locator('#address-input')).toBeEditable();
+  // The title goes back to the start page; Back returns to the lot.
+  await page.locator('#home-link').click();
+  await expect(page.locator('#intro')).toBeVisible();
+  await expect(page.locator('#lot')).toBeHidden();
+  await expect(page.locator('html')).not.toHaveClass(/\bhas-lot\b/);
+  expect(new URL(page.url()).hash).toBe('');
+  await page.goBack();
+  await expect(page.locator(RESULT)).toBeVisible();
 });
 
 test('Advanced: modes, time, 3D data, inspector and links', async ({ page, context }) => {
@@ -98,6 +125,8 @@ test('Advanced: modes, time, 3D data, inspector and links', async ({ page, conte
   await page.locator('input[name="mode"][value="season"]').check();
   await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
+  await expect(page.locator('#result-headline')).toContainText(/With typical weather, expect about/);
+  await expect(page.locator('#result-summary')).toContainText(/with typical weather/);
   await expect(page.locator('.spot-pin[data-kind="sunniest"]')).toContainText(/^Max ([\d.]+|0) h/);
   await expect(page.locator('.spot-pin[data-kind="shadiest"]')).toBeVisible();
   // The timeline shows the day's sunrise and sunset, and Now returns to the current time.
@@ -172,12 +201,12 @@ test('embed: "Copy embed code" gives an iframe that works on another page', asyn
   const frame = host.frameLocator('iframe');
   await expect(frame.locator(RESULT)).toBeVisible();
   await expect(frame.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
-  await expect(frame.locator('#basic-summary')).toContainText('1 June to 30 June');
+  await expect(frame.locator('#basic-period')).toContainText('1 June to 30 June');
   await expect(frame.locator('#basic-summary')).toContainText(/Maximum:\s*([\d.]+) hours/);
   await expect(frame.locator('#basic-dates')).toBeHidden(); // the embedding page fixed the dates
   // The compact layout: no site header (kept for screen readers only), search or tips; a link back
   // to the full site.
-  expect(await frame.locator('.site-header').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+  expect(await frame.locator('.site-header .brand').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
   await expect(frame.locator('#search-form')).toBeHidden();
   await expect(frame.locator('#tips')).toBeHidden();
   await expect(frame.locator('#embed-bar')).toContainText('Open Government Licences');

@@ -16,7 +16,8 @@ import { EngineError, ShadeEngine } from './engine/client';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, isoDate, momentSample, type LocalDate, type SunSample } from './engine/sun';
 import { MOSTLY_COVERED, sideOf, summarizeLot } from './engine/lotSummary';
-import { findSpots, type Spots } from './engine/spots';
+import { findSpots, quantile, type Spot, type Spots } from './engine/spots';
+import { localSunshine, type Sunshine } from './weather/sunshine';
 import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
@@ -62,8 +63,11 @@ export interface AnalysisElements {
   changesLabel: HTMLElement;
   /** The layer over the view that holds the sunniest / shadiest pins. */
   spotLayer: HTMLElement;
-  /** Basic mode's maximum / minimum summary. */
+  /** Basic mode's maximum / minimum summary, its dates line beside the address, and the "About these numbers" pop-up. */
   basicSummary: HTMLElement;
+  basicPeriod: HTMLElement;
+  numbersOpen: HTMLButtonElement;
+  numbersBody: HTMLElement;
 }
 
 /** The date halfway between two dates (calendar maths only). */
@@ -373,6 +377,8 @@ export class Analysis {
     this.result = null;
     this.clearPins();
     this.els.basicSummary.replaceChildren();
+    this.els.basicPeriod.textContent = '';
+    this.els.numbersOpen.hidden = true;
     this.els.inspector.hidden = true;
     this.inspectedCell = null;
     this.els.summary.textContent = '';
@@ -673,10 +679,18 @@ export class Analysis {
     return { ...this.controls.get(), date: t.date, time: minuteLabel(t.minute) };
   }
 
+  /** Typical weather at the lot (the nearer airport's sunshine record, adjusted locally). */
+  private weather(): Sunshine | null {
+    return this.lotRequest ? localSunshine(this.lotRequest.lonLat) : null;
+  }
+
   private async compute(signal?: AbortSignal) {
     if (!this.loaded) return;
     const seq = ++this.computeSeq;
-    const { result, ms } = await engine().compute(requestFor(this.state()), signal);
+    const request = requestFor(this.state());
+    const w = this.weather();
+    if (request.kind === 'season' && w) request.sunshine = w.shares;
+    const { result, ms } = await engine().compute(request, signal);
     if (seq !== this.computeSeq) return; // superseded
     this.result = result;
     this.timings = { ...this.timings, computeMs: ms };
@@ -837,7 +851,7 @@ export class Analysis {
     if (!r) return;
     const t = copy.summary;
     this.els.summary.textContent =
-      r.kind === 'season' ? t.season(r.days, r.meanDaylightH)
+      r.kind === 'season' ? t.season(r.days, r.meanDaylightH, r.meanTypicalH)
       : r.kind === 'day' ? t.day(r.daylightH)
       : r.kind === 'moment' ? t.moment(r.altDeg, r.azTrueDeg)
       : r.kind === 'shade' ? t.shade(r.windowHours ? (100 * r.sunUpHours) / r.windowHours : 0, r.days)
@@ -888,27 +902,46 @@ export class Analysis {
     return out;
   }
 
+  /** The values of open cells (not under a roof or tree, with data). */
+  private openValues(values: ArrayLike<number>): number[] {
+    const covered = this.summaryCovered();
+    const out: number[] = [];
+    for (let i = 0; i < values.length; i++) if (!covered[i] && values[i] === values[i]) out.push(values[i]!);
+    return out;
+  }
+
+  /** A spot's typical-weather hours: the mean over its cells, like its clear-day value. */
+  private typicalAt(spot: Spot): number | null {
+    const r = this.result;
+    if (r?.kind !== 'season' || !r.typical) return null;
+    return spot.cells.reduce((s, i) => s + r.typical![i]!, 0) / spot.cells.length;
+  }
+
   /** Basic mode: "Maximum: 11.5 hours, in the north-east", the same for the minimum, and the dates. */
   private renderBasicSummary() {
     const el = this.els.basicSummary;
     el.replaceChildren();
+    this.els.basicPeriod.textContent = '';
+    this.els.numbersOpen.hidden = true;
     const r = this.result;
     if (!this.basic || !r || r.kind !== 'season') return;
     const b = copy.basic;
     const { start, end } = seasonRange(this.controls.get());
     const p = (className: string, textContent: string) => Object.assign(document.createElement('p'), { className, textContent });
-    el.append(p('period', b.period(isoDate(start), isoDate(end))));
+    this.els.basicPeriod.textContent = b.period(isoDate(start), isoDate(end));
     const range = this.openRange();
     if (range.coveredShare >= MOSTLY_COVERED || !range.open.length) {
       el.append(p('note', b.mostlyCovered));
       return;
     }
     const { sunniest, shadiest } = this.spots;
-    if (!sunniest || !shadiest) el.append(p('even', b.even(range.low, range.high)));
+    // The figures, with "About these numbers" at the end of the same row.
+    const row = Object.assign(document.createElement('div'), { className: 'basic-stats-row' });
+    el.append(row);
+    if (!sunniest || !shadiest) row.append(p('even', b.even(range.low, range.high)));
     else {
       const dl = Object.assign(document.createElement('dl'), { className: 'basic-stats' });
       for (const [kind, spot] of [['sunniest', sunniest], ['shadiest', shadiest]] as const) {
-        const row = document.createElement('div');
         const dt = document.createElement('dt');
         const dot = Object.assign(document.createElement('span'), { className: 'spot-dot' });
         dot.dataset.kind = kind;
@@ -920,13 +953,22 @@ export class Analysis {
         show.addEventListener('click', () => this.highlightSpot(kind));
         const dd = document.createElement('dd');
         dd.append(Object.assign(document.createElement('strong'), { textContent: b.hours(spot.value) }), `, ${before} `, show);
-        row.append(dt, dd);
-        dl.append(row);
+        const typical = this.typicalAt(spot);
+        if (typical !== null && typical >= 0.05) dd.append(Object.assign(document.createElement('span'), { className: 'typical', textContent: copy.weather.hours(typical) }));
+        const item = document.createElement('div');
+        item.append(dt, dd);
+        dl.append(item);
       }
-      el.append(dl);
+      row.append(dl);
     }
-    if (sunniest && shadiest) el.append(p('note', b.spotSize));
-    if (range.coveredShare >= 0.05) el.append(p('note', copy.headline.covered(range.coveredShare)));
+    // The fine print goes in the "About these numbers" pop-up, so the summary stays two lines.
+    const notes: string[] = [];
+    if (sunniest && shadiest) notes.push(b.spotSize);
+    const w = this.weather();
+    if (w && r.typical) notes.push(copy.weather.source(w.station.short, w.station.period));
+    if (range.coveredShare >= 0.05) notes.push(copy.headline.covered(range.coveredShare));
+    this.els.numbersBody.replaceChildren(...notes.map((t) => p('', t)));
+    this.els.numbersOpen.hidden = !notes.length;
   }
 
   /** Point at a spot: pulse its pin, put the 3D ring there and bring the view into sight. */
@@ -1013,6 +1055,10 @@ export class Analysis {
       const cls = h.classNames[sum.medianClass];
       const period = s.preset === 'custom' ? h.customPeriod(s.start, s.end) : (h.periods[s.preset] ?? '');
       parts.push(mode === 'day' ? h.day(sum.low, sum.high, cls, s.date, onSurface) : h.season(sum.low, sum.high, cls, period, onSurface));
+      if (r.kind === 'season' && r.typical) {
+        const t = this.openValues(r.typical).sort((x, y) => x - y);
+        if (t.length) parts.push(copy.weather.range(quantile(t, 0.25), quantile(t, 0.75)));
+      }
       parts.push(h.sides(sum.sunniest.side, sum.sunniest.value, sum.shadiest.side));
     }
     if (!onSurface && sum.coveredShare >= 0.05 && parts.length) parts.push(h.covered(sum.coveredShare));
@@ -1045,12 +1091,15 @@ export class Analysis {
     const s = this.state();
     const date = this.timeline.localDate();
     try {
-      const { result } = await engine().compute({ kind: 'inspect', cell, date, year: s.year });
+      const { result } = await engine().compute({ kind: 'inspect', cell, date, year: s.year, sunshine: this.weather()?.shares });
       if (result.kind !== 'inspect' || seq !== this.pickSeq) return;
+      const r = this.result;
+      const typical = r?.kind === 'season' && r.typical ? copy.weather.short(r.typical[cell]!) : '';
       renderInspector(this.els.inspector, {
         heading: this.valueText(cell),
-        details: [this.contextText(s), l.covered[cell] ? copy.inspector.covered : '', copy.inspector.height(l.z0[cell]!)].filter(Boolean),
+        details: [typical, this.contextText(s), l.covered[cell] ? copy.inspector.covered : '', copy.inspector.height(l.z0[cell]!)].filter(Boolean),
         monthlyHours: result.inspection.monthlyHours,
+        monthlyTypical: r?.kind === 'season' ? result.inspection.monthlyTypical : undefined,
         strip: result.inspection.strip,
         dateLabel: s.date,
         year: s.year,

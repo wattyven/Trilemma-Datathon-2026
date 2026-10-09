@@ -110,6 +110,14 @@ describe('headline wording', async () => {
     expect(copy.spots.pin('sunniest', 'shade', 10, '2026-10-08').text).toBe('Least shade 10%');
   });
 
+  it('words typical weather as an extra line', () => {
+    const w = copy.weather;
+    expect(w.hours(6.12)).toBe('about 6.1 hours with typical weather');
+    expect(w.range(2.4, 4.1)).toBe('With typical weather, expect about 2.5–4 hours.');
+    expect(w.source('Vancouver airport', '1981–2000')).toBe('Typical weather: sunshine records at Vancouver airport (1981–2000), adjusted for local cloud with Open-Meteo.');
+    expect(copy.summary.season(27, 14.6, 7.7)).toBe('For comparison, open ground with nothing around it would get 14.6 hours of sun a day (about 7.7 with typical weather).');
+  });
+
   it('words the Basic summary plainly', () => {
     const b = copy.basic;
     expect(b.period('2026-04-01', '2026-09-30')).toBe('Average hours of direct sun a day, 1 April to 30 September');

@@ -47,7 +47,24 @@ a { color: var(--shade); }
 
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
 
-.site-header { max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 16px 8px; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
+.site-header {
+  max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 16px 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'brand switch' 'search search'; align-items: start; gap: 12px 24px;
+}
+.site-header .brand { grid-area: brand; }
+.site-header .mode-switch { grid-area: switch; }
+.site-header .search { grid-area: search; margin: 6px 0 4px; }
+.wordmark a { color: inherit; text-decoration: none; }
+.wordmark a:hover { text-decoration: underline; text-underline-offset: 4px; }
+/* With a lot showing (html.has-lot), the header tucks into one row: name, address bar, switch. */
+.has-lot .site-header { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'brand search switch'; align-items: center; padding-top: 14px; padding-bottom: 4px; }
+.has-lot .wordmark { font-size: 1.5rem; }
+.has-lot .tagline, .has-lot #locate-row { display: none !important; }
+.has-lot .site-header .search { margin: 0; }
+.has-lot .search label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.has-lot .combobox input { padding: 8px 10px; }
+.has-lot .search button[type='submit'] { padding: 8px 14px; }
+.has-lot .site-header .mode-switch { margin-top: 0; }
 /* "Advanced mode": a labelled on/off switch, like a dark-mode toggle. */
 .mode-switch {
   display: inline-flex; align-items: center; gap: 10px; min-height: 36px; margin-top: 4px; padding: 4px 6px 4px 12px;
@@ -273,21 +290,46 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .basic #result-headline, .basic #result-summary, .basic #sun-controls, .basic #lot-facts, .basic #lot-more, .basic .debug,
 .basic #timeline, .basic #timeline-note, .basic #opacity-wrap, .basic #changes-wrap, .basic #shadows-wrap,
 .basic [data-ui='advanced'], html:not(.basic) [data-ui='basic'],
-html:not(.basic) #basic-summary, html:not(.basic) #basic-dates { display: none !important; }
+html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic) #basic-head, html:not(.basic) #credit-notices,
+.basic #photo-credit { display: none !important; }
 .basic .lot { grid-template-columns: 1fr; gap: 12px; }
 /* The panel's pieces join the page's column: address, summary and dates first, then the view, then the rest. */
 .basic .lot-info { display: contents; }
-.basic .lot-info > #lot-heading, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-dates { order: -1; margin-bottom: 0; }
-.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
+.basic .lot-info > #lot-heading, .basic .lot-info > #basic-head, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-dates { order: -1; margin-bottom: 0; }
+.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #credit-notices, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
+.basic .lot-info > #credit-notices { margin-top: -12px; } /* one list with the lot notices */
+.credit-notices li { color: var(--muted); }
+/* The dates line and "About these numbers" sit beside the address on wider screens. */
+.basic-head { margin: 0; color: var(--muted); }
+.basic-stats-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; }
+/* The ⓘ after the dates line opens "About these numbers". */
+.info-button { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: 4px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); vertical-align: -3px; cursor: pointer; }
+.info-button:hover { color: var(--shade); }
+.info-button svg { width: 18px; height: 18px; }
+@media (min-width: 721px) {
+  .basic .lot { grid-template-columns: auto minmax(0, 1fr); column-gap: 20px; }
+  .basic .lot > *, .basic .lot-info > * { grid-column: 1 / -1; }
+  .basic .lot-info > #lot-heading { grid-column: 1; align-self: baseline; }
+  .basic .lot-info > #basic-head { grid-column: 2; align-self: baseline; }
+}
+/* In Basic the 3D / Map toolbar and the legend sit inside the map (main.ts moves them there). */
+.view-stage > .view-toolbar, .view-stage > .legend {
+  position: absolute; z-index: 3; left: max(10px, calc((var(--page-width, 100vw) - 1200px) / 2 + 16px)); margin: 0; padding: 6px 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--mist); border-radius: var(--radius);
+}
+.view-stage > .view-toolbar { top: 10px; justify-content: flex-start; gap: 6px 14px; }
+.view-stage > .legend { bottom: 10px; max-width: calc(100% - 20px); }
+.basic .hud { right: max(10px, calc((var(--page-width, 100vw) - 1200px) / 2 + 16px)); }
 .basic .view-stage {
   width: var(--page-width, 100vw); margin-left: calc(50% - var(--page-width, 100vw) / 2);
   height: min(72vh, 860px); min-height: 320px; border-radius: 0; border-left: 0; border-right: 0;
 }
 .basic-summary:empty { display: none; }
-.basic-summary .period { margin: 0 0 6px; color: var(--muted); }
 .basic-stats { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; font-size: 1.05rem; }
-.basic-stats > div { display: flex; align-items: center; gap: 8px; }
-.basic-stats dt { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.basic-stats > div { display: flex; align-items: baseline; gap: 8px; }
+.basic-stats .typical { display: block; font-size: 0.875rem; color: var(--muted); }
+.basic-stats dt { display: inline-flex; align-items: baseline; gap: 8px; font-weight: 600; flex: none; }
+.basic-stats dt .spot-dot { align-self: center; }
 .basic-stats dd { margin: 0; }
 .basic-summary .note { margin: 6px 0 0; font-size: 0.875rem; color: var(--muted); }
 .basic-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0; }
@@ -300,8 +342,9 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates { display: none !
 .embed .controls .row, .embed .controls > .hint:not(.mode-hint), .embed #elevation-wrap { display: none !important; }
 .embed.embed-lot .search { display: none; }
 .embed #basic-dates, .embed #advanced-toggle { display: none !important; }
-/* The header stays for screen readers: it's the page's h1. */
-.embed .site-header { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* The name stays for screen readers (it's the page's h1); the address bar stays for embeds without an address. */
+.embed .site-header .brand { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.embed .site-header { padding: 8px 12px 0; }
 .embed main { padding: 8px 12px 12px; }
 .embed .lot { margin-top: 8px; gap: 16px; }
 .embed .view-stage { height: min(520px, 62vh); min-height: 260px; }
@@ -318,6 +361,8 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates { display: none !
   .lot { grid-template-columns: 1fr; gap: 12px; }
   .view-stage { height: 55vh; min-height: 300px; }
   .search-row { flex-direction: column; }
+  .has-lot .site-header { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'brand switch' 'search search'; gap: 8px 12px; }
+  .has-lot .search-row { flex-direction: row; }
   main { padding-bottom: 12.5rem; } /* room for the collapsed sheet */
 
   /* The info column becomes a bottom sheet. */
