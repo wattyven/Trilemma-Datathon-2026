@@ -30,6 +30,8 @@ afternoon.
 - **Full / part sun / shade:** how One day and Season are coloured, with adjustable thresholds (6 h and 3 h); untick it
   for exact hours. The aerial photo is on by default where the municipality publishes one, with the colours at half
   strength over it.
+- **Sunniest and shadiest spots:** in One day, Season and Shade finder, pins mark the largest patch of the sunniest and of
+  the shadiest ground, and the headline describes the same two places. Click a pin for that spot's sun month by month.
 - **Time slider, Now and Play the day:** move the sun and its shadows between sunrise and sunset (both shown).
 - **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
   and its sun/shade through the day.

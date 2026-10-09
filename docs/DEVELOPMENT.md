@@ -41,11 +41,11 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 | `src/elevation/` | STAC lookup, the pixel window, COG reads (worker side), the LiDAR vintage lookup (`vintage.json` is built by `spike/09-build-vintage.ts`). Sharper surfaces: `hires.ts` chooses one (main thread, with `hires-index.json` from `spike/12-hires-index.ts`), `build.ts` builds it (worker side) from `copc.ts` (point clouds) or LidarBC GeoTIFFs, on HRDEM resampled by `resample.ts`. `rangeFetch.ts` makes every byte-range read. |
 | `src/imagery/` | municipal aerial photos: `sources.ts` (one per municipality), `fetch.ts` (export or tiles into a canvas), `georef.ts` (grid → photo and photo → local affines) |
 | `proxy/lidarbc/` | the Cloudflare Worker that adds CORS to LidarBC (see its README) |
-| `src/engine/` | the shading engine: cells, horizons, sun sampling, outputs (all pure and tested), `lotSummary.ts` (the numbers behind the plain-language headline), plus the worker protocol and main-thread client |
+| `src/engine/` | the shading engine: cells, horizons, sun sampling, outputs (all pure and tested), `lotSummary.ts` (the numbers behind the plain-language headline), `spots.ts` (the sunniest and shadiest patches, for the headline and the pins), plus the worker protocol and main-thread client |
 | `src/workers/shade.worker.ts` | elevation fetch, horizon precompute and outputs off the main thread |
 | `src/analysis.ts` | wires a selected lot to the engine, the 3D scene / 2D map, the timeline and the inspector |
 | `src/scene/` | the three.js view (`view3d.ts`, lazy-loaded) plus pure helpers: `frame.ts` (axes, sun direction) and `terrain.ts` (meshes) |
-| `src/ui/` | DOM modules: search, controls, timeline, inspector, the 2D map, design tokens (`tokens.ts` mirrors the CSS variables) |
+| `src/ui/` | DOM modules: search, controls, timeline, inspector, the 2D map, the sunniest / shadiest pins (`spotPins.ts`), design tokens (`tokens.ts` mirrors the CSS variables) |
 | `src/embed.ts` | the "Copy embed code" iframe snippet and the embed's link back to the full site |
 | `tests/` | Vitest specs. `tests/fixtures/` are real responses captured by `spike/08-capture-fixtures.ts`. |
 | `spike/` | Phase 0 probes, with their own `package.json`. Not part of the app build. |
@@ -78,6 +78,7 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
   - `localStorage` is used only to remember that the "How to read this" card was dismissed (`ui/tips.ts`, wrapped in try/catch).
   - Defaults favour new visitors: One moment at the current time (midday if it's dark, with a note in the headline: `Timeline.showingMiddayForNight`), the aerial photo on with the colours at 50%, and full / part sun / shade for One day and Season (`cls=0` / `img=0` in links turn them off).
   - The panel leads with the result and then the "Show" controls; on phones the collapsed sheet is only the address and the result.
+  - Pins mark the sunniest and shadiest patches in One day, Season and Shade finder (`spots=0` hides them). `engine/spots.ts` finds the patches (bands at the 95th / 5th percentiles, largest connected patch, pin cell farthest from its edge) and the headline's sides come from the same patches. The pins are buttons in `#spot-layer`; both views expose `projectCell(cell)` and a hook after each render or draw so the pins follow the camera. Pins hold cell indices, so they're cleared in `start()` and `swapIn()`.
   - Test locations are civic, commercial or council sites, never homes (see `spike/addresses.ts`). Check new ones in ParcelMap BC before committing them.
   - New UI must keep `spike/23-a11y-audit.ts` clean: zero axe violations, no phone tap targets under 24 px, no horizontal scroll at 200% zoom.
 - The 3D mesh near the lot is `buildTerraced` (true cell footprints, vertical walls between smooth cells more than 2 m apart, rough cells such as tree crowns blended). Overlays use its tops only (`walls: false`). It's rendering only: the engine never sees it.
