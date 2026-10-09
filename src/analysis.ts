@@ -16,6 +16,7 @@ import { EngineError, ShadeEngine } from './engine/client';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
 import { MOSTLY_COVERED, summarizeLot } from './engine/lotSummary';
+import { findSpots, type Spots } from './engine/spots';
 import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
@@ -95,6 +96,8 @@ export class Analysis {
   private pickSeq = 0;
   /** Each cell's position in local metres, for the headline (refreshed with the grid). */
   private cellPositions: Position[] = [];
+  /** The current result's sunniest and shadiest patches (found in render(), for the headline and pins). */
+  private spots: Spots = { sunniest: null, shadiest: null };
   /** The current lot (for restarting a refinement an observer change interrupted). */
   private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
   /** The sharper surface loading (or loaded) after the first result. */
@@ -721,6 +724,7 @@ export class Analysis {
   }
 
   private render() {
+    this.spots = this.findSpots();
     const layer = this.layer();
     this.map.setLayer(layer);
     this.scene?.setLayer(layer);
@@ -798,20 +802,34 @@ export class Analysis {
     setRichText(this.els.headline, this.headlineText());
   }
 
+  /** Covered cells as the summary sees them: on roofs and decks they're exactly what's being measured. */
+  private summaryCovered(): ArrayLike<number> {
+    const l = this.loaded!;
+    return this.controls.get().observer === 'surface' ? new Uint8Array(l.covered.length) : l.covered;
+  }
+
+  /** The sunniest and shadiest patches of the current result (none at a moment or mid-load). */
+  private findSpots(): Spots {
+    const r = this.result, l = this.loaded;
+    if (!r || !l || r.kind === 'inspect' || r.kind === 'moment') return { sunniest: null, shadiest: null };
+    const s = l.summary;
+    return findSpots({ mode: r.kind, values: r.values, covered: this.summaryCovered(), px: l.px, py: l.py, step: s.step, cellAreaM2: s.cellSizeM * s.cellSizeM });
+  }
+
   /** "What this means": the result in a sentence or three (engine/lotSummary.ts, copy.headline). */
   private headlineText(): string {
     const r = this.result, l = this.loaded;
     if (!r || !l || r.kind === 'inspect') return '';
     const s = this.state(), h = copy.headline;
-    // Standing on roofs and decks, the covered cells are exactly what's being measured.
     const onSurface = s.observer === 'surface';
     const mode = r.kind;
     const sum = summarizeLot({
       mode,
       values: r.values,
-      covered: onSurface ? new Uint8Array(l.covered.length) : l.covered,
+      covered: this.summaryCovered(),
       positions: this.cellPositions,
       thresholds: { fullSunH: s.fullSunH, partSunH: s.partSunH },
+      spots: this.spots,
     });
     if (sum.coveredShare >= MOSTLY_COVERED) return h.mostlyCovered;
     const parts: string[] = [];

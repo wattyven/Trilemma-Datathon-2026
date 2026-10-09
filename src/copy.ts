@@ -19,6 +19,8 @@ export const fmtTime = (hhmm: string) => {
 };
 /** Hours to the nearest half hour, as a phrase: "about 6 hours", "3–5 hours". */
 const half = (h: number) => Math.round(h * 2) / 2;
+/** Where a part of the lot is: "toward the **north-east**", "near the **middle** of the lot". */
+const where = (side: Side) => (side === 'middle' ? 'near the **middle** of the lot' : `toward the **${side}**`);
 const hoursRange = (low: number, high: number) => {
   const lo = half(low), hi = half(high);
   return hi - lo < 0.75 ? `about ${fmtH(half((low + high) / 2))} hours` : `${fmtH(lo)}–${fmtH(hi)} hours`;
@@ -174,9 +176,10 @@ export const copy = {
       `${onSurface ? 'Most surfaces on this lot (roofs, decks and ground) get' : 'Most of the open ground here gets'} **${hoursRange(low, high)} of direct sun** on ${fmtDate(date)} (${cls}).`,
     sides: (sunny: Side, sunnyH: number, shady: Side) => {
       if (sunny === 'spread' && shady === 'spread') return 'Sun is fairly even across the lot.';
-      if (sunny === 'spread') return `The **${shady}** side is shadiest.`;
-      const first = `The sunniest part is toward the **${sunny}** (about ${fmtH(half(sunnyH))} h)`;
-      return shady !== 'spread' && shady !== sunny ? `${first}; the **${shady}** side is shadiest.` : `${first}.`;
+      const shadiest = shady === 'middle' ? 'the shadiest part is near the **middle**' : `the **${shady}** side is shadiest`;
+      if (sunny === 'spread') return `${shadiest[0]!.toUpperCase()}${shadiest.slice(1)}.`;
+      const first = `The sunniest part is ${where(sunny)} (about ${fmtH(half(sunnyH))} h)`;
+      return shady !== 'spread' && shady !== sunny ? `${first}; ${shadiest}.` : `${first}.`;
     },
     covered: (share: number) => `About ${Math.round(100 * share)}% of the lot is under a roof or trees and isn't counted.`,
     moment: (share: number, time: string, date: string, onSurface = false) =>
@@ -188,10 +191,22 @@ export const copy = {
       const when = `Between ${fmtTime(from)} and ${fmtTime(to)}, ${fmtDate(start)} to ${fmtDate(end)}`;
       return side === 'spread'
         ? `${when}, shade is fairly even across the lot: about **${Math.round(pct)}% of the time**.`
-        : `${when}, the shadiest part is toward the **${side}**, in shade about **${Math.round(pct)}% of the time**.`;
+        : `${when}, the shadiest part is ${where(side)}, in shade about **${Math.round(pct)}% of the time**.`;
     },
     shadeNoSun: "The sun is down for this whole time window, so there's no direct sun to block.",
     mostlyCovered: 'Almost all of this lot is under a roof or trees. To see the sun on a roof or deck, choose "Rooftop or deck surface" under Measure at.',
+  },
+  /** The pins on the view: visible text, and the rest of the button's name for screen readers. */
+  spots: {
+    pin: (kind: 'sunniest' | 'shadiest', mode: 'season' | 'day' | 'shade', value: number, date: string) => {
+      if (mode === 'shade')
+        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} · ${Math.round(value)}% of the time`, more: ' shaded: show its sun month by month' };
+      const h = half(value);
+      return {
+        text: `${kind === 'sunniest' ? 'Sunniest' : 'Shadiest'} · ${h === 0 ? 'under 0.5 h' : `about ${fmtH(h)} h`}`,
+        more: `${mode === 'day' ? ` of direct sun on ${fmtDate(date)}` : ' of direct sun a day'}: show its sun month by month`,
+      };
+    },
   },
   inspector: {
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,
