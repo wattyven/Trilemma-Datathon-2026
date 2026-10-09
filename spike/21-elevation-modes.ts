@@ -19,7 +19,7 @@ try {
   page.on('console', (m) => m.type() === 'error' && console.log('  console error:', m.text()));
   page.on('worker', (w) => w.on('console', (m) => m.text().includes('VanShade') && console.log('  worker:', m.text())));
   const t0 = Date.now();
-  await page.goto(`${base}#${new URLSearchParams({ a: address, m: 'moment', d: '2026-06-21', t: '15:00' })}`);
+  await page.goto(`${base}#${new URLSearchParams({ a: address, m: 'moment', d: '2026-06-21', t: '15:00', debug: '1' })}`);
   await page.locator(RESULT).waitFor({ timeout: 90_000 });
   const first = Date.now() - t0;
   await page.locator(surface, { hasText: /from/ }).waitFor({ timeout: 90_000, state: 'attached' });

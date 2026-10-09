@@ -222,7 +222,8 @@ export const copy = {
   timeline: {
     play: 'Play the day',
     pause: 'Pause',
-    valueText: (hhmm: string) => `${hhmm} Vancouver time`,
+    valueText: (time: string) => `${time} Vancouver time`,
+    sunTimes: (sunrise: string, sunset: string) => `Sunrise ${sunrise} · Sunset ${sunset}`,
   },
   view: {
     sunDown: 'The sun is down at this time. Move the time slider to see shadows.',

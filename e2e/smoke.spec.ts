@@ -29,6 +29,18 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
+  // The timeline shows the day's sunrise and sunset, and Now returns to the current time.
+  await expect(page.locator('#tl-sun')).toContainText(/Sunrise \d{1,2}:\d\d am · Sunset \d{1,2}:\d\d pm/);
+  const sunrise = await page.locator('#tl-time').getAttribute('min');
+  await page.locator('#tl-time').evaluate((el: HTMLInputElement, v) => {
+    el.value = v!;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, sunrise);
+  const atSunrise = await page.locator('#tl-time-label').textContent();
+  await page.locator('#tl-now').click();
+  await expect(page.locator('#tl-time-label')).not.toHaveText(atSunrise!);
+  // Debug details only with debug=1.
+  await expect(page.locator('#debug')).toBeHidden();
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
   // The first result is the 1 m HRDEM surface; a sharper one then swaps in: the 2016 point cloud

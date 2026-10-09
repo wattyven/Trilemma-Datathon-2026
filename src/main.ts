@@ -74,6 +74,9 @@ const analysisEls: AnalysisElements = {
 
 const today = todayInVancouver();
 const defaults = defaultState(today, nowMinuteInVancouver());
+/** `debug=1` in the link shows the debug details (and keeps it in the link). */
+const debugOn = decodeHash(location.hash).debug === true;
+byId('debug').hidden = !debugOn;
 
 const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
   onHover: (cell) => analysis.hover(cell),
@@ -90,12 +93,15 @@ const timeline = new Timeline(
     slider: byId<HTMLInputElement>('tl-time'),
     label: byId<HTMLOutputElement>('tl-time-label'),
     play: byId<HTMLButtonElement>('tl-play'),
+    now: byId<HTMLButtonElement>('tl-now'),
+    sun: byId('tl-sun'),
   },
   initialTimeline(today, nowMinuteInVancouver()),
   (t, dateChanged) => {
     void analysis.onTimeline(t, dateChanged);
     writeUrl(false);
   },
+  () => initialTimeline(todayInVancouver(), nowMinuteInVancouver()),
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
 analysis.onViewChange = () => writeUrl(false);
@@ -326,6 +332,7 @@ function urlDefaults(): UrlState {
     opacity: IMAGERY.defaultOpacity,
     source: 'best',
     changes: false,
+    debug: false,
     classes: defaults.classes,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
@@ -364,6 +371,7 @@ function urlStateNow(): UrlState | null {
     toTime: c.toTime,
     source: analysis.sourcePreference,
     changes: analysis.changesEnabled,
+    debug: debugOn,
   };
 }
 

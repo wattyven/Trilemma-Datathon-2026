@@ -32,7 +32,7 @@ try {
       const page = await browser.newPage({ viewport: { width: 1280, height: 860 } });
       page.on('console', (m) => m.text().includes('VanShade') && console.log('  console:', m.text()));
       page.on('worker', (w) => w.on('console', (m) => m.text().includes('VanShade') && console.log('  worker console:', m.text(), JSON.stringify(m.location()))));
-      const hash = new URLSearchParams({ a: address!, d: '2026-06-21', t: '17:00', m: 'moment' });
+      const hash = new URLSearchParams({ a: address!, d: '2026-06-21', t: '17:00', m: 'moment', debug: '1' });
       if (elev !== 'auto') hash.set('elev', elev);
       const t0 = Date.now();
       await page.goto(`${base}#${hash}`);

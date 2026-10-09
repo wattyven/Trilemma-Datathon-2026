@@ -32,6 +32,8 @@ export interface UrlState {
   source?: Source;
   /** Show where the newer survey replaced the older one. */
   changes?: boolean;
+  /** Show the debug details (`debug=1`). */
+  debug?: boolean;
 }
 
 /** The "Elevation data" setting; `hrdem` is a debug value. */
@@ -60,6 +62,7 @@ const KEYS: Record<keyof UrlState, string> = {
   opacity: 'op',
   source: 'elev',
   changes: 'chg',
+  debug: 'debug',
 };
 
 const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
@@ -113,6 +116,7 @@ export function decodeHash(hash: string): UrlState {
   if (source && SOURCES.has(source as Source)) out.source = source as Source;
   const chg = get('changes');
   if (chg === '1' || chg === '0') out.changes = chg === '1';
+  if (get('debug') === '1') out.debug = true;
   const img = get('photo');
   if (img === '1' || img === '0') out.photo = img === '1';
   const op = get('opacity');

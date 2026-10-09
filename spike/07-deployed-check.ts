@@ -62,7 +62,7 @@ page.on('requestfailed', (r) => failedRequests.push(`${r.failure()?.errorText} $
 const results: Record<string, unknown>[] = [];
 let failures = 0;
 try {
-  await page.goto(base, { waitUntil: 'networkidle' });
+  await page.goto(`${base}#debug=1`, { waitUntil: 'networkidle' }); // debug=1 shows the debug details
   const build = await page.locator('meta[name="vanshade-build"]').getAttribute('content');
   console.log(`Page ${base} build=${build}`);
 

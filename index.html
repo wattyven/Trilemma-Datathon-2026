@@ -50,7 +50,7 @@
           <ol class="how">
             <li><strong>Type your address</strong> anywhere in Metro Vancouver.</li>
             <li><strong>See your lot in 3D</strong>, with its real neighbours, trees and buildings, built from laser scans of the city.</li>
-            <li><strong>Find the sunny and shady spots</strong>: hours of direct sun for each spot, right now, on any day, or over the growing season.</li>
+            <li><strong>Find the sunny and shady spots</strong>: sun and shade right now or at any time, and hours of direct sun over a day or the growing season.</li>
           </ol>
           <p class="examples">
             <span>Try an example:</span>
@@ -77,9 +77,9 @@
             <div class="view-options">
               <label class="check"><input type="checkbox" id="photo-toggle" /> Aerial photo</label>
               <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
-              <label class="check opacity" id="opacity-wrap" hidden>Results
-                <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Results opacity over the photo" /></label>
-              <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
+              <label class="check opacity" id="opacity-wrap" hidden>Colour strength
+                <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Colour strength over the photo" /></label>
+              <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
             </div>
           </div>
           <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
@@ -109,9 +109,11 @@
           <p id="view-note" class="readout" hidden></p>
           <div id="timeline" class="timeline" hidden>
             <label>Date <input type="date" id="tl-date" /></label>
+            <button type="button" id="tl-now" class="ghost">Now</button>
             <button type="button" id="tl-play" class="ghost" aria-pressed="false">Play the day</button>
             <label class="slider">Time <input type="range" id="tl-time" min="0" max="1435" step="5" />
               <output id="tl-time-label" for="tl-time"></output></label>
+            <p id="tl-sun" class="hint tl-sun" hidden></p>
           </div>
           <p id="timeline-note" class="hint timeline-note" hidden></p>
           <div id="legend" class="legend" hidden></div>
@@ -131,35 +133,18 @@
           </button>
           <h2 id="lot-heading" tabindex="-1"></h2>
           <p id="result-headline" class="headline" aria-live="polite"></p>
-          <p class="share-row">
-            <button type="button" id="share" class="ghost">Copy link to this view</button>
-            <span id="share-status" class="hint" aria-live="polite"></span>
-          </p>
-          <dl id="lot-facts" class="facts"></dl>
-          <details id="lot-more" class="lot-more">
-            <summary>Lot and data details</summary>
-            <dl id="lot-facts-more" class="facts"></dl>
-          </details>
-          <ul id="lot-notices" class="notices"></ul>
-          <details id="lot-switcher" class="switcher" hidden>
-            <summary id="lot-switcher-summary">Not the right lot?</summary>
-            <fieldset>
-              <legend class="visually-hidden">Choose a lot</legend>
-              <div id="lot-options"></div>
-            </fieldset>
-          </details>
-
+          <p id="result-summary" class="summary"></p>
           <form id="sun-controls" class="controls" hidden>
             <fieldset class="modes">
               <legend>Show</legend>
-              <label><input type="radio" name="mode" value="season" /> Season</label>
-              <label><input type="radio" name="mode" value="day" /> One day</label>
               <label><input type="radio" name="mode" value="moment" /> One moment</label>
+              <label><input type="radio" name="mode" value="day" /> One day</label>
+              <label><input type="radio" name="mode" value="season" /> Season</label>
               <label><input type="radio" name="mode" value="shade" /> Shade finder</label>
             </fieldset>
+            <p class="hint mode-hint" data-for="moment">Sun and shade at one moment: now, or move the time under the view.</p>
+            <p class="hint mode-hint" data-for="day">Total sun on one day (change the date under the view).</p>
             <p class="hint mode-hint" data-for="season">Average daily sun over months: best for planning a garden.</p>
-            <p class="hint mode-hint" data-for="day">Total sun on the day you pick (change the date under the view).</p>
-            <p class="hint mode-hint" data-for="moment">Sun and shade at the moment you pick (change the date and time under the view).</p>
             <p class="hint mode-hint" data-for="shade">How often each spot is shaded at a time of day, over a range of dates: handy for a patio.</p>
             <div class="row" data-for="season">
               <label>Season
@@ -208,9 +193,26 @@
               <p class="hint">Which laser scans build the 3D landscape. "Best of both" is the most detailed and up to date.</p>
             </details>
           </form>
-          <p id="result-summary" class="summary"></p>
+          <p class="share-row">
+            <button type="button" id="share" class="ghost">Copy link</button>
+            <span id="share-status" class="hint" aria-live="polite"></span>
+          </p>
+          <dl id="lot-facts" class="facts"></dl>
+          <details id="lot-more" class="lot-more">
+            <summary>Lot and data details</summary>
+            <dl id="lot-facts-more" class="facts"></dl>
+          </details>
+          <ul id="lot-notices" class="notices"></ul>
+          <details id="lot-switcher" class="switcher" hidden>
+            <summary id="lot-switcher-summary">Not the right lot?</summary>
+            <fieldset>
+              <legend class="visually-hidden">Choose a lot</legend>
+              <div id="lot-options"></div>
+            </fieldset>
+          </details>
 
-          <details class="debug">
+
+          <details class="debug" id="debug" hidden>
             <summary>Debug details</summary>
             <label class="check"><input type="checkbox" id="compare-toggle" /> Compare 3D shadows with the shade engine (engine shade is tinted blue)</label>
             <dl id="debug-facts" class="facts"></dl>
@@ -240,14 +242,14 @@
         LiDAR elevation for the lot and 200 m around it (roofs, neighbouring buildings, trees and hedges included), and for every
         square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
         keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
-        the newer survey wherever something did. "Elevation data" lets you pick either survey on its own. It then follows the sun across the day or season
+        the newer survey wherever something did. "3D data" under More options lets you pick either survey on its own. It then follows the sun across the day or season
         to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests.
       </p>
       <h3>How to use VanShade</h3>
       <ol>
         <li><strong>Type your address</strong> and pick it from the list. If the outline isn't your lot, choose another under "Not the right lot?".</li>
         <li><strong>Read the result</strong>: the sentence at the top of the panel sums it up, and on the lot yellow spots get the most direct sun, dark blue the least.</li>
-        <li><strong>Choose what to show</strong>: a season average (best for planning a garden), one day, one moment, or the shade finder (how often a patio is shaded at a time of day). Click any spot for its sun month by month.</li>
+        <li><strong>Choose what to show</strong>: one moment (it opens on now), one day, a season average (best for planning a garden), or the shade finder (how often a patio is shaded at a time of day). Click any spot for its sun month by month.</li>
       </ol>
       <h3>Words used here</h3>
       <dl class="glossary">

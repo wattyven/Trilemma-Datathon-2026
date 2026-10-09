@@ -25,6 +25,7 @@ const full: UrlState = {
   opacity: 0.55,
   source: 'detailed',
   changes: true,
+  debug: true,
 };
 
 describe('URL hash state', () => {
@@ -76,6 +77,12 @@ describe('URL hash state', () => {
     const linkDefaults: UrlState = { mode: 'season' };
     expect(encodeHash({ mode: 'moment' }, linkDefaults)).toBe('#m=moment');
     expect(encodeHash({ mode: 'season' }, linkDefaults)).toBe('');
+  });
+
+  it('shows debug details only for debug=1, and leaves the flag out otherwise', () => {
+    expect(decodeHash('#debug=1')).toEqual({ debug: true });
+    expect(decodeHash('#debug=0&debug=yes')).toEqual({});
+    expect(encodeHash({ debug: false }, { debug: false })).toBe('');
   });
 
   it('tolerates a missing or junk hash', () => {

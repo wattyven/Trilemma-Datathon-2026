@@ -121,7 +121,8 @@ button.ghost:hover { border-color: var(--moss); }
 .timeline input[type='date'] { font: inherit; padding: 4px 6px; border: 1px solid var(--mist); border-radius: 6px; background: var(--panel); color: inherit; }
 .timeline .slider { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 10px; }
 .timeline input[type='range'] { flex: 1; accent-color: var(--sun); }
-.timeline output { min-width: 3.2em; font-variant-numeric: tabular-nums; font-weight: 600; }
+.timeline output { min-width: 4.6em; font-variant-numeric: tabular-nums; font-weight: 600; }
+.timeline .tl-sun { flex-basis: 100%; margin: -4px 0 0; }
 
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 10px 0 0; font-size: 0.9rem; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -249,6 +250,8 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
   .lot-info > h2 { order: 1; margin: 2px 0 4px; font-size: 1.05rem; }
   .lot-info > .headline { order: 2; margin: 0 0 8px; }
   .lot-info[data-sheet='collapsed'] > .headline { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  /* Collapsed, the sheet is just the address and the result; the rest can't be tabbed into unseen. */
+  .lot-info[data-sheet='collapsed'] > :not(.sheet-handle, h2, .headline) { display: none; }
   .sheet-handle {
     display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;
     padding: 8px 0 6px; border: 0; background: none; color: var(--muted); font-size: 0.875rem;
