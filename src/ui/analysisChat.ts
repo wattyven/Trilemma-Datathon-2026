@@ -15,6 +15,13 @@ export interface AnalysisChatElements {
 
 type ChatCode = 'failed' | 'no-server' | 'no-key' | 'no-repo' | 'busy';
 
+/** Chat id. `randomUUID` is missing in an insecure frame, and that throw used to stop the map from loading. */
+function newSessionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 interface StreamEvent {
   text?: string;
   status?: 'starting' | 'reading' | 'working';
@@ -30,7 +37,7 @@ export function initAnalysisChat(
 ) {
   const { open, panel, log, status, form, input, chips } = els;
   const closeBtn = panel.querySelector<HTMLButtonElement>('#analysis-close');
-  let sessionId = crypto.randomUUID();
+  let sessionId = newSessionId();
   let shownContext = '';
   let abort: AbortController | null = null;
   let busy = false;
@@ -110,7 +117,7 @@ export function initAnalysisChat(
     abort?.abort();
     abort = null;
     setBusy(false);
-    sessionId = crypto.randomUUID();
+    sessionId = newSessionId();
     shownContext = context;
     log.replaceChildren();
     void closeSession(previous);
@@ -125,7 +132,7 @@ export function initAnalysisChat(
     abort?.abort();
     abort = null;
     setBusy(false);
-    sessionId = crypto.randomUUID();
+    sessionId = newSessionId();
     hide();
     log.replaceChildren();
     status.textContent = '';
