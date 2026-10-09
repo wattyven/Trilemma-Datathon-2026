@@ -12,7 +12,7 @@ add "WFS GetFeature json +Referer (as browsers send)" "https://openmaps.gov.bc.c
 add "WFS GetFeature jsonp" "https://openmaps.gov.bc.ca/geo/pub/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW&outputFormat=text/javascript&format_options=callback:cb&srsName=EPSG:4326&count=5&CQL_FILTER=INTERSECTS(SHAPE,SRID=4326;POINT($PT))"
 add "STAC search" "https://datacube.services.geo.ca/stac/api/search?collections=hrdem-mosaic-1m&bbox=-123.115,49.26,-123.113,49.262&limit=1"
 add "COG (S3) range" "$COG"
-add "WCS spec URL (redirects)" "https://datacube.services.geo.ca/ows/elevation?service=WCS&request=GetCapabilities"
+add "WCS documented URL (redirects)" "https://datacube.services.geo.ca/ows/elevation?service=WCS&request=GetCapabilities"
 add "WCS final URL" "https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic?service=WCS&version=1.1.1&request=GetCapabilities"
 
 for i in "${!NAMES[@]}"; do

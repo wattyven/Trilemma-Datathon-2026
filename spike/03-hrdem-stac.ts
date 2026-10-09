@@ -1,4 +1,4 @@
-// §4.3 NRCan HRDEM STAC probe: mosaic items per address, DSM/DTM hrefs and grids, vintage.
+// NRCan HRDEM STAC probe: mosaic items per address, DSM/DTM hrefs and grids, vintage.
 import { getJson, politeGet, corsSummary, readOut, writeOut, writeSample, check, pointInGeometry, stats } from './lib.ts';
 import { convergenceDeg, toLcc } from './cog-probe.ts';
 

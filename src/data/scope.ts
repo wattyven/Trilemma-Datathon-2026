@@ -1,4 +1,4 @@
-// Metro Vancouver scope rules.
+// Metro Vancouver scope rules (verified in docs/DATA_SOURCES.md §2).
 //
 // The District of North Vancouver and the City of North Vancouver are distinct jurisdictions,
 // as are the City of Langley and the Township of Langley. Never collapse them.

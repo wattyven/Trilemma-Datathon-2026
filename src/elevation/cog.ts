@@ -1,4 +1,4 @@
-// Worker-side COG access with geotiff.js (path A in docs/DATA_SOURCES.md). Tile offsets load
+// Worker-side COG access with geotiff.js (the recommended elevation path in docs/DATA_SOURCES.md). Tile offsets load
 // lazily, so opening a 133 GB mosaic costs ~5 KiB; a lot window costs a few 1 MiB tiles.
 import { BaseClient, BaseResponse, fromCustomClient, type GeoTIFFImage } from 'geotiff';
 import { fetchRange } from './rangeFetch';

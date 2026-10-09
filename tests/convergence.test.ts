@@ -1,4 +1,4 @@
-// put the synthetic box at Vancouver in EPSG:3979. The solar-noon shadow must point
+// Put the synthetic box at Vancouver in EPSG:3979. The solar-noon shadow must point
 // to TRUE north, which in the EPSG:3979 grid is rotated ~25° clockwise from grid north.
 import { describe, expect, it } from 'vitest';
 import { momentMask, prepareSamples } from '../src/engine/outputs';

@@ -1,4 +1,4 @@
-// Elevation fetch, horizon precompute and every output, off the main thread.
+// Elevation fetch, horizon precompute and every output, off the main thread (§5.3).
 import { ELEVATION, HORIZON, SUN } from '../config';
 import { buildRasters, CancelledBuild } from '../elevation/build';
 import { openImage } from '../elevation/cog';

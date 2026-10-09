@@ -1,4 +1,4 @@
-// flat ground with one 10 m box. The ground shadow is ≈ 10 / tan(alt) long (± 1 cell)
+// Flat ground with one 10 m box. The ground shadow is ≈ 10 / tan(alt) long (± 1 cell)
 // and points away from the sun. Grid aligned with true north here (γ = 0); see convergence.test.ts.
 import { describe, expect, it } from 'vitest';
 import { momentMask, prepareSamples } from '../src/engine/outputs';

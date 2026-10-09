@@ -1,4 +1,4 @@
-// horizon lookups agree with direct ray marching ≥ 99% of the time on a synthetic DSM.
+// Horizon lookups agree with direct ray marching ≥ 99% of the time on a synthetic DSM.
 import { describe, expect, it } from 'vitest';
 import { computeHorizons, horizonAt, rayMarchSunlit, sectorLookup, splitRanges } from '../src/engine/horizon';
 import type { Raster } from '../src/engine/grid';

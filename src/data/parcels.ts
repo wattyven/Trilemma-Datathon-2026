@@ -1,4 +1,4 @@
-// ParcelMap BC lot lookup.
+// ParcelMap BC lot lookup (docs/DATA_SOURCES.md §3).
 import { PARCEL_BUFFER_M, PARCEL_LAYER, PARCEL_PROPERTIES, WFS_URL } from '../config';
 import { localFrame } from '../geo/local';
 import { distanceToGeometry, geometryArea, geometryKey, mapGeometry, type AreaGeometry, type Position } from '../geo/polygon';

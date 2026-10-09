@@ -107,7 +107,7 @@ export const IMAGERY = { marginM: 48, defaultOpacity: 0.7 } as const;
 /** LidarBC rasters have no CORS headers, so they're read through our proxy (proxy/lidarbc). Unset: skipped. */
 export const LIDARBC_PROXY = (import.meta.env.VITE_LIDARBC_PROXY ?? '').replace(/\/+$/, '');
 
-/** A step of max(0.5 m, 0.02·d) is usual; 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
+/** Ray-march steps of max(minStepM, stepFrac · d): 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
 export const HORIZON = {
   sectors: 180,
   minStepM: 0.25,

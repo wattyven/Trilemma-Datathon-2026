@@ -310,7 +310,7 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   }
 }
 
-// ── Shareable URL ──────────────────────────────────────────────────────
+// ── Shareable URL ────────────────────────────────────────────────────────────────
 
 function urlDefaults(): UrlState {
   return {

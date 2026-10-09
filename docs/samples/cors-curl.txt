@@ -59,7 +59,7 @@
   OPT  Access-Control-Allow-Headers: range
   OPT  Access-Control-Expose-Headers: ETag, x-amz-meta-custom-header
   OPT  Access-Control-Max-Age: 3000
-=== WCS spec URL (redirects)
+=== WCS documented URL (redirects)
   GET  HTTP/2 308 
   GET  location: https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic?service=WCS&request=GetCapabilities
   OPT  HTTP/2 308 

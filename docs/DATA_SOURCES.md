@@ -1,4 +1,4 @@
-# VanShade data sources (Phase 0 findings)
+# VanShade data sources
 
 Verified **2026-10-07**, from Node 25 and from headless Chromium 153 (Playwright) at `http://localhost:5199`. CORS for `https://wattyven.github.io` was checked with curl. Every number here comes from a script in [`spike/`](../spike). Trimmed raw evidence is in [`docs/samples/`](samples).
 
@@ -17,32 +17,32 @@ npm run browser    # Vite + Playwright Chromium: every probe under real CORS →
 
 | Decision | Recommendation |
 |---|---|
-| **Elevation path** | **A: direct COG window reads with geotiff.js ≥ 3** from NRCan's S3 bucket. Works in Chromium with no proxy. A cold DSM + DTM load for a lot plus a 200 m buffer took **1.9–2.3 s and 8.3 MiB** in parallel. B (WCS 1.1.1) also works and stays as a documented fallback. **C and D are not needed.** |
+| **Elevation path** | **A: direct COG window reads with geotiff.js ≥ 3** from NRCan's S3 bucket. Works in Chromium with no proxy. A cold DSM + DTM load for a lot plus a 200 m buffer took **1.9–2.3 s and 8.3 MiB** in parallel. B (WCS 1.1.1) also works and stays as a documented fallback. **No preprocessing or proxy is needed.** |
 | **Parcel path** | Direct `fetch` to the DataBC WFS. CORS works **only when the browser sends a `Referer`**, which it does by default. Never set `Referrer-Policy: no-referrer`. Fallback: WFS JSONP loaded inside a sandboxed iframe (verified). No proxy. |
 | **Scope filter** | Geocoder `bbox`, then a `localityName` allow-list or `electoralArea == "MVRD Electoral Area A"`, then a parcel `REGIONAL_DISTRICT == "Metro Vancouver Regional District"` check. |
 | **Vintage** | The newest `hrdem-lidar` project whose **extent GeoJSON** contains the point. Precompute a small Metro-clipped lookup in Phase 2. Most of the region is **2016** LiDAR. |
-| **Convergence** | Grid north to true north is **+24.9° to +25.4°** (clockwise) across Metro Vancouver, computed numerically per lot with proj4 as §5.1 asks. |
+| **Convergence** | Grid north to true north is **+24.9° to +25.4°** (clockwise) across Metro Vancouver, computed numerically per lot with proj4. |
 
 ## Surprises worth knowing
 
-1. **The parcel layer name in the spec is restricted.** `WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_FA_SVW` is "ParcelMap BC Parcel Fabric – Fully Attributed", licensed *Access Only*. The WFS answers it with `Could not find type`. The public OGL-BC layer is **`WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW`**.
-2. **The geocoder rate limit is 3,000/min**, from the `x-ratelimit-limit-minute` header, not about 1,000.
+1. **The obvious parcel layer is restricted.** `WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_FA_SVW` is "ParcelMap BC Parcel Fabric – Fully Attributed", licensed *Access Only*. The WFS answers it with `Could not find type`. The public OGL-BC layer is **`WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW`**.
+2. **The geocoder rate limit is 3,000/min**, from the `x-ratelimit-limit-minute` header.
 3. **`parcelPoint` isn't always available.** For `BLOCK`-precision matches, the geocoder silently returns an `accessPoint` instead, and that point falls in the street. Coquitlam City Hall (3000 Guildford Way) hit **zero parcels** this way. A buffered parcel search handles it.
 4. **`localityName` doesn't filter.** `localityName=Burnaby,Surrey` still returned Vancouver and Kamloops matches. Filter on the client.
-5. **Locality names aren't the member names in §8.** Addresses carry "District of North Vancouver" and "Township of Langley". UBC/UEL addresses carry "Vancouver". Electoral Area A shows up in `electoralArea`.
+5. **Locality names aren't the official member names.** Addresses carry "District of North Vancouver" and "Township of Langley". UBC/UEL addresses carry "Vancouver". Electoral Area A shows up in `electoralArea`.
 6. **WFS CORS depends on `Referer`, not `Origin`.** With curl, no origin ever gets `Access-Control-Allow-Origin` unless a `Referer` is sent.
-7. **The WCS URL in the spec is a 308 redirect with no CORS headers**, so browsers can't follow it. Only **WCS 1.1.1** GetCoverage works on the final URL.
+7. **The documented WCS URL (`/ows/elevation`) is a 308 redirect with no CORS headers**, so browsers can't follow it. Only **WCS 1.1.1** GetCoverage works on the final URL.
 8. **STAC item footprints overstate coverage**, so they can't be used for vintage. The per-project `extent` GeoJSON is accurate.
 9. **Strata parcels come back as stacked identical polygons**, one per strata lot. Deduplicate them.
 10. **The data is older than you might expect:** 12 of the 14 Metro test points come from 2016 LiDAR.
-11. **SunCalc 2 changed every convention §5.4 assumes** (found in Phase 2, released June 2026; we use 2.1.1). Angles are degrees, azimuth is clockwise from true north, and altitude is apparent (refraction-corrected). `getTimes` takes an optional UTC offset for the civil day.
+11. **SunCalc 2 changed the classic SunCalc conventions** (found in Phase 2, released June 2026; we use 2.1.1). Angles are degrees, azimuth is clockwise from true north, and altitude is apparent (refraction-corrected). `getTimes` takes an optional UTC offset for the civil day.
 12. **STAC `proj:transform` on the HRDEM items is in GDAL geotransform order**, `[originX, res, 0, originY, 0, −res]`, not the STAC `[a…f]` order. The app reads tile geometry from the COG header instead.
 14. **British Columbia dropped clock changes.** IANA tzdb 2026b (April 2026) says BC moved to permanent UTC−7 on 2026-03-09, so Vancouver doesn't fall back on 2026-11-01. DST-aware handling through luxon/Intl still works, but only on runtimes with tz data 2026b or later. Node 25.8.1 (tz 2026a) still models UTC−8 for winter 2026. Sun positions use UTC instants and are unaffected; only how user-entered local times are read and how times are displayed depend on it. Current browsers update their tz data regularly.
 13. **The EPSG:3979 scale factor in Metro Vancouver is about 0.999**, so a 1 m grid pixel is about 1.001 m on the ground. The effect on horizon angles (under 0.05°) is ignored.
 
 ---
 
-## 1. BC Address Geocoder (§4.1)
+## 1. BC Address Geocoder
 
 **Endpoint:** `https://geocoder.api.gov.bc.ca/addresses.json`. Keyless.
 
@@ -118,7 +118,7 @@ The top level also carries `disclaimer`, `privacyStatement` and `copyrightLicens
 
 **Rate limit and licence:** `x-ratelimit-limit-minute: 3000`. Open Government Licence – British Columbia.
 
-## 2. Metro Vancouver scope (§8)
+## 2. Metro Vancouver scope
 
 **Rough bbox (lon/lat):** `-123.5, 49.0, -122.2, 49.6`.
 - All 14 in-scope test points fall inside and Victoria falls outside.
@@ -144,7 +144,7 @@ Notes:
 - **Communities aren't localities on addresses.** Ladner, Steveston, Cloverdale, Fleetwood, Aldergrove, Walnut Grove, Deep Cove, Horseshoe Bay, Ioco, Whonnock and the like only appear as `LOCALITY` matches formatted "X in \<municipality\>". Addresses carry the municipality name.
 - **Second, authoritative check:** the parcel's `REGIONAL_DISTRICT` field. It was `"Metro Vancouver Regional District"` for all 13 in-scope parcels found and `"Capital Regional District"` for Victoria.
 
-## 3. ParcelMap BC (§4.2)
+## 3. ParcelMap BC
 
 **WFS:** `https://openmaps.gov.bc.ca/geo/pub/wfs` (GeoServer behind a Kong gateway). Layer details:
 
@@ -166,7 +166,7 @@ https://openmaps.gov.bc.ca/geo/pub/wfs?service=WFS&version=2.0.0&request=GetFeat
 
 Samples: [`wfs-parcel.json`](samples/wfs-parcel.json), [`wfs-parcel-strata.json`](samples/wfs-parcel-strata.json) (PIDs removed).
 
-**Axis order (gotcha #3):**
+**Axis order (docs/DEVELOPMENT.md, gotcha 3):**
 - GeoJSON output is **`[lon, lat]`** for `srsName=EPSG:4326`, for `urn:ogc:def:crs:EPSG::4326`, and for WFS 1.1.0.
 - The CQL point must be `POINT(lon lat)`. A flipped point returns 0 hits rather than an error.
 - The point-in-polygon assert passed for every test address that had a parcel point.
@@ -186,7 +186,7 @@ Responses took 30–100 ms.
 | Zero hits | A road intersection gives 0. Retrying with `DWITHIN(SHAPE,POINT(x y),d,meters)` in **EPSG:3005**: 5 m → 0, 15 m → 3, 30 m → 10. The Coquitlam `BLOCK` point: 5 m → 0, **15 m → 1** (the civic parcel), 30 m → 2 (adds a park). | Retry DWITHIN at about 15 m in EPSG:3005, where metres are true metres. If there are several, rank by distance and let the user pick. If none, show "We couldn't find a lot at this address." |
 | Multiple hits | Surrey City Hall: an `Interest` polygon plus a `Subdivision` polygon with **identical geometry**. | Deduplicate identical geometries, deprioritise `Interest` and `Road`, and pick the smallest containing polygon. |
 | Strata | `PARCEL_CLASS = "Building Strata"`, one identical polygon **per strata lot**. 297 of 300 parcels in a downtown 300 m box were strata. Strata plan prefixes: BCS, LMS, EPS, NWS, VAS. Subdivision plans: BCP, LMP, EPP, NWP, VAP. | Deduplicate and show the strata/complex notice. |
-| Very large lots | UBC: one 924,398 m² `Subdivision / Private / NO_PLAN` parcel with `MUNICIPALITY: "Rural"`. | The §5.1 cell cap and coarsening are essential. |
+| Very large lots | UBC: one 924,398 m² `Subdivision / Private / NO_PLAN` parcel with `MUNICIPALITY: "Rural"`. | The cell cap and coarsening are essential. |
 
 **CORS (important):**
 - The Kong gateway sets `Access-Control-Allow-Origin` to the **origin of the `Referer` header**. It ignores `Origin`.
@@ -202,7 +202,7 @@ Responses took 30–100 ms.
 - Not a legal survey boundary.
 - The full province is also downloadable as a file geodatabase, which isn't needed here.
 
-## 4. NRCan HRDEM 1 m mosaic (§4.3)
+## 4. NRCan HRDEM 1 m mosaic
 
 ### 4.1 STAC
 
@@ -246,7 +246,7 @@ Sample: [`stac-mosaic-item.json`](samples/stac-mosaic-item.json).
 | Origin and pixel size | (−2,000,000, 500,000), 1 m |
 | IFDs | 11 (overviews 2× to 512×) |
 
-- **DSM and DTM share an identical grid** (same VRT size, GeoTransform and nodata), so gotcha #6 holds.
+- **DSM and DTM share an identical grid** (same VRT size, GeoTransform and nodata), so docs/DEVELOPMENT.md gotcha 6 holds.
 - Heights are CGVD2013.
 
 **S3 CORS:**
@@ -307,7 +307,7 @@ Sample: [`stac-mosaic-item.json`](samples/stac-mosaic-item.json).
 
 No nodata appeared at any of the 14 points, and the three full 441 m windows read (van, dnv, mr) were 100% valid.
 
-### 4.3 Vintage (§4.3(d))
+### 4.3 Vintage
 
 - The mosaic item's `datetime` (`2023-08-13` for `2_3`) belongs to the newest project in the tile. It isn't a per-pixel date.
 - STAC `hrdem-lidar` item geometries **overstate** coverage. `BC-Vancouver_Island_Sunshine_Coast_2018` "contains" every Metro point but is nodata at all of them.
@@ -327,7 +327,7 @@ Sample: [`stac-lidar-projects.json`](samples/stac-lidar-projects.json).
 
 ### 4.4 WCS (path B, fallback)
 
-- **The spec URL** `https://datacube.services.geo.ca/ows/elevation` returns **308** to `https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic`. The redirect has **no CORS header**, so Chromium blocks it. **Call the final URL directly.**
+- **The documented URL** `https://datacube.services.geo.ca/ows/elevation` returns **308** to `https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic`. The redirect has **no CORS header**, so Chromium blocks it. **Call the final URL directly.**
 - **Coverages:** `dsm` and `dtm`. Capabilities are WCS 1.1-style (`<Identifier>`). Supported CRSs include EPSG:3979, 4326, 3857, 3978 and 4617.
 - **Versions:** only **WCS 1.1.1 GetCoverage** works. 2.0.1 and 1.0.0 return `400 layer does not exist`.
 
@@ -348,7 +348,7 @@ https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic?service=WCS&
 
 `spike/09-build-vintage.ts` clipped the extents of the **11** `hrdem-lidar` projects that touch the Metro bbox to that box, then simplified them to about 10 m. The result is `src/elevation/vintage.json` at 18.5 KiB. At runtime the app picks the newest project containing the point, and also runs a STAC search there so it can notice projects published later. Tests confirm City Hall gives Lower Mainland 2016 and Maple Ridge gives FHIMP 2023, matching the Phase 0 pixel check.
 
-### 4.5 Grid convergence (§5.1)
+### 4.5 Grid convergence
 
 - The angle from grid north to true north (clockwise), computed with proj4 by projecting the point and a point 1e-4° north of it, is **+24.86° (Maple Ridge) to +25.45° (UBC)**. It's +25.33° at Vancouver City Hall.
 - Grid bearing = true bearing + γ.
@@ -379,7 +379,7 @@ So the geocoder and a plain WFS `fetch` work from `https://wattyven.github.io`, 
 | STAC search | `*` | ✅ | preflight 403, so use simple GETs only |
 | S3 COG (Range) | `*`, allows `range` | ✅ | `Content-Range` not exposed (harmless) |
 | S3 extent GeoJSON | `*` | ✅ | |
-| WCS spec URL `/ows/elevation` | none (308) | ❌ | redirect lacks CORS |
+| WCS documented URL `/ows/elevation` | none (308) | ❌ | redirect lacks CORS |
 | WCS `/wrapper/ogc/elevation-hrdem-mosaic` | reflects origin | ✅ | WCS 1.1.1 only |
 | S3 COPC point clouds (Range) | `*` | ✅ | §7.3 |
 | LidarBC object store | none, preflight 403 | ❌ | read through `proxy/lidarbc` (§7.1) |
@@ -402,9 +402,9 @@ The spike ran requests one at a time with a 350 ms gap and an in-memory cache. G
 
 Measured with `spike/12`–`19` (the `*.live.test.ts` ones run with `npx vitest run --config spike/vitest.live.config.ts`).
 
-### 7.1 The one server-side piece: a LidarBC CORS proxy (approved exception)
+### 7.1 The one server-side piece: a LidarBC CORS proxy
 
-VanShade is a static site. On 2026-10-08 the owner approved one exception: a small Cloudflare Worker
+VanShade is a static site with one exception: a small Cloudflare Worker
 ([`proxy/lidarbc/`](../proxy/lidarbc)) that adds CORS headers to the LidarBC object store, which has the newest LiDAR and no
 CORS. It forwards `GET`/`HEAD` of LidarBC DSM/DEM tiles only, passes `Range` through, and caches at the edge for a day. The
 site reads its URL from the build-time variable `VITE_LIDARBC_PROXY` (a GitHub repository variable). **Without it the site is
@@ -544,4 +544,4 @@ switching between the three choices afterwards takes 0.3–1.9 s, because the wo
 **Spikes.** Point-cloud and LidarBC surfaces drop cells at least 2.5 m above three-quarters of their neighbours that have
 data (wires, poles, birds), replacing them with the neighbours' median. Roof edges and 2 × 2 chimneys stay.
 
-**Vertical walls** are a rendering change only (`scene/terrain.ts` `buildTerraced`).
+**Vertical walls** are a rendering change only (`scene/terrain.ts` `buildTerraced`); see [`DEVELOPMENT.md`](DEVELOPMENT.md).

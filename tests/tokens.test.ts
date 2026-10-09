@@ -15,7 +15,7 @@ describe('design tokens', () => {
     }
   });
 
-  it('are a small set', () => {
+  it('are a small set (4–6 colours)', () => {
     expect(Object.keys(TOKENS).length).toBeGreaterThanOrEqual(4);
     expect(Object.keys(TOKENS).length).toBeLessThanOrEqual(6);
   });

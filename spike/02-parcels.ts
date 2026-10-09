@@ -1,4 +1,4 @@
-// §4.2 ParcelMap BC WFS probe.
+// ParcelMap BC WFS probe.
 import proj4 from 'proj4';
 import { getJson, politeGet, corsSummary, readOut, writeOut, writeSample, check, pointInGeometry, stats } from './lib.ts';
 

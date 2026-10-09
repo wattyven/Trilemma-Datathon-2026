@@ -34,7 +34,7 @@ const grow = (b: Bbox, m: number): Bbox => ({ minX: b.minX - m, minY: b.minY - m
 async function openHrdem(spec: HrdemSpec) {
   const [dsmImg, dtmImg] = await Promise.all([openImage(spec.dsmUrl), openImage(spec.dtmUrl)]);
   const tile = tileGrid(dsmImg);
-  if (JSON.stringify(tile) !== JSON.stringify(tileGrid(dtmImg))) throw new Error('DSM and DTM grids differ'); // gotcha #6
+  if (JSON.stringify(tile) !== JSON.stringify(tileGrid(dtmImg))) throw new Error('DSM and DTM grids differ'); // docs/DEVELOPMENT.md, gotcha 6
   return { dsmImg, dtmImg, tile };
 }
 

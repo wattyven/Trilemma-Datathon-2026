@@ -10,7 +10,7 @@ export const TOKENS = {
   mist: '#D8D5CB', // borders, hairlines
 } as const;
 
-/** Chart hue for single-series sun-hours bars: validated for band, chroma and ≥ 3:1 on white. */
+/** Chart hue for single-series sun-hours bars: checked for lightness band, chroma and ≥ 3:1 contrast on white. */
 export const CHART_BAR = '#B7791F';
 
 /** Scene materials (not UI tokens): land (a neutral clay-model tone) and water. */

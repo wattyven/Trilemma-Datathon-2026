@@ -1,4 +1,4 @@
-// §4.1 BC Address Geocoder probe.
+// BC Address Geocoder probe.
 import { getJson, politeGet, corsSummary, writeOut, writeSample, check, stats } from './lib.ts';
 import { TEST_ADDRESSES, LOCALITY_CANDIDATES, METRO_BBOX } from './addresses.ts';
 

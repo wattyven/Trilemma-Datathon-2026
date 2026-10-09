@@ -1,4 +1,4 @@
-// §4.3(a,b,d) COG reads with geotiff.js in Node: cold/warm timings, bytes, coverage, DSM−DTM, vintage by pixel match.
+// COG reads with geotiff.js in Node: cold/warm timings, bytes, coverage, DSM−DTM, vintage by pixel match.
 import { readOut, writeOut, check } from './lib.ts';
 import { probePoint, parallelLoad, openCog, readWindow, toLcc, instrumentFetch, net, resetNet } from './cog-probe.ts';
 

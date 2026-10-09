@@ -1,4 +1,4 @@
-// §4.3(c) WCS GetCoverage probe, compared against the COG window at the same place.
+// WCS GetCoverage probe, compared against the COG window at the same place.
 import { fromArrayBuffer } from 'geotiff';
 import { readOut, writeOut, check, corsSummary, ORIGIN, UA } from './lib.ts';
 import { openCog, readWindow, toLcc } from './cog-probe.ts';
@@ -24,11 +24,11 @@ async function get(url: string, redirect: RequestRedirect = 'follow') {
   return { status: res.status, ms: Math.round(performance.now() - t0), headers, buf };
 }
 
-// Redirect behaviour of the spec URL.
+// Redirect behaviour of the documented URL.
 {
   const r = await get(`${DOCUMENTED_WCS}?service=WCS&request=GetCapabilities`, 'manual');
-  results.specUrlRedirect = { status: r.status, location: r.headers.location, ...corsSummary(r.headers) };
-  console.log('Spec URL:', results.specUrlRedirect);
+  results.documentedUrlRedirect = { status: r.status, location: r.headers.location, ...corsSummary(r.headers) };
+  console.log('Documented URL:', results.documentedUrlRedirect);
 }
 
 const variants: Record<string, string> = {
@@ -83,5 +83,5 @@ console.log('\n# Checks');
 const ok = Object.values(results.variants).some((v: any) => v.maxDiffVsCog !== undefined && v.maxDiffVsCog < 0.01);
 check('Some WCS GetCoverage variant returns Float32 elevations identical to the COG', ok);
 check('WCS final URL sends ACAO for the github.io origin', Object.values(results.variants).some((v: any) => v.acao === ORIGIN || v.acao === '*'));
-check('Spec WCS URL redirect carries ACAO (needed for browsers to follow it)', !!results.specUrlRedirect.acao, `status ${results.specUrlRedirect.status}`);
+check('Documented WCS URL redirect carries ACAO (needed for browsers to follow it)', !!results.documentedUrlRedirect.acao, `status ${results.documentedUrlRedirect.status}`);
 writeOut('wcs-results.json', results);

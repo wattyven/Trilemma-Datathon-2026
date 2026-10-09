@@ -1,6 +1,6 @@
 // Sun positions (SunCalc 2) and sampling schedules, always in America/Vancouver via luxon.
 //
-// SunCalc 2 conventions (not the 1.x ones): angles in DEGREES, azimuth
+// SunCalc 2 conventions (not SunCalc 1.x's): angles in DEGREES, azimuth
 // clockwise from TRUE north, altitude apparent (refraction-corrected). Never build analysis
 // dates with `new Date(y, m, d)`; everything goes through `vancouver()` below.
 import { DateTime } from 'luxon';

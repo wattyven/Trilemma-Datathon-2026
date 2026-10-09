@@ -1,4 +1,4 @@
-// Every output, as table lookups against precomputed horizons.
+// Every result (sun now, sun-hours, season average, shade finder, the inspector), as table lookups against precomputed horizons.
 import { CLASS_THRESHOLDS, type Thresholds } from '../config';
 import { sectorLookup, type SectorLookup } from './horizon';
 import type { SunSample } from './sun';

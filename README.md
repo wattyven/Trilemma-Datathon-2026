@@ -133,5 +133,6 @@ The app is a static Vite + TypeScript site with no backend. The one optional exc
 | `src/ui/` | search, controls, timeline, inspector, 2D map, design tokens |
 | `tests/`, `e2e/` | Vitest unit tests (with captured API fixtures), the Playwright smoke test |
 | `spike/` | the Phase 0 data probes and measurement scripts |
-| `docs/` | data-source findings, screenshots |
+| `docs/` | the developer guide, data-source findings, screenshots |
 
+Contributor notes and gotchas are in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).

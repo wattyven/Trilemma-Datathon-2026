@@ -1,5 +1,5 @@
 // Test addresses: public civic buildings only, so no private homes are named
-// in the repo. Spread across the municipalities §4.3(a) asks about, plus edge cases.
+// in the repo. Spread across the municipalities, plus edge cases.
 export interface TestAddress {
   id: string;
   address: string;
@@ -26,7 +26,7 @@ export const TEST_ADDRESSES: TestAddress[] = [
   { id: 'vic', address: '1 Centennial Sq, Victoria, BC', jurisdiction: 'Victoria (out of area)', expectInScope: false },
 ];
 
-/** The 23 Metro Vancouver members (§8) plus sub-communities whose names may show up as localities. */
+/** The 23 Metro Vancouver members plus sub-communities whose names may show up as localities. */
 export const LOCALITY_CANDIDATES = [
   // members
   'Anmore', 'Belcarra', 'Bowen Island', 'Burnaby', 'Coquitlam', 'Delta', 'Langley', 'Lions Bay', 'Maple Ridge',

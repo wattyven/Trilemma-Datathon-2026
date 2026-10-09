@@ -1,4 +1,4 @@
-// BC Address Geocoder client.
+// BC Address Geocoder client (docs/DATA_SOURCES.md §1).
 import { AUTOCOMPLETE, GEOCODER_NEAREST_URL, GEOCODER_URL, LOCATE, METRO_BBOX, MIN_CONFIDENT_SCORE } from '../config';
 import type { Position } from '../geo/polygon';
 import { getJson } from './http';

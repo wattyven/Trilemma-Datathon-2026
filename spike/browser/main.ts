@@ -156,7 +156,7 @@ async function run() {
     return { status: r.status, size: `${img.getWidth()}×${img.getHeight()}`, resolution: img.getResolution(), first: +ras[0].toFixed(2) };
   });
 
-  await probe('WCS spec URL (308 redirect) GetCapabilities', async () => {
+  await probe('WCS documented URL (308 redirect) GetCapabilities', async () => {
     const r = await fetch('https://datacube.services.geo.ca/ows/elevation?service=WCS&request=GetCapabilities');
     return { status: r.status, redirected: r.redirected, url: r.url };
   });
