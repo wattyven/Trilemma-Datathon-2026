@@ -43,7 +43,7 @@ export function defaultState(today: LocalDate, nowMinute: number): ControlState 
     fromTime: '13:00',
     toTime: '18:00',
     observer: 'bed',
-    classes: false,
+    classes: true, // full / part sun / shade: clearer than the hours ramp for most people
     fullSunH: CLASS_THRESHOLDS.fullSunH,
     partSunH: CLASS_THRESHOLDS.partSunH,
   };

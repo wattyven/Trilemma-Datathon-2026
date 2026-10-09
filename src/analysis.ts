@@ -110,7 +110,9 @@ export class Analysis {
   private baseVintage: Vintage | null = null;
   private changesOn = false;
   private jurisdiction = '';
-  private photoOn = false;
+  /** On by default; `photoChosen` says whether the visitor (or their link) asked for it. */
+  private photoOn = true;
+  private photoChosen = false;
   private opacity: number = IMAGERY.defaultOpacity;
   private photo: Photo | null = null;
   private photoSeq = 0;
@@ -141,6 +143,8 @@ export class Analysis {
       this.setPhotoEnabled(els.photoToggle.checked);
       this.onPhotoChange();
     });
+    els.photoToggle.checked = this.photoOn;
+    els.opacityWrap.hidden = !this.photoOn;
     els.opacityInput.addEventListener('input', () => {
       this.setResultsOpacity(Number(els.opacityInput.value));
       this.onPhotoChange();
@@ -259,8 +263,9 @@ export class Analysis {
   }
 
   /** Aerial photo under the results, in both views (also restores a shared link). */
-  setPhotoEnabled(on: boolean) {
+  setPhotoEnabled(on: boolean, chosen = true) {
     this.photoOn = on;
+    this.photoChosen = chosen;
     this.els.photoToggle.checked = on;
     this.els.opacityWrap.hidden = !on;
     this.applyOpacity();
@@ -299,7 +304,7 @@ export class Analysis {
     const source = imageryFor(this.jurisdiction);
     if (!source) {
       this.clearPhoto();
-      credit.textContent = copy.imagery.gap(this.jurisdiction);
+      credit.textContent = this.photoChosen ? copy.imagery.gap(this.jurisdiction) : copy.imagery.gapQuiet(this.jurisdiction);
       return;
     }
     credit.textContent = copy.imagery.loading;

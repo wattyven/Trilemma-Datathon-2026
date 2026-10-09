@@ -294,11 +294,11 @@ function urlDefaults(): UrlState {
     year: defaults.year,
     observer: defaults.observer,
     view: '3d',
-    photo: false,
+    photo: true,
     opacity: IMAGERY.defaultOpacity,
     source: 'best',
     changes: false,
-    classes: false,
+    classes: defaults.classes,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
     shadeStart: defaults.shadeStart,
@@ -379,7 +379,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     analysis.chooseSource(s.source ?? 'best');
     analysis.setChangesEnabled(s.changes ?? false);
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
-    analysis.setPhotoEnabled(s.photo ?? false);
+    analysis.setPhotoEnabled(s.photo ?? true, s.photo !== undefined);
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
       const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;

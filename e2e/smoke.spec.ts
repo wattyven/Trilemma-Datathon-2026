@@ -13,7 +13,8 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   // Results, legend, caveats and attribution.
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
-  await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
+  // Full sun / part sun / shade is the default view.
+  await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   // A first visit explains how to read the view, once.
   await expect(page.locator('#tips')).toBeVisible();
   await page.locator('#tips-close').click();
@@ -40,13 +41,15 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
     await expect(page.locator(RESULT)).toBeVisible();
   }
 
-  // The aerial photo drapes under the results, with its credit line, and goes into the link.
-  await page.locator('#photo-toggle').check();
+  // The aerial photo is on by default, with its credit line; turning it off goes into the link.
+  await expect(page.locator('#photo-toggle')).toBeChecked();
   await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
   await expect(page.locator('#opacity-wrap')).toBeVisible();
-  await expect.poll(() => page.url()).toMatch(/img=1/);
   await page.locator('#photo-toggle').uncheck();
   await expect(page.locator('#photo-credit')).toBeHidden();
+  await expect.poll(() => page.url()).toMatch(/img=0/);
+  await page.locator('#photo-toggle').check();
+  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
 
   // Keyboard inspector: 12 monthly bars.
   await page.locator('.scene-canvas').focus();

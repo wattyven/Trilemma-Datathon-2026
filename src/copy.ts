@@ -112,6 +112,8 @@ export const copy = {
   imagery: {
     loading: 'Loading the aerial photo…',
     gap: (jurisdiction: string) => `No open aerial photo is published for ${jurisdiction}, so the view stays plain.`,
+    /** The same, when the photo is only on because it's the default. */
+    gapQuiet: (jurisdiction: string) => `No aerial photo is published for ${jurisdiction}; showing the 3D model.`,
     noCoverage: (owner: string) => `The ${owner} aerial photo doesn't cover this lot.`,
     failed: "The aerial photo didn't load. Try switching it off and on again in a moment.",
     about: (items: string[]) => `Aerial photos, when switched on, come from each municipality's open data: ${items.join('; ')}.`,

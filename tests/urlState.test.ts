@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeThresholds } from '../src/ui/controls';
+import { defaultState, sanitizeThresholds } from '../src/ui/controls';
 import { decodeHash, encodeHash, type UrlState } from '../src/urlState';
 
 const full: UrlState = {
@@ -58,6 +58,15 @@ describe('URL hash state', () => {
     expect(decodeHash('#elev=lidarbc').source).toBe('newest');
     expect(decodeHash('#elev=best&chg=1')).toEqual({ source: 'best', changes: true });
     expect(decodeHash('#elev=everything&chg=maybe')).toEqual({});
+  });
+
+  it('records turning off a default (the photo, the full / part sun / shade view)', () => {
+    expect(encodeHash({ photo: false, classes: false }, { photo: true, classes: true })).toBe('#cls=0&img=0');
+    expect(encodeHash({ photo: true, classes: true }, { photo: true, classes: true })).toBe('');
+  });
+
+  it('starts new visitors on full / part sun / shade', () => {
+    expect(defaultState({ year: 2026, month: 10, day: 8 }, 600).classes).toBe(true);
   });
 
   it('tolerates a missing or junk hash', () => {
