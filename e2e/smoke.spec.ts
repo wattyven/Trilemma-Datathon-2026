@@ -49,9 +49,14 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect(page.locator('.spot-pin[data-kind="shadiest"]')).toContainText(/^Min ([\d.]+|0) h/);
   await summary.locator('button').first().click();
   await expect(max).toHaveClass(/flash/);
-  // A pin opens its spot's months.
-  await max.click();
-  await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
+  // A spot's months are Advanced only: in Basic the pins are markers, and the lot doesn't pick a spot.
+  await expect(page.locator('#readout')).not.toContainText('Click a spot');
+  await expect(max).toHaveAttribute('aria-hidden', 'true');
+  await max.click({ force: true }); // lands on the view underneath
+  await page.locator('.scene-canvas').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1500);
+  await expect(page.locator('#inspector')).toBeHidden();
 
   // Analysis: Gemini reads the lot through the proxy (stubbed here, so the test costs nothing). A
   // build without VITE_GEMINI_PROXY has no Analysis button; the deployed site must have one.
@@ -207,6 +212,7 @@ test('Advanced: modes, time, 3D data, inspector and links', async ({ page, conte
   await page.locator('#advanced-toggle').click(); // the "Advanced mode" switch
   await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
   await expect(page.locator('#basic-summary')).toContainText(/Maximum:\s*([\d.]+) hours/);
+  await expect(page.locator('#inspector')).toBeHidden(); // the spot picked in Advanced
   await expect.poll(() => page.url()).not.toMatch(/adv=1/);
 });
 

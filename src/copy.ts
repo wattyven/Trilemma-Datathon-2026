@@ -269,6 +269,7 @@ export const copy = {
     sunDown: 'The sun is down at this time. Move the time slider to see shadows.',
     webglMissing: "Your browser can't show the 3D view, so here's the map view instead.",
     keyboard: 'Drag to orbit, right-drag or two fingers to pan, scroll to zoom. Focus the view and use the arrow keys to step across the lot; Enter shows that spot.',
+    keyboardBasic: 'Drag to orbit, right-drag or two fingers to pan, scroll to zoom. Focus the view and use the arrow keys to step across the lot.',
   },
   tryAgain: 'Try again',
   offline: "You seem to be offline. VanShade needs the internet to fetch addresses, lot lines and elevation. Try again once you're connected.",

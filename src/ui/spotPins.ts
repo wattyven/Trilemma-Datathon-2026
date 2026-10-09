@@ -1,6 +1,6 @@
 // The two pins marking the sunniest and shadiest spots: buttons in a layer over the 3D view or the
-// map. Each is a dot exactly on its spot, a short stem and a small label. The views say where a
-// cell appears on screen; this labels the pins and places them.
+// map (markers only in Basic). Each is a dot exactly on its spot, a short stem and a small label.
+// The views say where a cell appears on screen; this labels the pins and places them.
 
 export type SpotKind = 'sunniest' | 'shadiest';
 
@@ -29,6 +29,7 @@ export class SpotPins {
   private pins = new Map<SpotKind, Pin>();
   private specs: PinSpec[] = [];
   private flashTimers = new Map<SpotKind, ReturnType<typeof setTimeout>>();
+  private interactive = true;
 
   /**
    * @param onPick a pin was clicked
@@ -51,6 +52,7 @@ export class SpotPins {
       for (const x of [stem, dot]) x.setAttribute('aria-hidden', 'true');
       el.append(label, stem, dot);
       el.addEventListener('click', () => {
+        if (!this.interactive) return;
         const spec = this.specs.find((s) => s.kind === kind);
         if (spec) onPick(spec.cell);
       });
@@ -84,6 +86,20 @@ export class SpotPins {
 
   clear() {
     this.set([]);
+  }
+
+  /**
+   * Buttons that open a spot's months, or markers only (Basic): out of the tab order, hidden from
+   * screen readers (the summary says the same) and letting clicks and the wheel through to the view.
+   */
+  setInteractive(on: boolean) {
+    this.interactive = on;
+    for (const p of this.pins.values()) {
+      p.el.tabIndex = on ? 0 : -1;
+      p.el.classList.toggle('marker', !on);
+      if (on) p.el.removeAttribute('aria-hidden');
+      else p.el.setAttribute('aria-hidden', 'true');
+    }
   }
 
   /** Pulse a pin's dot so it's easy to find (from the summary's "north-east" and the like). */

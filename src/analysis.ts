@@ -557,7 +557,7 @@ export class Analysis {
       },
       { lowPower: isLowPower() },
     );
-    this.scene.canvas.setAttribute('aria-label', copy.view.keyboard);
+    this.setPickable();
     this.scene.setShadows(!this.basic && this.els.shadowsToggle.checked);
     this.scene.setSunVisible(!this.basic);
     this.scene.onRender = () => this.placePins();
@@ -773,7 +773,7 @@ export class Analysis {
     this.els.timelineNote.textContent = note;
     this.els.timelineNote.hidden = !note;
     this.renderDebug();
-    this.els.readout.textContent = copy.inspector.hint;
+    this.els.readout.textContent = this.readoutHint;
     this.refreshInspector();
     if (this.result && this.result.kind !== 'inspect') this.onResult();
   }
@@ -996,8 +996,31 @@ export class Analysis {
     this.basic = on;
     this.scene?.setShadows(!on && this.els.shadowsToggle.checked);
     this.scene?.setSunVisible(!on);
+    this.setPickable();
+    if (on) this.closeInspector();
     this.updateSun();
     if (this.result) this.render();
+  }
+
+  /** A spot's months are Advanced only: in Basic, clicking the lot and the pins does nothing. */
+  private setPickable() {
+    this.map.pickable = !this.basic;
+    this.pins.setInteractive(!this.basic);
+    if (!this.scene) return;
+    this.scene.pickable = !this.basic;
+    this.scene.canvas.setAttribute('aria-label', this.basic ? copy.view.keyboardBasic : copy.view.keyboard);
+  }
+
+  private closeInspector() {
+    this.pickSeq++; // drop a pick still on its way
+    this.els.inspector.hidden = true;
+    this.inspectedCell = null;
+    this.scene?.setCursor(null);
+  }
+
+  /** Under the legend until the pointer is over the lot. */
+  private get readoutHint(): string {
+    return this.basic ? '' : copy.inspector.hint;
   }
 
   /** Label the pins for the current spots (when the setting is on). */
@@ -1082,7 +1105,7 @@ export class Analysis {
     const l = this.loaded;
     if (!l || !this.result) return;
     if (cell === null) {
-      this.els.readout.textContent = copy.inspector.hint;
+      this.els.readout.textContent = this.readoutHint;
       return;
     }
     const extra = [l.covered[cell] ? copy.readout.covered : '', copy.readout.height(l.z0[cell]!)].filter(Boolean);

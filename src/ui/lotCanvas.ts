@@ -87,6 +87,8 @@ export class LotCanvas {
   private ro: ResizeObserver;
   /** Called after every redraw, so the pins on the view can follow. */
   onDraw: () => void = () => {};
+  /** Whether a click on a spot picks it (off in Basic). */
+  pickable = true;
 
   constructor(private canvas: HTMLCanvasElement, private handlers: CanvasHandlers) {
     this.ro = new ResizeObserver(() => this.draw());
@@ -94,6 +96,7 @@ export class LotCanvas {
     canvas.addEventListener('mousemove', (ev) => this.handlers.onHover(this.cellAt(ev)));
     canvas.addEventListener('mouseleave', () => this.handlers.onHover(null));
     canvas.addEventListener('click', (ev) => {
+      if (!this.pickable) return;
       const c = this.cellAt(ev);
       if (c !== null) this.handlers.onPick(c);
     });

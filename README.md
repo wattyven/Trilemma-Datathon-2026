@@ -86,8 +86,8 @@ how VanShade follows it:
   - **Time slider, Now and Play the day**, with sunrise and sunset; real-time 3D shadows.
   - **3D data:** *Best of both* (2016 detail, updated wherever something changed by 2025; the default), *Newest survey*
     (2025, 1 m) or *Most detailed* (2016, 0.5 m); *Show changes since 2016* hatches what changed.
-- **Click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's sun month by
-  month (with a typical-weather column in the table view) and through the day.
+- In Advanced mode, **click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that
+  spot's sun month by month (with a typical-weather column in the table view) and through the day.
 - **Analysis:** a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each part), then
   your own questions, such as "Where should I plant vegetables?". It answers from the numbers VanShade shows for the lot.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of

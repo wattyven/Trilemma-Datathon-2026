@@ -29,29 +29,28 @@ const tipsSeen = () => localStorage.setItem('vanshade:tips-seen-v1', '1'); // RE
 
 const browser = await chromium.launch({ args });
 try {
-  // Desktop: empty state, then a lot in Basic with a pin's months open, then About.
+  // Desktop: empty state, then a lot in Basic, then About, then a pin's months in Advanced.
   const desk = await browser.newPage({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 1 });
   await desk.addInitScript(tipsSeen);
   await desk.goto(base);
   await desk.screenshot({ path: join(OUT_DIR, 'review-intro.png') });
   await search(desk, '453 W 12th Ave, Vancouver');
   await refined(desk);
-  await desk.locator('.spot-pin[data-kind="sunniest"]').click();
-  await desk.locator('#inspector svg.chart').waitFor();
   await desk.waitForTimeout(500);
-  await desk.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await desk.evaluate(() => window.scrollTo(0, 0)); // the inspector opens below the fold
-  await desk.waitForTimeout(300);
   await desk.screenshot({ path: join(DOCS, 'desktop.png') });
-  await desk.locator('#inspector').screenshot({ path: join(DOCS, 'inspector.png') });
   await desk.screenshot({ path: join(OUT_DIR, 'review-desktop-full.png'), fullPage: true });
   await desk.locator('#lot-caveats [data-open-about]').click();
   await desk.waitForTimeout(300);
   await desk.screenshot({ path: join(OUT_DIR, 'review-about.png') });
   await desk.keyboard.press('Escape');
 
-  // Advanced mode: classes with custom thresholds.
+  // Advanced mode (still the season Basic showed): a pin's months, then classes with custom thresholds.
   await desk.locator('#advanced-toggle').click();
+  await desk.locator('.spot-pin[data-kind="sunniest"]').click();
+  await desk.locator('#inspector svg.chart').waitFor();
+  await desk.mouse.move(0, 0); // no hover on a bar
+  await desk.waitForTimeout(500);
+  await desk.locator('#inspector').screenshot({ path: join(DOCS, 'inspector.png') });
   await desk.locator('input[name="classes"]').check();
   await desk.locator('input[name="fullSunH"]').fill('8');
   await desk.locator('input[name="fullSunH"]').dispatchEvent('change');

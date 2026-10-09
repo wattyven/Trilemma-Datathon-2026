@@ -101,6 +101,8 @@ export class LotScene {
   private hoverQueued = false;
   /** Called after every render, so the pins on the view can follow the camera. */
   onRender: () => void = () => {};
+  /** Whether a click or Enter on a spot picks it (off in Basic; the arrow keys still step and hover). */
+  pickable = true;
   /** The sun marker and its daily arc (off in Basic, which shows an average, not a moment). */
   private sunVisible = true;
 
@@ -522,6 +524,7 @@ export class LotScene {
 
   private onClick(e: MouseEvent) {
     if (this.downAt && Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > 4) return; // a drag, not a click
+    if (!this.pickable) return;
     const cell = this.cellFromEvent(e);
     if (cell === null) return;
     this.setCursor(cell);
@@ -548,14 +551,14 @@ export class LotScene {
         this.setCursor(next);
         this.handlers.onHover(next);
       }
-    } else if ((e.key === 'Enter' || e.key === ' ') && this.cursorCell === null) {
+    } else if ((e.key === 'Enter' || e.key === ' ') && this.pickable && this.cursorCell === null) {
       e.preventDefault();
       const c = nearestCellToOrigin(m);
       if (c !== null) {
         this.setCursor(c);
         this.handlers.onPick(c);
       }
-    } else if ((e.key === 'Enter' || e.key === ' ') && this.cursorCell !== null) {
+    } else if ((e.key === 'Enter' || e.key === ' ') && this.pickable && this.cursorCell !== null) {
       e.preventDefault();
       this.handlers.onPick(this.cursorCell);
     } else if (e.key === 'Escape') {
