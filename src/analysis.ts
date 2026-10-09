@@ -751,6 +751,9 @@ export class Analysis {
     const s = this.loaded?.summary.source;
     if (this.changesOn && !this.els.changesWrap.hidden && s?.oldYear && s.year)
       L.append(swatch('repeating-linear-gradient(-45deg, var(--cedar) 0 2px, transparent 2px 5px)', copy.legend.changed(s.oldYear, s.year), true));
+    const tipsLink = Object.assign(document.createElement('button'), { type: 'button', className: 'link', textContent: copy.tipsLink });
+    tipsLink.dataset.showTips = ''; // main.ts opens the card
+    L.append(tipsLink);
   }
 
   private renderSummary() {

@@ -14,6 +14,11 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
   await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
+  // A first visit explains how to read the view, once.
+  await expect(page.locator('#tips')).toBeVisible();
+  await page.locator('#tips-close').click();
+  await expect(page.locator('#tips')).toBeHidden();
+
   // The result in plain words, first thing in the panel.
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
@@ -55,6 +60,7 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(shared.locator(RESULT)).toBeVisible();
   await expect(shared.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(shared.locator('input[name="mode"][value="day"]')).toBeChecked();
+  await expect(shared.locator('#tips')).toBeHidden(); // already dismissed in this browser
 
   // About accuracy opens and closes.
   await shared.locator('#caveats [data-open-about]').click();

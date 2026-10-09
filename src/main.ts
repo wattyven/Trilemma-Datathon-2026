@@ -14,6 +14,7 @@ import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
 import { initSheet } from './ui/sheet';
+import { initTips } from './ui/tips';
 import { showSteps, type StepId, type Steps } from './ui/status';
 import { Timeline, initialTimeline, minuteLabel } from './ui/timeline';
 import { decodeHash, encodeHash, type UrlState } from './urlState';
@@ -99,6 +100,10 @@ analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
+const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'));
+document.addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
+});
 initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
@@ -268,6 +273,7 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   try {
     await analysis.start(parcel, match, steps, signal);
     steps.hide();
+    if (!signal.aborted) tips.showFirstTime();
   } catch (e) {
     if (isAbortError(e)) return;
     console.error(e);

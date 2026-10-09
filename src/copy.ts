@@ -26,11 +26,12 @@ const hoursRange = (low: number, high: number) => {
 
 export const copy = {
   steps: {
-    address: 'Finding address',
-    lot: 'Finding the lot',
-    elevation: 'Loading elevation',
-    sunlight: 'Calculating sunlight',
+    address: 'Finding your address',
+    lot: 'Finding your lot',
+    elevation: 'Building the 3D landscape',
+    sunlight: 'Working out the sun',
   },
+  stepsNote: 'This usually takes 5–10 seconds.',
   emptyQuery: 'Type a street address to get started, for example "453 W 12th Ave, Vancouver".',
   notFound: 'We couldn\'t find that address. Check the spelling, or add the city, like "453 W 12th Ave, Vancouver".',
   didYouMean: (address: string) => `We're not sure we found the right place. Did you mean ${address}?`,
@@ -61,7 +62,7 @@ export const copy = {
   noCells: 'This lot is too small to work out sun for on a 1 m grid.',
   tileEdge: "This lot sits right on the edge of the elevation data, which VanShade can't stitch together yet.",
   elevationDown: "We found the lot but couldn't load elevation data from Natural Resources Canada. Try again in a moment.",
-  sunlightProgress: (pct: number) => `Calculating sunlight (${pct}%)`,
+  sunlightProgress: (pct: number) => `Working out the sun (${pct}%)`,
   analysisNotices: {
     coarsened: (sizeM: number) => `This is a big lot, so we worked on a ${sizeM} m grid to keep it quick.`,
     bufferNodata: (pct: number) =>
@@ -101,6 +102,7 @@ export const copy = {
   },
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
+  tipsLink: 'How to read this',
   legend: {
     hours: 'Hours of direct sun a day',
     percent: 'Share of the time in shade',

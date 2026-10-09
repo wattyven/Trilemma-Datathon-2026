@@ -22,6 +22,7 @@ export function showSteps(list: HTMLOListElement, ids: StepId[]): Steps {
       items.set(id, li);
       return li;
     }),
+    Object.assign(document.createElement('li'), { className: 'note', textContent: copy.stepsNote }),
   );
   list.hidden = false;
   return {

@@ -41,18 +41,25 @@
       <div id="message" class="message" role="alert" hidden></div>
 
       <section id="intro" class="intro" aria-labelledby="intro-heading">
-        <h2 id="intro-heading">Where does the sun fall on your lot?</h2>
-        <p>
-          Type a Metro Vancouver address to see your lot in 3D with its real neighbours, trees and buildings, and how many
-          hours of direct sun each spot gets: right now, on any day, or over the growing season.
-        </p>
-        <p class="examples">
-          <span>Try a civic building:</span>
+        <div class="intro-text">
+          <h2 id="intro-heading">Where does the sun fall on your lot?</h2>
+          <ol class="how">
+            <li><strong>Type your address</strong> anywhere in Metro Vancouver.</li>
+            <li><strong>See your lot in 3D</strong>, with its real neighbours, trees and buildings, built from laser scans of the city.</li>
+            <li><strong>Find the sunny and shady spots</strong>: hours of direct sun for each spot, right now, on any day, or over the growing season.</li>
+          </ol>
+          <p class="examples">
+            <span>Try an example:</span>
           <button type="button" class="ghost" data-example="453 W 12th Ave, Vancouver">Vancouver City Hall</button>
           <button type="button" class="ghost" data-example="4949 Canada Way, Burnaby">Burnaby City Hall</button>
           <button type="button" class="ghost" data-example="355 W Queens Rd, North Vancouver">District of North Vancouver Hall</button>
-        </p>
-        <p class="hint">Covers the 21 municipalities, Electoral Area A and Tsawwassen First Nation in Metro Vancouver.</p>
+          </p>
+          <p class="hint">Covers the 21 municipalities, Electoral Area A and Tsawwassen First Nation in Metro Vancouver. Free, with no account. Addresses are looked up with BC's public address service; VanShade keeps nothing.</p>
+        </div>
+        <figure class="intro-preview">
+          <img src="preview.jpg" width="640" height="440" alt="Example result: Vancouver City Hall's lot in 3D among its neighbours, with sunny lawns in yellow and shaded areas in dark blue" />
+          <figcaption>Vancouver City Hall: yellow gets full sun, dark blue is shaded.</figcaption>
+        </figure>
       </section>
 
       <section id="lot" class="lot" aria-labelledby="lot-heading" hidden>
@@ -71,6 +78,17 @@
               <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
             </div>
           </div>
+          <aside id="tips" class="tips" aria-labelledby="tips-heading" hidden>
+            <h3 id="tips-heading">How to read this</h3>
+            <ul>
+              <li><strong>Colours</strong>: yellow spots get the most direct sun, dark blue the least.</li>
+              <li><strong>Hatched spots</strong> are under a roof or tree.</li>
+              <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
+              <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
+              <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
+            </ul>
+            <button type="button" id="tips-close" class="ghost">Got it</button>
+          </aside>
           <div class="view-stage">
             <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
             <div id="scene-host" class="scene-host" hidden>

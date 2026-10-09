@@ -150,9 +150,21 @@ button.ghost:hover { border-color: var(--moss); }
 .inspector summary { cursor: pointer; color: var(--shade); }
 
 /* Empty state, caveats, About, share */
-.intro { max-width: 720px; margin: 8px 0 24px; }
-.intro h2 { margin: 0 0 6px; font-size: 1.5rem; }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px 32px; align-items: start; margin: 8px 0 24px; }
+.intro h2 { margin: 0 0 10px; font-size: 1.5rem; }
 .intro p { margin: 0 0 10px; }
+.how { margin: 0 0 16px; padding-left: 1.4em; line-height: 1.5; }
+.how li { margin: 0 0 6px; padding-left: 4px; }
+.intro-preview { margin: 0; }
+.intro-preview img { display: block; width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--mist); }
+.intro-preview figcaption { margin-top: 6px; font-size: 0.8rem; color: var(--muted); }
+.status .note { color: var(--muted); font-size: 0.85rem; }
+.tips { position: relative; margin: 0 0 10px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--mist); border-left: 4px solid var(--sun); border-radius: var(--radius); font-size: 0.9rem; }
+.tips h3 { margin: 0 0 6px; font-size: 1rem; }
+.tips ul { margin: 0 0 10px; padding-left: 1.2em; }
+.tips li { margin: 0 0 4px; }
+@media (pointer: coarse) { .tips [data-pointer='fine'] { display: none; } }
+@media (pointer: fine) { .tips [data-pointer='coarse'] { display: none; } }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .examples span { color: var(--muted); }
 button.link { padding: 0; border: 0; background: none; color: var(--shade); text-decoration: underline; text-underline-offset: 2px; }
@@ -203,6 +215,7 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .build { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
 
 @media (max-width: 720px) {
+  .intro { grid-template-columns: 1fr; }
   .lot { grid-template-columns: 1fr; gap: 12px; }
   .view-stage { height: 55vh; min-height: 300px; }
   .search-row { flex-direction: column; }
