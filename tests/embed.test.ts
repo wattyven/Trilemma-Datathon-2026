@@ -9,7 +9,7 @@ const state = { address: '453 W 12th Ave, Vancouver, BC', mode: 'moment' as cons
 describe('embedding', () => {
   it('copies an iframe for this lot and time, in the compact layout, without the debug flag', () => {
     const code = embedSnippet(PAGE, state, { mode: 'season' }, 'VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC');
-    expect(code).toMatch(/^<iframe src="https:\/\/vanshade\.ca\/#[^"]+" width="100%" height="600" style="border:0" loading="lazy" title="[^"]+"><\/iframe>$/);
+    expect(code).toMatch(/^<iframe src="https:\/\/vanshade\.ca\/#[^"]+" width="100%" height="600" style="border:0" title="[^"]+"><\/iframe>$/);
     const src = /src="([^"]+)"/.exec(code)![1]!.replace(/&amp;/g, '&');
     expect(decodeHash(new URL(src).hash)).toEqual({ address: state.address, mode: 'moment', date: '2026-06-21', time: '15:30', embed: true });
   });

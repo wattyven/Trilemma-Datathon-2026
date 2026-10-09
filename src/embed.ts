@@ -15,5 +15,5 @@ export function fullSiteUrl(pageUrl: string, s: UrlState, defaults: UrlState): s
 /** An iframe showing this lot, mode, date and time in the compact layout. */
 export function embedSnippet(pageUrl: string, s: UrlState, defaults: UrlState, title: string): string {
   const src = pageUrl + encodeHash({ ...s, embed: true, debug: undefined }, defaults);
-  return `<iframe src="${escapeAttr(src)}" width="100%" height="600" style="border:0" loading="lazy" title="${escapeAttr(title)}"></iframe>`;
+  return `<iframe src="${escapeAttr(src)}" width="100%" height="600" style="border:0" title="${escapeAttr(title)}"></iframe>`;
 }

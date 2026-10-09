@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advisorInstructions, buildAdvisorPrompt, explainAdvisorFailure, formatInsightContext, geminiChunkText, mergeAssistantText, takeSseEvents, type InsightFacts } from '../src/insight';
+import { advisorInstructions, buildAdvisorPrompt, explainAdvisorFailure, formatInsightContext, geminiChunkText, geminiPayloadText, mergeAssistantText, takeSseEvents, takeSseEventsEnd, type InsightFacts } from '../src/insight';
 
 const facts: InsightFacts = {
   address: '453 W 12th Ave, Vancouver, BC',
@@ -44,11 +44,27 @@ describe('geminiChunkText', () => {
   });
 });
 
+describe('geminiPayloadText', () => {
+  it('reads every JSON object in one data block and skips thinking', () => {
+    const data = [
+      '{"candidates":[{"content":{"parts":[{"thought":true,"text":"planning"}]}}]}',
+      '{"candidates":[{"content":{"parts":[{"text":"The south bed is sunny."}]}}]}',
+    ].join('\n');
+    expect(geminiPayloadText(data)).toBe('The south bed is sunny.');
+  });
+});
+
 describe('takeSseEvents', () => {
   it('splits complete events and keeps a partial tail', () => {
     const { events, rest } = takeSseEvents('event: assistant\ndata: {"text":"Hi"}\n\nevent: result\ndata: {"sta');
     expect(events).toEqual([{ event: 'assistant', data: '{"text":"Hi"}' }]);
     expect(rest).toBe('event: result\ndata: {"sta');
+  });
+
+  it('keeps a last event that has no trailing blank line', () => {
+    const { events, rest } = takeSseEventsEnd('data: {"text":"Hi"}');
+    expect(events).toEqual([{ event: 'message', data: '{"text":"Hi"}' }]);
+    expect(rest).toBe('');
   });
 });
 

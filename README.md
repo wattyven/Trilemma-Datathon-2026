@@ -100,7 +100,7 @@ Put a live VanShade view on your own page, such as a blog post or a garden club 
 mode in Advanced), then press **Copy embed code**. You get an iframe like this one:
 
 ```html
-<iframe src="https://vanshade.ca/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
+<iframe src="https://vanshade.ca/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;embed=1" width="100%" height="600" style="border:0" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
 ```
 
 The embed keeps the 3D view and the result, credits the data, and links to the full site.

@@ -1,7 +1,7 @@
 // Dev-server side of the Analysis chat. Keys are read from .env.local and never sent to the browser.
 // Gemini answers directly. Cursor is only used when no Gemini key is saved, as a no-repo cloud agent.
 import { loadEnv, type Plugin } from 'vite';
-import { advisorInstructions, buildAdvisorPrompt, explainAdvisorFailure, geminiChunkText, mergeAssistantText, takeSseEvents } from '../insight';
+import { advisorInstructions, buildAdvisorPrompt, explainAdvisorFailure, geminiPayloadText, mergeAssistantText, takeSseEvents, takeSseEventsEnd } from '../insight';
 
 const API = 'https://api.cursor.com';
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse';
@@ -140,52 +140,72 @@ async function answerWithGemini(
       ...chat.turns.map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
       { role: 'user' as const, parts: [{ text: body.message }] },
     ];
-    const response = await geminiStream(key, advisorInstructions(body.context), contents, stop.signal);
+    const instructions = advisorInstructions(body.context);
+    let response = await geminiStream(key, instructions, contents, true, stop.signal);
     if (!response.ok || !response.body) throw await geminiFailure(response);
-    const reader = response.body.getReader();
-    const dec = new TextDecoder();
-    let buf = '';
-    let soFar = '';
-    const push = (next: string) => {
-      const merged = mergeAssistantText(soFar, next);
-      const extra = merged.slice(soFar.length);
-      soFar = merged;
-      if (extra) writeEvent(res, { text: extra });
-    };
-    while (!stop.signal.aborted) {
-      const { done, value } = await reader.read();
-      if (value) buf += dec.decode(value, { stream: !done });
-      const taken = takeSseEvents(buf);
-      buf = taken.rest;
-      for (const ev of taken.events) {
-        if (!ev.data || ev.data === '[DONE]') continue;
-        try {
-          push(geminiChunkText(JSON.parse(ev.data) as unknown));
-        } catch {
-          /* a partial chunk waits for the next read */
-        }
-      }
-      if (done) break;
+    let soFar = await readGeminiReply(response, (extra) => writeEvent(res, { text: extra }), stop.signal);
+    // A thinking-only reply has no visible text. Ask once more with thinking turned off.
+    if (!soFar.trim() && !stop.signal.aborted) {
+      response = await geminiStream(key, instructions, contents, false, stop.signal);
+      if (!response.ok || !response.body) throw await geminiFailure(response);
+      soFar = await readGeminiReply(response, (extra) => writeEvent(res, { text: extra }), stop.signal);
     }
-    if (soFar.trim() && !stop.signal.aborted) {
+    if (!soFar.trim()) {
+      if (!stop.signal.aborted) writeEvent(res, { code: 'failed', detail: 'Gemini returned no reply text.' });
+    } else if (!stop.signal.aborted) {
       chat.turns.push({ role: 'user', text: body.message }, { role: 'model', text: soFar });
       while (chat.turns.length > 8) chat.turns.splice(0, 2);
+      writeEvent(res, { done: true });
     }
-    writeEvent(res, { done: true });
     res.end();
   });
+}
+
+async function readGeminiReply(response: Response, onText: (extra: string) => void, signal: AbortSignal): Promise<string> {
+  const reader = response.body!.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let raw = '';
+  let soFar = '';
+  const pushData = (data: string) => {
+    const merged = mergeAssistantText(soFar, geminiPayloadText(data));
+    const extra = merged.slice(soFar.length);
+    soFar = merged;
+    if (extra) onText(extra);
+  };
+  const take = (events: { data: string }[]) => {
+    for (const ev of events) if (ev.data && ev.data !== '[DONE]') pushData(ev.data);
+  };
+  while (!signal.aborted) {
+    const { done, value } = await reader.read();
+    if (value) {
+      const chunk = dec.decode(value, { stream: !done });
+      buf += chunk;
+      raw += chunk;
+    }
+    if (done) {
+      take(takeSseEventsEnd(buf).events);
+      break;
+    }
+    const taken = takeSseEvents(buf);
+    buf = taken.rest;
+    take(taken.events);
+  }
+  if (!soFar.trim() && raw.trim()) pushData(raw);
+  return soFar;
 }
 
 async function geminiStream(
   key: string,
   instructions: string,
   contents: { role: 'user' | 'model'; parts: { text: string }[] }[],
+  allowThinking: boolean,
   signal: AbortSignal,
 ): Promise<Response> {
   const generationConfig: { maxOutputTokens: number; thinkingConfig?: { thinkingLevel: string } } = {
     maxOutputTokens: 800,
-    thinkingConfig: { thinkingLevel: 'low' },
   };
+  if (allowThinking) generationConfig.thinkingConfig = { thinkingLevel: 'low' };
   const post = () => fetch(GEMINI, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },

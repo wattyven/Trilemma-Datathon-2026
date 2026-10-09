@@ -58,6 +58,21 @@ export function buildAdvisorPrompt(context: string, question: string): string {
   return [advisorInstructions(context), '', 'Question:', question.trim()].join('\n');
 }
 
+/** Visible reply text from one Gemini `data` payload. Several JSON objects on separate lines all count. */
+export function geminiPayloadText(data: string): string {
+  let text = '';
+  for (const piece of data.split('\n')) {
+    const line = piece.trim();
+    if (!line || line === '[DONE]') continue;
+    try {
+      text += geminiChunkText(JSON.parse(line) as unknown);
+    } catch {
+      /* a non-JSON line is not a reply chunk */
+    }
+  }
+  return text;
+}
+
 /** Visible reply text from one Gemini stream chunk. Thinking parts are left out. */
 export function geminiChunkText(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return '';
@@ -100,6 +115,13 @@ export function takeSseEvents(buffer: string): { events: SseEvent[]; rest: strin
     events.push({ event, data: data.join('\n') });
   }
   return { events, rest };
+}
+
+/** Same as `takeSseEvents`, and a final block that arrived without a trailing blank line. */
+export function takeSseEventsEnd(buffer: string): { events: SseEvent[]; rest: string } {
+  if (!buffer.trim()) return { events: [], rest: '' };
+  const padded = buffer.endsWith('\n') ? `${buffer}\n` : `${buffer}\n\n`;
+  return { events: takeSseEvents(padded).events, rest: '' };
 }
 
 /**
