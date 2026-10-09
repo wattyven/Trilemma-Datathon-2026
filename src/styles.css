@@ -203,6 +203,13 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .hint { margin: 4px 0 0; font-size: 0.8rem; color: var(--muted); }
 .summary { font-size: 0.85rem; color: var(--muted); }
 .headline { margin: 4px 0 12px; font-size: 1.02rem; line-height: 1.45; }
+.timeline-note { margin: -4px 0 8px; }
+.more-options { margin-top: 10px; }
+.more-options summary, .lot-more summary, .switcher summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+.more-options label { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.lot-more { margin: -4px 0 12px; }
+.lot-more .facts { margin-top: 8px; }
+.switcher > fieldset { margin: 8px 0 0; padding: 0; border: 0; }
 .headline:empty { display: none; }
 .headline strong { font-weight: 650; }
 .debug { margin-top: 14px; font-size: 0.85rem; color: var(--muted); }

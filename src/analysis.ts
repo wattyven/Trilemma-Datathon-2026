@@ -31,6 +31,7 @@ import { minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
 
 export interface AnalysisElements {
   headline: HTMLElement;
+  timelineNote: HTMLElement;
   legend: HTMLElement;
   readout: HTMLElement;
   summary: HTMLElement;
@@ -223,7 +224,8 @@ export class Analysis {
     }
     if (!fact) return;
     this.vintageText = fact;
-    setFact(this.lotEls, 'lidar', copy.lidarFact, fact);
+    setFact(this.lotEls, 'lidar', copy.lidarFact, fact, true);
+    this.renderDataFact();
     this.els.caveatLidar.textContent = caveat;
     this.els.aboutLidar.textContent = about;
   }
@@ -348,6 +350,7 @@ export class Analysis {
     this.inspectedCell = null;
     this.els.summary.textContent = '';
     this.els.headline.textContent = '';
+    this.els.timelineNote.hidden = true;
     this.els.readout.textContent = '';
     this.els.legend.hidden = true;
     this.els.hud.hidden = true;
@@ -488,7 +491,23 @@ export class Analysis {
       : s.source.kind === 'merged' ? copy.surfaceMerged(s.source.oldYear ?? '', s.source.year ?? '', s.source.changedShare ?? 0)
       : s.source.kind !== 'hrdem' ? copy.surface.refined(s.source.kind, s.source.resM, s.source.year)
       : copy.surface.base(s.source.resM);
-    setFact(this.lotEls, 'surface', copy.surfaceFact, value);
+    setFact(this.lotEls, 'surface', copy.surfaceFact, value, true);
+    this.renderDataFact();
+  }
+
+  /** The plain "3D data" fact: which laser scans, in words. */
+  private renderDataFact() {
+    const s = this.loaded?.summary.source;
+    if (!s) return;
+    const baseYear = this.baseVintage?.date.slice(0, 4) ?? null;
+    const d = copy.data;
+    const value =
+      this.refinement?.state === 'running' && s.kind === 'hrdem' ? d.loading(baseYear)
+      : s.kind === 'merged' && s.oldYear && s.year ? d.merged(s.oldYear, s.year)
+      : s.kind === 'copc' ? d.detailed(s.year)
+      : s.kind === 'lidarbc' ? d.newest(s.year)
+      : d.base(baseYear);
+    setFact(this.lotEls, 'data', copy.facts.data, value);
   }
 
   /** Start the slow parts as soon as the address is known, in parallel with the lot lookup. */
@@ -702,6 +721,11 @@ export class Analysis {
     this.scene?.setLayer(layer);
     this.renderLegend(layer);
     this.renderSummary();
+    // The time slider always moves the 3D sun, but only changes the colours in "One moment".
+    const mode = this.controls.get().mode;
+    const note = mode === 'season' || mode === 'shade' ? copy.timelineNote.average : mode === 'day' ? copy.timelineNote.day : '';
+    this.els.timelineNote.textContent = note;
+    this.els.timelineNote.hidden = !note;
     this.renderDebug();
     this.els.readout.textContent = copy.inspector.hint;
     this.refreshInspector();

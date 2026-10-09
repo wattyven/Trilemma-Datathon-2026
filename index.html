@@ -109,6 +109,7 @@
             <label class="slider">Time <input type="range" id="tl-time" min="0" max="1435" step="5" />
               <output id="tl-time-label" for="tl-time"></output></label>
           </div>
+          <p id="timeline-note" class="hint timeline-note" hidden></p>
           <div id="legend" class="legend" hidden></div>
           <p id="readout" class="readout" aria-live="polite"></p>
           <section id="inspector" class="inspector" aria-live="polite" hidden></section>
@@ -131,11 +132,18 @@
             <span id="share-status" class="hint" aria-live="polite"></span>
           </p>
           <dl id="lot-facts" class="facts"></dl>
+          <details id="lot-more" class="lot-more">
+            <summary>Lot and data details</summary>
+            <dl id="lot-facts-more" class="facts"></dl>
+          </details>
           <ul id="lot-notices" class="notices"></ul>
-          <fieldset id="lot-switcher" class="switcher" hidden>
-            <legend>Not your lot? Other lots here</legend>
-            <div id="lot-options"></div>
-          </fieldset>
+          <details id="lot-switcher" class="switcher" hidden>
+            <summary id="lot-switcher-summary">Not the right lot?</summary>
+            <fieldset>
+              <legend class="visually-hidden">Choose a lot</legend>
+              <div id="lot-options"></div>
+            </fieldset>
+          </details>
 
           <form id="sun-controls" class="controls" hidden>
             <fieldset class="modes">
@@ -145,6 +153,10 @@
               <label><input type="radio" name="mode" value="moment" /> One moment</label>
               <label><input type="radio" name="mode" value="shade" /> Shade finder</label>
             </fieldset>
+            <p class="hint mode-hint" data-for="season">Average daily sun over months: best for planning a garden.</p>
+            <p class="hint mode-hint" data-for="day">Total sun on the day you pick (change the date under the view).</p>
+            <p class="hint mode-hint" data-for="moment">Sun and shade at the moment you pick (change the date and time under the view).</p>
+            <p class="hint mode-hint" data-for="shade">How often each spot is shaded at a time of day, over a range of dates: handy for a patio.</p>
             <div class="row" data-for="season">
               <label>Season
                 <select name="preset">
@@ -177,16 +189,20 @@
                   <option value="surface">Rooftop or deck surface</option>
                 </select>
               </label>
-              <label id="elevation-wrap" hidden>Elevation data
-                <select id="elevation-choice"></select>
-              </label>
               <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full / part sun / shade</label>
             </div>
             <div class="row" data-for="season day" data-when="classes">
               <label>Full sun from <input type="number" name="fullSunH" min="0.5" max="16" step="0.5" inputmode="decimal" /> h</label>
               <label>Part sun from <input type="number" name="partSunH" min="0" max="15.5" step="0.5" inputmode="decimal" /> h</label>
             </div>
-            <p class="hint" data-for="day moment">Pick the day and time under the view. Times are Vancouver time.</p>
+            <p class="hint" data-for="day moment">Times are Vancouver time.</p>
+            <details id="elevation-wrap" class="more-options" hidden>
+              <summary>More options</summary>
+              <label>3D data
+                <select id="elevation-choice"></select>
+              </label>
+              <p class="hint">Which laser scans build the 3D landscape. "Best of both" is the most detailed and up to date.</p>
+            </details>
           </form>
           <p id="result-summary" class="summary"></p>
 

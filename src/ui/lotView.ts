@@ -16,8 +16,11 @@ export interface LotViewElements {
   section: HTMLElement;
   heading: HTMLElement;
   facts: HTMLDListElement;
+  /** Facts most people don't need, in a closed "Lot and data details" disclosure. */
+  factsMore: HTMLDListElement;
   notices: HTMLUListElement;
-  switcher: HTMLFieldSetElement;
+  switcher: HTMLDetailsElement;
+  switcherSummary: HTMLElement;
   options: HTMLElement;
 }
 
@@ -27,10 +30,11 @@ export function renderLot(els: LotViewElements, model: LotViewModel) {
   els.section.hidden = false;
   els.heading.textContent = model.address;
   els.facts.replaceChildren();
+  els.factsMore.replaceChildren();
   setFact(els, 'jurisdiction', copy.facts.jurisdiction, model.jurisdiction);
   setFact(els, 'area', copy.facts.area, copy.areaM2(parcel.areaM2));
-  setFact(els, 'type', copy.facts.type, parcel.parcelClass);
-  if (parcel.planNumber) setFact(els, 'plan', copy.facts.plan, parcel.planNumber);
+  setFact(els, 'type', copy.facts.type, plainParcelClass(parcel.parcelClass), true);
+  if (parcel.planNumber) setFact(els, 'plan', copy.facts.plan, parcel.planNumber, true);
 
   els.notices.replaceChildren(
     ...model.notices.map((n) => {
@@ -43,17 +47,29 @@ export function renderLot(els: LotViewElements, model: LotViewModel) {
   renderSwitcher(els, model);
 }
 
-/** Adds or replaces one fact row, keyed so later phases can update it in place. */
-export function setFact(els: LotViewElements, key: string, label: string, value: string) {
-  let dd = els.facts.querySelector<HTMLElement>(`dd[data-key="${key}"]`);
+/** Adds or replaces one fact row, keyed so later phases can update it in place. `more`: in the details disclosure. */
+export function setFact(els: LotViewElements, key: string, label: string, value: string, more = false) {
+  const list = more ? els.factsMore : els.facts;
+  let dd = list.querySelector<HTMLElement>(`dd[data-key="${key}"]`);
   if (!dd) {
     const dt = document.createElement('dt');
     dt.textContent = label;
     dd = document.createElement('dd');
     dd.dataset.key = key;
-    els.facts.append(dt, dd);
+    list.append(dt, dd);
   }
   dd.textContent = value;
+}
+
+export function plainParcelClass(cls: string): string {
+  return copy.parcelClass[cls] ?? cls;
+}
+
+/** "Best match: strata building, 369 m²" / "Lot 2: 389 m², 6 m away". */
+export function lotOptionLabel(p: { parcelClass: string; areaM2: number; containsPoint: boolean; distanceM: number }, i: number): string {
+  const kind = plainParcelClass(p.parcelClass);
+  const parts = [kind !== 'Lot' ? kind.toLowerCase() : '', copy.areaM2(p.areaM2), p.containsPoint ? '' : copy.metresAway(p.distanceM)].filter(Boolean);
+  return `${i === 0 ? copy.switcherBest : `${copy.switcherOther} ${i + 1}`}: ${parts.join(', ')}`;
 }
 
 /** Text with `**emphasis**` markers, rendered as <strong> (never as HTML). */
@@ -84,6 +100,9 @@ function renderSwitcher(els: LotViewElements, model: LotViewModel) {
     return;
   }
   els.switcher.hidden = false;
+  els.switcherSummary.textContent = copy.switcherSummary(model.candidates.length - 1);
+  // Open when the match was a guess (or another lot is chosen); otherwise most people never need it.
+  els.switcher.open = model.notices.includes('nearest-lot') || model.selected > 0;
   els.options.replaceChildren(
     ...model.candidates.map((p, i) => {
       const label = document.createElement('label');
@@ -93,9 +112,7 @@ function renderSwitcher(els: LotViewElements, model: LotViewModel) {
       radio.value = String(i);
       radio.checked = i === model.selected;
       radio.addEventListener('change', () => model.onSelect(i));
-      const parts = [i === 0 ? copy.switcherBest : `${copy.switcherOther} ${i + 1}`, p.parcelClass, copy.areaM2(p.areaM2)];
-      if (!p.containsPoint) parts.push(copy.metresAway(p.distanceM));
-      label.append(radio, ` ${parts.join(' · ')}`);
+      label.append(radio, ` ${lotOptionLabel(p, i)}`);
       return label;
     }),
   );

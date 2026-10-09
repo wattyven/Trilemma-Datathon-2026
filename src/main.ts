@@ -36,11 +36,14 @@ const lotEls: LotViewElements = {
   heading: byId('lot-heading'),
   facts: byId<HTMLDListElement>('lot-facts'),
   notices: byId<HTMLUListElement>('lot-notices'),
-  switcher: byId<HTMLFieldSetElement>('lot-switcher'),
+  switcher: byId<HTMLDetailsElement>('lot-switcher'),
+  switcherSummary: byId('lot-switcher-summary'),
+  factsMore: byId<HTMLDListElement>('lot-facts-more'),
   options: byId('lot-options'),
 };
 const analysisEls: AnalysisElements = {
   headline: byId('result-headline'),
+  timelineNote: byId('timeline-note'),
   legend: byId('legend'),
   readout: byId('readout'),
   summary: byId('result-summary'),

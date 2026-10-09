@@ -10,7 +10,7 @@ const address = process.argv[3] ?? '410 W Georgia St, Vancouver';
 const key = address.split(',')[0]!.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 mkdirSync(OUT_DIR, { recursive: true });
 const RESULT = '.scene-canvas[data-state="result"]';
-const surface = '#lot-facts dd[data-key="surface"]';
+const surface = 'dd[data-key="surface"]';
 
 setTimeout(() => (console.log('gave up after 4 minutes'), process.exit(2)), 240_000);
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -22,10 +22,10 @@ try {
   await page.goto(`${base}#${new URLSearchParams({ a: address, m: 'moment', d: '2026-06-21', t: '15:00' })}`);
   await page.locator(RESULT).waitFor({ timeout: 90_000 });
   const first = Date.now() - t0;
-  await page.locator(surface, { hasText: /from/ }).waitFor({ timeout: 90_000 });
+  await page.locator(surface, { hasText: /from/ }).waitFor({ timeout: 90_000, state: 'attached' });
   await page.locator(RESULT).waitFor();
   console.log(`first result ${first} ms, refined ${Date.now() - t0} ms: "${await page.locator(surface).textContent()}"`);
-  console.log('  LiDAR from:', await page.locator('#lot-facts dd[data-key="lidar"]').textContent());
+  console.log('  LiDAR from:', await page.locator('dd[data-key="lidar"]').textContent());
   console.log('  choices:', (await page.locator('#elevation-choice option').allTextContents()).join(' | '));
   await page.waitForTimeout(1200);
   await page.locator('.view-stage').screenshot({ path: join(OUT_DIR, `modes-${key}-best.png`) });
@@ -44,7 +44,7 @@ try {
     if (!(await page.locator(`#elevation-choice option[value="${mode}"]`).count())) continue;
     const s0 = Date.now();
     await page.locator('#elevation-choice').selectOption(mode);
-    await page.locator(surface, { hasText: text }).waitFor({ timeout: 60_000 });
+    await page.locator(surface, { hasText: text }).waitFor({ timeout: 60_000, state: 'attached' });
     await page.locator(RESULT).waitFor();
     console.log(`${mode}: ${Date.now() - s0} ms: "${await page.locator(surface).textContent()}"; URL ${new URL(page.url()).hash.match(/elev=\w+/)?.[0] ?? '(default)'}`);
     await page.waitForTimeout(1000);

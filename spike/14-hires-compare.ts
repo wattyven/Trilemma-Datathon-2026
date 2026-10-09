@@ -40,14 +40,14 @@ try {
       const first = Date.now() - t0;
       let refined = 0;
       if (elev !== 'hrdem') {
-        await page.locator('#lot-facts dd[data-key="surface"]', { hasText: /from/ }).waitFor({ timeout: 90_000 }).catch(() => {});
+        await page.locator('dd[data-key="surface"]', { hasText: /from/ }).waitFor({ timeout: 90_000, state: 'attached' }).catch(() => {});
         await page.locator(RESULT).waitFor();
         refined = Date.now() - t0;
       }
       await page.waitForTimeout(1500);
       await page.locator('#scene-host').screenshot({ path: join(OUT_DIR, `hires-${key}-${elev}.png`) });
       const rows = await debugRows(page);
-      const surface = await page.locator('#lot-facts dd[data-key="surface"]').textContent();
+      const surface = await page.locator('dd[data-key="surface"]').textContent();
       console.log(`${key} ${elev}: first ${first} ms${refined ? `, refined ${refined} ms` : ''}; surface "${surface}"`);
       console.log(`  ${rows['Elevation source']}\n  ${rows['Refinement']}\n  ${rows['Cells']}\n  ${rows['Timings']}`);
       await page.close();

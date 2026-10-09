@@ -56,6 +56,22 @@ export const copy = {
     area: 'Lot area',
     type: 'Lot type',
     plan: 'Plan',
+    data: '3D data',
+  },
+  /** The "3D data" fact, in plain words. */
+  data: {
+    base: (year: string | null) => (year ? `Laser scans from ${year}` : 'Laser scans'),
+    loading: (year: string | null) => `${year ? `Laser scans from ${year}` : 'Laser scans'}; loading finer detail…`,
+    merged: (oldYear: string, newYear: string) => `Laser scans from ${oldYear}, updated where things changed by ${newYear}`,
+    detailed: (year: string | null) => `Laser scans from ${year ?? 'a recent survey'}, in fine detail`,
+    newest: (year: string | null) => `Laser scans from ${year ?? 'a recent survey'}`,
+  },
+  /** ParcelMap BC's parcel classes in plain words (anything else is shown as published). */
+  parcelClass: { Subdivision: 'Lot', 'Building Strata': 'Strata building', 'Bare Land Strata': 'Bare-land strata lot', 'Common Property': 'Strata common area', Interest: 'Easement or other interest', 'Air Space': 'Air space' } as Record<string, string>,
+  switcherSummary: (others: number) => `Not the right lot? Choose another (${others} nearby)`,
+  timelineNote: {
+    average: 'Move the time to preview shadows in 3D. The colours show the average, not this moment.',
+    day: 'The colours show the whole day; move the time to preview shadows in 3D.',
   },
   noLidar: "There's no LiDAR elevation data for this lot, so we can't work out its sun. This happens over water and in a few gaps in coverage.",
   noLidarArea: "There's no LiDAR elevation data around this address yet, so we can't work out its sun.",
@@ -89,7 +105,7 @@ export const copy = {
   },
   changesToggle: (oldYear: string) => `Show changes since ${oldYear}`,
   caveatMerged: (oldYear: string, newYear: string) =>
-    `Detail comes from ${oldYear} LiDAR, updated with ${newYear} LiDAR wherever something changed by more than 2.5 m; smaller changes, like a few metres of tree growth, may be missing.`,
+    `The 3D landscape comes from laser scans flown in ${oldYear}, updated with ${newYear} scans wherever something changed by more than 2.5 m; smaller changes, like a few years of tree growth, may be missing.`,
   aboutMerged: (oldYear: string, newYear: string) =>
     `This lot's elevation combines ${oldYear} LiDAR (0.5 m detail) with ${newYear} LiDAR wherever something changed by more than 2.5 m since.`,
   lidarNearLot: (label: string) => `${label}, near the lot`,
@@ -211,7 +227,7 @@ export const copy = {
     manual: (url: string) => `Copy this link: ${url}`,
   },
   sheet: { show: 'Show details and settings', hide: 'Hide details' },
-  caveatLidar: (year: string) => `The LiDAR is from ${year}, so newer buildings or tree growth may be missing.`,
+  caveatLidar: (year: string) => `The 3D landscape comes from laser scans flown in ${year}, so newer buildings or tree growth may be missing.`,
   aboutLidar: (label: string, year: string) => `This lot's LiDAR comes from ${label}, flown in ${year}.`,
   switcherBest: 'Best match',
   switcherOther: 'Lot',
