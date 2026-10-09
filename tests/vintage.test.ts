@@ -4,7 +4,7 @@ import { labelFor, vintageAt, vintageFor } from '../src/elevation/vintage';
 import pointsJson from './fixtures/points.json';
 
 const points = pointsJson as unknown as Record<string, [number, number]>;
-const MAPLE_RIDGE: [number, number] = [-122.5999606, 49.2193815]; // 11995 Haney Pl (Phase 0 pixel-matched to FHIMP 2023)
+const MAPLE_RIDGE: [number, number] = [-122.5999606, 49.2193815]; // 11995 Haney Pl (FHIMP 2023, matched pixel by pixel)
 
 describe('vintageAt (committed footprints)', () => {
   it('matches the pixel-verified sources from Phase 0', () => {

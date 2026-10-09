@@ -3,7 +3,7 @@ import { clampMinute, dayMinuteRange, minuteLabel } from '../src/ui/timeline';
 
 describe('timeline', () => {
   it('spans sunrise to sunset on the slider, snapped to 5 minutes', () => {
-    const r = dayMinuteRange({ year: 2026, month: 6, day: 21 }, 49.2613, -123.1139);
+    const r = dayMinuteRange({ year: 2026, month: 6, day: 21 }, 49.2613, -123.1139); // Vancouver City Hall
     expect(minuteLabel(r.min)).toBe('05:05'); // sunrise 05:06
     expect(minuteLabel(r.max)).toBe('21:25'); // sunset 21:21
   });

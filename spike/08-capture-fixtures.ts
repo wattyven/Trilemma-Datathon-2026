@@ -1,6 +1,7 @@
-// Captures small, real API responses as Vitest fixtures (tests/fixtures/). Civic buildings only;
-// PIDs are stripped. Re-run only when a data source changes shape.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// Captures small, real API responses as Vitest fixtures (tests/fixtures/). Civic and commercial
+// sites only, never homes; PIDs are stripped. Re-run only when a data source changes shape.
+// `--strata` recaptures just the strata case (wfs-strata.json and points.json's `strata`).
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import proj4 from 'proj4';
 import { getJson, SPIKE_DIR } from './lib.ts';
@@ -30,6 +31,21 @@ const stripPids = (fc: any) => ({
 });
 const geocodeTrim = (fc: any) => ({ type: fc.type, features: fc.features });
 
+// The strata case: a light-industrial Building Strata (30 units), not a residential tower.
+const STRATA = '3871 North Fraser Way, Burnaby';
+async function captureStrata() {
+  const point = (await getJson(resolveUrl(STRATA))).json.features[0].geometry.coordinates;
+  save('wfs-strata.json', stripPids((await getJson(wfs(intersects(point), 10))).json));
+  return point;
+}
+if (process.argv.includes('--strata')) {
+  const strata = await captureStrata();
+  const file = join(OUT, 'points.json');
+  save('points.json', { ...JSON.parse(readFileSync(file, 'utf8')), strata });
+  console.log('strata', strata);
+  process.exit(0);
+}
+
 // Geocoder fixtures.
 const geocodes: Record<string, string> = {
   'resolve-van.json': '453 W 12th Ave, Vancouver',
@@ -47,8 +63,9 @@ for (const [file, q] of Object.entries(geocodes)) {
   console.log(file, json.features?.[0]?.properties?.fullAddress, json.features?.[0]?.properties?.matchPrecision);
 }
 {
+  // Only the civic match: the other suggestions for "453 W 12" are homes.
   const { json } = await getJson(suggestUrl('453 W 12'));
-  save('suggest-453-w-12.json', geocodeTrim(json));
+  save('suggest-453-w-12.json', geocodeTrim({ ...json, features: json.features.filter((f: any) => f.properties.fullAddress.startsWith('453 W 12th Ave')) }));
 }
 
 // WFS fixtures.
@@ -56,8 +73,7 @@ const { json: van } = await getJson(wfs(intersects(points['resolve-van.json']!),
 save('wfs-van.json', stripPids(van));
 const sry = (await getJson(resolveUrl('13450 104 Ave, Surrey'))).json.features[0].geometry.coordinates;
 save('wfs-surrey-twins.json', stripPids((await getJson(wfs(intersects(sry), 10))).json));
-const strata = (await getJson(resolveUrl('3871 North Fraser Way, Burnaby'))).json.features[0].geometry.coordinates;
-save('wfs-strata.json', stripPids((await getJson(wfs(intersects(strata), 10))).json));
+const strata = await captureStrata();
 const coq = points['resolve-coq-block.json']!;
 save('wfs-coq-empty.json', (await getJson(wfs(intersects(coq), 10))).json);
 save('wfs-coq-buffer.json', stripPids((await getJson(wfs(dwithin(coq, 15), 20))).json));

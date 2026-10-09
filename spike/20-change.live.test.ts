@@ -1,5 +1,6 @@
 // Live: the "best of both" surface around two lots. At 410 W Georgia (Deloitte Summit, finished
-// 2023) the tower must come from LidarBC 2025; in Kitsilano almost everything stays 2016 detail.
+// 2023) the tower must come from LidarBC 2025; around the Kitsilano library (houses on every side)
+// almost everything stays 2016 detail.
 //   npx vitest run --config spike/vitest.live.config.ts spike/20-change
 import { createLazPerf } from 'laz-perf/lib/node/index.js';
 import { describe, expect, it } from 'vitest';
@@ -69,7 +70,7 @@ describe('best of both, live', () => {
 
   it('changes little around the Kitsilano library', async () => {
     useLazPerf(await createLazPerf());
-    const ll: [number, number] = [-123.1686926, 49.2647221];
+    const ll: [number, number] = [-123.1686926, 49.2647221]; // 2425 MacDonald St
     const item = (await findMosaicItem(ll))!;
     const o = await refinementOptions({ dsmUrl: item.dsm, dtmUrl: item.dtm }, lot(ll), ll, PROXY);
     const merged = await buildRasters(o.best!, lot(ll), 200, () => true);

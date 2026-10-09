@@ -55,7 +55,7 @@ describe('local frame', () => {
   });
 
   it('puts true north on +y and east on +x, and round-trips', () => {
-    const frame = localFrame([-123.1139, 49.2613]);
+    const frame = localFrame([-123.1139, 49.2613]); // Vancouver City Hall
     const [xN, yN] = frame.toLocal([-123.1139, 49.2623]);
     expect(xN).toBeCloseTo(0, 6);
     expect(yN).toBeCloseTo(111.19, 1); // 0.001° of latitude

@@ -19,7 +19,7 @@ describe('scene axes: X east, Y up, Z south', () => {
   });
 
   it('draws the June sun path above the horizon, rising in the north-east', () => {
-    const samples = daySamples({ year: 2026, month: 6, day: 21 }, 49.2613, -123.1139, 10);
+    const samples = daySamples({ year: 2026, month: 6, day: 21 }, 49.2613, -123.1139, 10); // Vancouver City Hall
     const pts = sunPathPoints(samples, 100);
     expect(pts.length).toBe(samples.filter((s) => s.altDeg > 0).length);
     for (const p of pts) expect(p[1]).toBeGreaterThan(0);

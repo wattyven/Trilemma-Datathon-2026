@@ -7,17 +7,19 @@ import { join } from 'node:path';
 import { IMAGERY_SOURCES, exportUrl, tileRange, tileUrl } from '../src/imagery/sources.ts';
 import { OUT_DIR, ORIGIN } from './lib.ts';
 
+// Each municipality's hall (the geocoder's parcel point), except Coquitlam: one tile there is a flat
+// roof that compresses below the blank check, so it uses the council's site at 1111 Brunette Ave.
 const POINTS: Record<string, [number, number]> = {
-  vancouver: [-123.1139, 49.2613],
-  burnaby: [-122.9946, 49.247],
-  surrey: [-122.849, 49.191],
+  vancouver: [-123.1139388, 49.261317],
+  burnaby: [-122.9726467, 49.2429958],
+  surrey: [-122.8491387, 49.1914644],
   coquitlam: [-122.8616074, 49.2394162],
   dnv: [-123.0780745, 49.3360657],
-  delta: [-123.0835, 49.0855],
-  mapleridge: [-122.6, 49.2194],
+  delta: [-123.0584615, 49.0854597],
+  mapleridge: [-122.5999606, 49.2193815],
   'township-langley': [-122.6588767, 49.1202891],
   'city-langley': [-122.6575906, 49.1042438],
-  'port-coquitlam': [-122.7637, 49.2622],
+  'port-coquitlam': [-122.7806045, 49.2622547],
   'white-rock': [-122.7976004, 49.0235959],
 };
 mkdirSync(OUT_DIR, { recursive: true });

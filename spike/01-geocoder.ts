@@ -87,7 +87,8 @@ for (const s of partials) {
     results.autocomplete[`${s} (${variant})`] = { ms: r.ms, rows };
     console.log(`"${s}" ${variant.padEnd(8)} ${r.ms} ms`);
     rows.forEach((x: string) => console.log('     ' + x));
-    if (s === '453 W 12' && variant === 'filtered') writeSample('geocoder-autocomplete.json', json);
+    // The sample keeps only the civic match: the other suggestions for "453 W 12" are homes.
+    if (s === '453 W 12' && variant === 'filtered') writeSample('geocoder-autocomplete.json', { ...json, features: json.features.filter((f: any) => f.properties.fullAddress.startsWith('453 W 12th Ave')) });
   }
 }
 

@@ -1,5 +1,5 @@
-// Flat ground with one 10 m box. The ground shadow is ≈ 10 / tan(alt) long (± 1 cell)
-// and points away from the sun. Grid aligned with true north here (γ = 0); see convergence.test.ts.
+// Flat ground with one 10 m box. The ground shadow is ≈ 10 / tan(alt) long (± one cell along
+// the shadow) and points away from the sun. Grid aligned with true north here (γ = 0); see convergence.test.ts.
 import { describe, expect, it } from 'vitest';
 import { momentMask, prepareSamples } from '../src/engine/outputs';
 import { momentSample } from '../src/engine/sun';
@@ -19,7 +19,7 @@ describe.each([
   addBox(dsm, BOX.c0, BOX.r0, BOX.c1, BOX.r1, BOX.height);
   const cells = regionCells(ground, 2, 2, W - 2, W - 2, 0, inBox); // observer on the ground, h = 0
   const h = horizonsFor(dsm, cells);
-  const sun = momentSample(date, minute, 49.2613, -123.1139);
+  const sun = momentSample(date, minute, 49.2613, -123.1139); // Vancouver City Hall
   const [s] = prepareSamples([sun], 0, PARAMS.sectors);
   const lit = momentMask(h, s!);
 
@@ -42,11 +42,12 @@ describe.each([
   const top = [[BOX.c0 + 0.5, BOX.r0 + 0.5], [BOX.c1 - 0.5, BOX.r0 + 0.5], [BOX.c0 + 0.5, BOX.r1 - 0.5], [BOX.c1 - 0.5, BOX.r1 - 0.5]] as const;
 
   it('is 10 / tan(alt) long, within one cell', () => {
-    // The tip is the shadow of the box's top corner farthest from the sun.
+    // The tip is the shadow of the box's top corner farthest from the sun. It's measured at cell
+    // centres, so it can be off by one cell's width along the shadow (1 m, up to √2 m diagonally).
     const edge = Math.max(...top.map(([x, y]) => proj(x, y, away)));
     const tip = Math.max(...shaded.map((i) => proj(cells.px[i]!, cells.py[i]!, away)));
     const expected = BOX.height / Math.tan((sun.altDeg * Math.PI) / 180);
-    expect(Math.abs(tip - edge - expected)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tip - edge - expected)).toBeLessThanOrEqual(Math.abs(away[0]) + Math.abs(away[1]));
   });
 
   it('points away from the sun', () => {

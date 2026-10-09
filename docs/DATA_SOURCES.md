@@ -82,7 +82,7 @@ The top level also carries `disclaimer`, `privacyStatement` and `copyrightLicens
 - For `CIVIC_NUMBER` matches, `parcelPoint` was 8–124 m from `accessPoint`.
 - For `BLOCK` matches (Coquitlam City Hall, UBC Life Building) the response says `locationDescriptor: "accessPoint"` even though `parcelPoint` was requested. **Always read `properties.locationDescriptor` back.**
 
-**Test addresses.** All are civic buildings. All scored 99–100.
+**Test addresses.** All are civic buildings except the strata case, a light-industrial strata. All scored 99–100.
 
 | id | Returned | Precision | localityName | parcel↔access |
 |---|---|---|---|---|
@@ -185,7 +185,7 @@ Responses took 30–100 ms.
 |---|---|---|
 | Zero hits | A road intersection gives 0. Retrying with `DWITHIN(SHAPE,POINT(x y),d,meters)` in **EPSG:3005**: 5 m → 0, 15 m → 3, 30 m → 10. The Coquitlam `BLOCK` point: 5 m → 0, **15 m → 1** (the civic parcel), 30 m → 2 (adds a park). | Retry DWITHIN at about 15 m in EPSG:3005, where metres are true metres. If there are several, rank by distance and let the user pick. If none, show "We couldn't find a lot at this address." |
 | Multiple hits | Surrey City Hall: an `Interest` polygon plus a `Subdivision` polygon with **identical geometry**. | Deduplicate identical geometries, deprioritise `Interest` and `Road`, and pick the smallest containing polygon. |
-| Strata | `PARCEL_CLASS = "Building Strata"`, one identical polygon **per strata lot**. 297 of 300 parcels in a downtown 300 m box were strata. Strata plan prefixes: BCS, LMS, EPS, NWS, VAS. Subdivision plans: BCP, LMP, EPP, NWP, VAP. | Deduplicate and show the strata/complex notice. |
+| Strata | `PARCEL_CLASS = "Building Strata"`, one identical polygon **per strata lot**. In a 300 m box downtown (around the Art Gallery), 276 of the first 300 parcels were strata. Strata plan prefixes: BCS, LMS, EPS, NWS, VAS. Subdivision plans: BCP, LMP, EPP, NWP, VAP. | Deduplicate and show the strata/complex notice. |
 | Very large lots | UBC: one 924,398 m² `Subdivision / Private / NO_PLAN` parcel with `MUNICIPALITY: "Rural"`. | The cell cap and coarsening are essential. |
 
 **CORS (important):**
@@ -444,8 +444,8 @@ or 1 km UTM squares.
   they're mostly skipped. Points are gridded as max z per 0.5 m cell, excluding noise classes 7 and 18, then small holes are
   filled.
 - **Cost per lot: 0.5–1.0 M points, 3–8 MB, 2–5 s.** Before level selection it was 1–2.8 M points and up to 33 MB.
-- **Vertical datum:** the files don't say. The median of (ground-class points − HRDEM DTM) measured +0.000 to +0.003 m at
-  City Hall, Kitsilano and Maple Ridge, so the files match HRDEM's CGVD2013. The offset is still measured and removed for
+- **Vertical datum:** the files don't say. The median of (ground-class points − HRDEM DTM) measured 0.00 m at City Hall,
+  the Kitsilano library and Maple Ridge City Hall, so the files match HRDEM's CGVD2013. The offset is still measured and removed for
   every lot, and the load is rejected above 30 m.
 
 ### 7.4 LidarBC rasters
@@ -460,7 +460,7 @@ or 1 km UTM squares.
 - **Strip TIFFs with one row per strip.** geotiff.js 3 without a block cache read each strip offset with its own 4-byte
   request: **1,358 requests** for one 450 m window. With `blockSize: 262144` it takes **10 requests** (2.5 MB, 0.2 s).
   `elevation/cog.ts` `openImage(url, { blockSize })` does this.
-- Measured datum offsets against HRDEM ground: −0.06 m (City Hall, Kitsilano), +0.09 m (Surrey), −0.02 m (Maple Ridge),
+- Measured datum offsets against HRDEM ground: −0.06 m (City Hall), −0.04 m (Kitsilano library), +0.09 m (Surrey), −0.03 m (Maple Ridge),
   consistent with real ground change since 2016. Near the lot the newer DEM replaces HRDEM's ground model.
 - Cost per lot through the proxy: 1–4 tiles, about 20–40 requests and 3–6 MB. Elevation took 0.8–1.8 s.
 
@@ -529,13 +529,13 @@ Changed areas take 2025 copied to 2 × 2 cells (nearest, not interpolated, so wa
 is used, and LidarBC covers the window beyond the point cloud's area. Each survey's datum is checked against HRDEM ground. The
 DTM near the lot comes from the 2025 DEM.
 
-| Measured (155 × 155 m around the lot) | 410 W Georgia | Kitsilano houses |
+| Measured (160 × 160 m around the lot) | 410 W Georgia | Kitsilano library, among houses |
 |---|---|---|
-| Cells differing by more than 2.5 m, naive | 29% | 20% |
-| With the ±1 cell slack | 13% | 5% |
-| After the opening | 8.6% | 1.1% |
-| Changed share as built (with the 2 m growth) | 12.8% | 1.9% |
-| Largest change | the Deloitte Summit (finished 2023): 2,225 m², 1.8 m from the address, on average 52 m higher than 2016 | 67 m² |
+| Cells differing by more than 2.5 m, naive | 29% | 11% |
+| With the ±1 cell slack | 14% | 1.7% |
+| After the opening and the 20 m² minimum | 8.5% | 0% |
+| Changed share as built (with the 2 m growth) | 12.8% | 0% |
+| Largest change | the Deloitte Summit (finished 2023): 2,225 m², 1.8 m from the address, on average 52 m higher than 2016 | none |
 
 Building Best of both takes about 3.5 s in Node for the downtown lot (the point cloud is about 10 MB there). In the browser,
 switching between the three choices afterwards takes 0.3–1.9 s, because the worker keeps each lot's downloads

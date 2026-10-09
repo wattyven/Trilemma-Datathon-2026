@@ -16,8 +16,8 @@ function lot([lon, lat]: [number, number], sizeM = 30): Ring[][] {
 const LOTS: [string, [number, number], number?][] = [
   ['Vancouver City Hall', [-123.1139388, 49.261317]],
   ['Kitsilano Branch Library', [-123.1686926, 49.2647221]],
-  ['Maple Ridge', [-122.5999606, 49.2193815]],
-  ['Maple Ridge, big lot', [-122.5999606, 49.2193815], 170],
+  ['Maple Ridge City Hall', [-122.5999606, 49.2193815]],
+  ['Maple Ridge City Hall, big lot', [-122.5999606, 49.2193815], 170],
 ];
 
 describe('COPC surface, live', () => {

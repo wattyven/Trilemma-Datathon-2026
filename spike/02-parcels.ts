@@ -19,6 +19,10 @@ const pointQuery = (lon: number, lat: number, extra: Record<string, string | num
   wfsUrl({ srsName: 'EPSG:4326', count: 5, propertyName: PROPS, CQL_FILTER: `INTERSECTS(SHAPE,SRID=4326;POINT(${lon} ${lat}))`, ...extra });
 
 const results: Record<string, any> = {};
+const unnamed = (fc: any) => ({
+  ...fc,
+  features: (fc.features ?? []).map((f: any) => ({ ...f, properties: { ...f.properties, PARCEL_NAME: '(removed)', PID_FORMATTED: '(removed)' } })),
+});
 
 // 1. Layer names.
 console.log('# 1. Layer names');
@@ -61,10 +65,10 @@ for (const g of geocoded) {
   const first = rows[0];
   console.log(`${g.id.padEnd(7)} hits=${rows.length} ${r.ms}ms contains=${rows.map((x: any) => x.contains).join('/')} ${first ? `${first.PARCEL_CLASS} | ${first.OWNER_TYPE} | ${first.PLAN_NUMBER} | ${first.MUNICIPALITY} | ${first.REGIONAL_DISTRICT} | ${Math.round(first.FEATURE_AREA_SQM)} m²` : ''}`);
   if (g.id === 'van') {
-    writeSample('wfs-parcel.json', json);
+    writeSample('wfs-parcel.json', unnamed(json));
     results.cors = corsSummary(r.headers);
   }
-  if (g.id === 'strata') writeSample('wfs-parcel-strata.json', json);
+  if (g.id === 'strata') writeSample('wfs-parcel-strata.json', unnamed(json));
 }
 
 // 3. Axis order variants.

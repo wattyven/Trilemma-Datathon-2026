@@ -13,7 +13,7 @@ const DTM = 'https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic
 const LAYER = 'WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW';
 const wfs = (fmt: string, extra = '') =>
   `https://openmaps.gov.bc.ca/geo/pub/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=${LAYER}` +
-  `&outputFormat=${encodeURIComponent(fmt)}&srsName=EPSG:4326&count=5&propertyName=PARCEL_NAME,PARCEL_CLASS,REGIONAL_DISTRICT,SHAPE` +
+  `&outputFormat=${encodeURIComponent(fmt)}&srsName=EPSG:4326&count=5&propertyName=PARCEL_CLASS,REGIONAL_DISTRICT,SHAPE` +
   `&CQL_FILTER=${encodeURIComponent(`INTERSECTS(SHAPE,SRID=4326;POINT(${VAN[0]} ${VAN[1]}))`)}${extra}`;
 
 const results: Record<string, unknown> = { origin: location.origin, userAgent: navigator.userAgent };
@@ -112,13 +112,13 @@ async function run() {
   await probe('WFS JSONP <script>', async () => {
     const j = await jsonp((cb) => wfs('text/javascript', `&format_options=callback:${cb}`));
     const f = j.features[0];
-    return { hits: j.features.length, parcel: f.properties.PARCEL_NAME, rd: f.properties.REGIONAL_DISTRICT, contains: pointInRing(VAN, f.geometry.coordinates[0]) };
+    return { hits: j.features.length, parcelClass: f.properties.PARCEL_CLASS, rd: f.properties.REGIONAL_DISTRICT, contains: pointInRing(VAN, f.geometry.coordinates[0]) };
   });
 
   await probe('WFS JSONP in sandboxed iframe', async () => {
     const j = await sandboxedJsonp(wfs('text/javascript', '&format_options=callback:vsCb'));
     const f = j.features[0];
-    return { hits: j.features.length, parcel: f.properties.PARCEL_NAME, contains: pointInRing(VAN, f.geometry.coordinates[0]) };
+    return { hits: j.features.length, parcelClass: f.properties.PARCEL_CLASS, contains: pointInRing(VAN, f.geometry.coordinates[0]) };
   });
 
   await probe('STAC search fetch', async () => {

@@ -37,7 +37,7 @@ function shadowLength(res: number, sun: { altDeg: number; azTrueDeg: number; tim
 
 // The 0.5 m case marches ~4× the rays: give slow CI runners room.
 describe('grid resolution', { timeout: 30_000 }, () => {
-  const sun = momentSample({ year: 2026, month: 3, day: 20 }, 15 * 60, 49.2613, -123.1139);
+  const sun = momentSample({ year: 2026, month: 3, day: 20 }, 15 * 60, 49.2613, -123.1139); // Vancouver City Hall
   const expected = 10 / Math.tan((sun.altDeg * Math.PI) / 180);
   const lengths = new Map<number, number>();
   const length = (res: number) => lengths.get(res) ?? lengths.set(res, shadowLength(res, sun)).get(res)!;

@@ -1,5 +1,5 @@
-// Test addresses: public civic buildings only, so no private homes are named
-// in the repo. Spread across the municipalities, plus edge cases.
+// Test addresses: public civic buildings, plus one light-industrial strata, so no
+// private homes are named in the repo. Spread across the municipalities, plus edge cases.
 export interface TestAddress {
   id: string;
   address: string;

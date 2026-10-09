@@ -32,7 +32,7 @@ describe('point-cloud file selection', () => {
   });
 
   it('adds margin files from the same survey when a lot sits near a tile edge', () => {
-    // Just inside the north-east corner of 092g025_3_2_2.
+    // In the street at Main St and 10th Ave, about 70 m inside the north-east corner of 092g025_3_2_2.
     const c = selectCopc(idx, lot([-123.101, 49.2622], 10), 2016);
     expect(c!.copc.urls.length).toBeGreaterThan(1);
     expect(new Set(c!.copc.urls.map((u) => u.split('/').at(-2))).size).toBe(1); // one survey
@@ -45,7 +45,7 @@ describe('point-cloud file selection', () => {
 });
 
 const CITY_HALL: [number, number] = [-123.1139388, 49.261317];
-const SURREY: [number, number] = [-122.849, 49.191];
+const SURREY: [number, number] = [-122.8491387, 49.1914644]; // 13450 104 Ave
 const PROXY = 'https://proxy.example';
 
 describe('LidarBC tile selection', () => {
@@ -67,7 +67,7 @@ describe('LidarBC tile selection', () => {
 
 describe('which sharper surfaces a lot can use', () => {
   const hrdem = { dsmUrl: 'dsm.tif', dtmUrl: 'dtm.tif' };
-  const MAPLE_RIDGE: [number, number] = [-122.5999606, 49.2193815];
+  const MAPLE_RIDGE: [number, number] = [-122.5999606, 49.2193815]; // 11995 Haney Pl
 
   it('offers all three where a point cloud and a newer LidarBC survey both exist', async () => {
     for (const [where, newYear, oldYear] of [[CITY_HALL, '2025', '2016'], [SURREY, '2024', '2016'], [MAPLE_RIDGE, '2025', '2023']] as const) {
