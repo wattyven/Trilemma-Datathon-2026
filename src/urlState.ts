@@ -34,6 +34,8 @@ export interface UrlState {
   changes?: boolean;
   /** Show the debug details (`debug=1`). */
   debug?: boolean;
+  /** The compact layout for an iframe on another site (`embed=1`). */
+  embed?: boolean;
 }
 
 /** The "Elevation data" setting; `hrdem` is a debug value. */
@@ -63,6 +65,7 @@ const KEYS: Record<keyof UrlState, string> = {
   source: 'elev',
   changes: 'chg',
   debug: 'debug',
+  embed: 'embed',
 };
 
 const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
@@ -117,6 +120,7 @@ export function decodeHash(hash: string): UrlState {
   const chg = get('changes');
   if (chg === '1' || chg === '0') out.changes = chg === '1';
   if (get('debug') === '1') out.debug = true;
+  if (get('embed') === '1') out.embed = true;
   const img = get('photo');
   if (img === '1' || img === '0') out.photo = img === '1';
   const op = get('opacity');

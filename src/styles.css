@@ -228,6 +228,24 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .site-footer a { color: inherit; }
 .build { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
 
+/* Embedded (embed=1): the view, the result and the modes; the rest stays on the full site. */
+.embed .site-footer, .embed #intro, .embed #locate-row, .embed .debug, .embed .share-row,
+.embed #lot-facts, .embed #lot-more, .embed #lot-notices, .embed #lot-switcher,
+.embed .controls .row, .embed .controls > .hint:not(.mode-hint), .embed #elevation-wrap { display: none !important; }
+.embed.embed-lot .search { display: none; }
+/* The header stays for screen readers: it's the page's h1. */
+.embed .site-header { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.embed main { padding: 8px 12px 12px; }
+.embed .lot { margin-top: 8px; gap: 16px; }
+.embed .view-stage { height: min(520px, 62vh); min-height: 260px; }
+.embed .lot-info h2 { font-size: 1.1rem; margin-bottom: 6px; }
+.embed .controls { margin-top: 8px; padding: 10px 12px; }
+.embed-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; font-size: 0.8rem; }
+.embed-bar .hint { margin: 0; }
+.embed-open { font-family: var(--font-display); font-weight: 600; font-size: 1rem; color: var(--ink); }
+.embed-open::before { content: ''; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--sun); }
+.embed-open::after { content: ' ↗'; }
+
 @media (max-width: 720px) {
   .intro { grid-template-columns: 1fr; }
   .lot { grid-template-columns: 1fr; gap: 12px; }
@@ -258,6 +276,10 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
     position: sticky; top: 0; background: var(--panel);
   }
   .grabber { width: 40px; height: 4px; border-radius: 2px; background: var(--mist); }
+  /* No bottom sheet inside an embed: the result and modes come first, then the view. */
+  .embed main { padding-bottom: 12px; }
+  .embed .lot-info { order: -1; position: static; display: block; max-height: none; overflow: visible; padding: 0; border: 0; box-shadow: none; background: none; }
+  .embed .sheet-handle, .embed .mode-hint, .embed #result-summary { display: none; }
 }
 
 /* Touch screens: controls big enough to tap (WCAG 2.2 target size, with room to spare). */

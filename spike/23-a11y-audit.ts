@@ -1,6 +1,7 @@
 // Accessibility check: axe-core (WCAG 2.0–2.2 A/AA + best practice) on the intro and a result,
-// desktop and phone; the keyboard order from the top; phone tap targets under 24 px; and
-// horizontal scrolling at 200% zoom. axe is loaded from cdnjs into the test browser only.
+// desktop and phone, and on the embedded layout (embed=1); the keyboard order from the top; phone
+// tap targets under 24 px; and horizontal scrolling at 200% zoom. axe is loaded from cdnjs into
+// the test browser only.
 //   node spike/23-a11y-audit.ts [base url]
 import { chromium, devices, type Page } from 'playwright';
 
@@ -55,6 +56,16 @@ try {
   );
   console.log(`${small.length ? '✗' : '✓'} phone tap targets under 24 px: ${small.length}${small.length ? ` (${small.slice(0, 10).join(', ')})` : ''}`);
   failures += small.length ? 1 : 0;
+
+  // Embedded at a typical blog column size (an iframe 600 px tall).
+  const embed = await browser.newPage({ viewport: { width: 700, height: 600 } });
+  await embed.goto(`${base}${LOT}&embed=1`);
+  await embed.locator(RESULT).waitFor({ timeout: 90_000 });
+  await embed.waitForTimeout(2500);
+  await audit(embed, 'embedded result, 700 × 600');
+  const embedOverflow = await embed.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  console.log(`${embedOverflow > 0 ? '✗' : '✓'} embedded: ${embedOverflow > 0 ? `${embedOverflow} px of horizontal scrolling` : 'no horizontal scrolling'}`);
+  failures += embedOverflow > 0 ? 1 : 0;
 
   const zoom = await browser.newPage({ viewport: { width: 640, height: 800 } }); // 1280 px at 200%
   await zoom.goto(base + LOT);

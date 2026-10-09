@@ -32,6 +32,10 @@
     </header>
 
     <main>
+      <div id="embed-bar" class="embed-bar" hidden>
+        <a id="embed-open" class="embed-open" href="./" target="_blank" rel="noopener">Open in VanShade<span class="visually-hidden"> (opens in a new tab)</span></a>
+        <p class="hint">Contains information licensed under the Open Government Licences of British Columbia and Canada. <button type="button" class="link" data-open-about>About</button></p>
+      </div>
       <form id="search-form" class="search" role="search" autocomplete="off" novalidate>
         <label for="address-input">Your address in Metro Vancouver</label>
         <div class="search-row">
@@ -211,6 +215,7 @@
           </form>
           <p class="share-row">
             <button type="button" id="share" class="ghost">Copy link</button>
+            <button type="button" id="share-embed" class="ghost">Copy embed code</button>
             <span id="share-status" class="hint" aria-live="polite"></span>
           </p>
           <dl id="lot-facts" class="facts"></dl>

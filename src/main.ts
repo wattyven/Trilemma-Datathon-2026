@@ -4,6 +4,7 @@ import { IMAGERY, LOCATE } from './config';
 import { copy } from './copy';
 import { nearestAddress, resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
+import { embedSnippet, fullSiteUrl } from './embed';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
@@ -74,9 +75,20 @@ const analysisEls: AnalysisElements = {
 
 const today = todayInVancouver();
 const defaults = defaultState(today, nowMinuteInVancouver());
+const linkState = decodeHash(location.hash);
 /** `debug=1` in the link shows the debug details (and keeps it in the link). */
-const debugOn = decodeHash(location.hash).debug === true;
+const debugOn = linkState.debug === true;
 byId('debug').hidden = !debugOn;
+/** `embed=1`: the compact layout for an iframe on another site, with a link to the full site. */
+const embedOn = linkState.embed === true;
+const pageUrl = () => location.origin + location.pathname;
+const embedOpen = byId<HTMLAnchorElement>('embed-open');
+if (embedOn) {
+  document.documentElement.classList.add('embed');
+  if (linkState.address) document.documentElement.classList.add('embed-lot');
+  byId('embed-bar').hidden = false;
+  embedOpen.href = fullSiteUrl(pageUrl(), linkState, {});
+}
 
 const lotCanvas = new LotCanvas(byId<HTMLCanvasElement>('lot-canvas'), {
   onHover: (cell) => analysis.hover(cell),
@@ -113,7 +125,8 @@ const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId(
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
 });
-initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
+if (embedOn) byId('lot-info').dataset.sheet = 'expanded'; // no bottom sheet inside an embed
+else initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
 interface LookupOptions {
@@ -307,7 +320,7 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   try {
     await analysis.start(parcel, match, steps, signal);
     steps.hide();
-    if (!signal.aborted) tips.showFirstTime();
+    if (!signal.aborted && !embedOn) tips.showFirstTime();
   } catch (e) {
     if (isAbortError(e)) return;
     console.error(e);
@@ -333,6 +346,7 @@ function urlDefaults(): UrlState {
     source: 'best',
     changes: false,
     debug: false,
+    embed: false,
     classes: defaults.classes,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
@@ -372,6 +386,7 @@ function urlStateNow(): UrlState | null {
     source: analysis.sourcePreference,
     changes: analysis.changesEnabled,
     debug: debugOn,
+    embed: embedOn,
   };
 }
 
@@ -384,6 +399,7 @@ function writeUrl(push: boolean) {
   const apply = () => {
     const s = urlStateNow();
     if (!s) return;
+    if (embedOn) embedOpen.href = fullSiteUrl(pageUrl(), s, urlDefaults());
     const hash = encodeHash(s, urlDefaults());
     if (hash === location.hash) return;
     if (push) history.pushState(null, '', hash);
@@ -449,6 +465,18 @@ byId<HTMLButtonElement>('share').addEventListener('click', async () => {
     shareStatus.textContent = copy.share.copied;
   } catch {
     shareStatus.textContent = copy.share.manual(location.href);
+  }
+});
+
+byId<HTMLButtonElement>('share-embed').addEventListener('click', async () => {
+  const s = urlStateNow();
+  if (!s) return;
+  const code = embedSnippet(pageUrl(), s, urlDefaults(), copy.share.embedTitle(s.address ?? ''));
+  try {
+    await navigator.clipboard.writeText(code);
+    shareStatus.textContent = copy.share.embedCopied;
+  } catch {
+    shareStatus.textContent = copy.share.embedManual(code);
   }
 });
 

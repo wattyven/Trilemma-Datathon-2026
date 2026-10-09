@@ -236,6 +236,9 @@ export const copy = {
   share: {
     copied: 'Link copied. Anyone with it sees this lot, mode, date and time.',
     manual: (url: string) => `Copy this link: ${url}`,
+    embedCopied: 'Embed code copied. Paste it into a web page to show this lot there.',
+    embedManual: (code: string) => `Copy this code into your web page: ${code}`,
+    embedTitle: (address: string) => `VanShade: sun and shade at ${address}`,
   },
   sheet: { show: 'Show details and settings', hide: 'Hide details' },
   caveatLidar: (year: string) => `The 3D landscape comes from laser scans flown in ${year}, so newer buildings or tree growth may be missing.`,

@@ -97,6 +97,37 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(shared.locator('#about')).toBeHidden();
 });
 
+test('embed: "Copy embed code" gives an iframe that works on another page', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC&m=moment&d=2026-06-21&t=15%3A30');
+  await expect(page.locator(RESULT)).toBeVisible();
+  await page.locator('#share-embed').click();
+  await expect(page.locator('#share-status')).toContainText('Embed code copied');
+  const code = await page.evaluate(() => navigator.clipboard.readText());
+  expect(code).toMatch(/^<iframe src="[^"]+embed=1[^"]*"[^>]* title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"><\/iframe>$/);
+
+  // A page on another site holding that iframe. Results load inside it, so the frame isn't
+  // blocked and the parcel lookup works from it (it needs a Referer).
+  const host = await context.newPage();
+  await host.setContent(`<!doctype html><title>A gardening blog</title><body>${code}</body>`);
+  const frame = host.frameLocator('iframe');
+  await expect(frame.locator(RESULT)).toBeVisible();
+  await expect(frame.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
+  await expect(frame.locator('#result-headline')).toContainText('At 3:30 pm on 21 June');
+  await expect(frame.locator('input[name="mode"][value="moment"]')).toBeChecked();
+  // The compact layout: no site header (kept for screen readers only), search or tips; a link back
+  // to the full site.
+  expect(await frame.locator('.site-header').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+  await expect(frame.locator('#search-form')).toBeHidden();
+  await expect(frame.locator('#tips')).toBeHidden();
+  await expect(frame.locator('#embed-bar')).toContainText('Open Government Licences');
+  const open = frame.locator('#embed-open');
+  await expect(open).toHaveAttribute('target', '_blank');
+  await expect(open).toHaveAttribute('href', /#a=453\+W\+12th\+Ave.*m=moment/);
+  await expect(open).not.toHaveAttribute('href', /embed=/);
+  await host.close();
+});
+
 test('"Use my location" finds the nearest address', async ({ browser }) => {
   const here = await browser.newContext({ geolocation: { latitude: 49.26131, longitude: -123.11394 }, permissions: ['geolocation'] }); // Vancouver City Hall
   const page = await here.newPage();
