@@ -1,0 +1,64 @@
+name: Refresh LiDAR index
+
+# Once a month, rebuild src/elevation/hires-index.json from the NRCan point-cloud and LidarBC
+# S3 listings (about 60 listing requests, ~10 s). If new surveys or tiles appear, open an issue:
+# this repository doesn't let Actions open pull requests.
+on:
+  schedule:
+    - cron: '17 9 3 * *' # 09:17 UTC on the 3rd
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Rebuild the index
+        run: |
+          cp src/elevation/hires-index.json "$RUNNER_TEMP/old-index.json"
+          node spike/12-hires-index.ts
+
+      - name: Compare with the committed index
+        id: diff
+        run: |
+          set +e
+          node spike/22-index-diff.ts "$RUNNER_TEMP/old-index.json" src/elevation/hires-index.json > "$RUNNER_TEMP/summary.md"
+          code=$?
+          set -e
+          if [ "$code" = 0 ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No new LiDAR since the committed index." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$code" = 10 ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            exit "$code"
+          fi
+
+      - name: Open an issue
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="New LiDAR available for VanShade"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq 'length')
+          if [ "$open" != "0" ]; then
+            echo "An issue about this is already open."
+            exit 0
+          fi
+          {
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "To use it: run \`node spike/12-hires-index.ts\`, then \`npm run test:tz\` (tests that name a survey year may need updating), and commit \`src/elevation/hires-index.json\`."
+            echo
+            echo "Found by the monthly refresh-index workflow."
+          } > "$RUNNER_TEMP/body.md"
+          gh issue create --title "$title" --body-file "$RUNNER_TEMP/body.md"
