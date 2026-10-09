@@ -132,6 +132,11 @@ export class LotScene {
     this.controls.minDistance = 8;
     this.controls.maxDistance = 1500;
     this.controls.screenSpacePanning = true;
+    // Touch: one finger turns the view (on phones a vertical drag scrolls the page instead; see
+    // the coarse-pointer touch-action in styles.css), two fingers tilt, turn and pinch-zoom.
+    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+    // OrbitControls sets an inline touch-action: none; on touch screens allow vertical page scrolling.
+    if (matchMedia('(pointer: coarse)').matches) this.canvas.style.touchAction = 'pan-y';
     this.controls.addEventListener('change', () => {
       this.handlers.onCamera(compassRotationDeg(this.controls.getAzimuthalAngle()));
       this.invalidate();
