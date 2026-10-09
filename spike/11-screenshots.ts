@@ -88,11 +88,6 @@ try {
   await mob.waitForTimeout(300);
   await mob.screenshot({ path: join(OUT_DIR, 'review-mobile-expanded.png') });
 
-  // Embedded (embed=1), the size an iframe in a blog column would be.
-  const emb = await browser.newPage({ viewport: { width: 720, height: 600 }, deviceScaleFactor: 1 });
-  await emb.goto(`${base}#${new URLSearchParams({ a: '453 W 12th Ave, Vancouver, BC', m: 'moment', d: '2026-06-21', t: '15:30', embed: '1' })}`);
-  await refined(emb);
-  await emb.screenshot({ path: join(DOCS, 'embed.png') });
 } finally {
   await browser.close();
 }

@@ -53,10 +53,7 @@ time, then press **Copy embed code**. You get an iframe like this one:
 <iframe src="https://wattyven.github.io/VanShade/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;m=moment&amp;d=2026-06-21&amp;t=15%3A30&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
 ```
 
-[![The embedded view of Vancouver City Hall at 3:30 pm on 21 June: the result in a sentence, the mode buttons and the 3D view over the aerial photo](docs/screenshots/embed.png)](https://wattyven.github.io/VanShade/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&m=moment&d=2026-06-21&t=15%3A30&embed=1)
-
-GitHub doesn't run iframes in a README, so this is a picture of that embed; click it to open it live. The embed keeps the
-3D view, the result, the modes and the time slider, credits the data, and links to the full site.
+The embed keeps the 3D view, the result, the modes and the time slider, credits the data, and links to the full site.
 
 ## How it works
 
