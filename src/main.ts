@@ -7,10 +7,10 @@ import { isAbortError } from './data/http';
 import { embedSnippet, fullSiteUrl } from './embed';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
-import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
+import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver } from './engine/sun';
 import { IMAGERY_SOURCES } from './imagery/sources';
 import { initAbout } from './ui/about';
-import { defaultState, initControls, type ControlState } from './ui/controls';
+import { defaultState, initControls, seasonRange, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
@@ -18,7 +18,7 @@ import { initSheet } from './ui/sheet';
 import { initTips } from './ui/tips';
 import { showSteps, type StepId, type Steps } from './ui/status';
 import { Timeline, initialTimeline, minuteLabel } from './ui/timeline';
-import { decodeHash, encodeHash, type UrlState } from './urlState';
+import { decodeHash, encodeHash, wantsAdvanced, type UrlState } from './urlState';
 
 const byId = <T extends HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -72,6 +72,7 @@ const analysisEls: AnalysisElements = {
   changesToggle: byId<HTMLInputElement>('changes-toggle'),
   changesLabel: byId('changes-label'),
   spotLayer: byId('spot-layer'),
+  basicSummary: byId('basic-summary'),
 };
 
 const today = todayInVancouver();
@@ -126,8 +127,68 @@ const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId(
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
 });
-if (embedOn) byId('lot-info').dataset.sheet = 'expanded'; // no bottom sheet inside an embed
-else initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
+const lotInfo = byId('lot-info');
+const sheet = embedOn ? null : initSheet(lotInfo, byId<HTMLButtonElement>('sheet-handle'));
+
+// The full-width view in Basic needs the page's width without the scrollbar (100vw includes it).
+const setPageWidth = () => document.documentElement.style.setProperty('--page-width', `${document.documentElement.clientWidth}px`);
+new ResizeObserver(setPageWidth).observe(document.documentElement);
+setPageWidth();
+
+// ── Basic and Advanced ───────────────────────────────────────────────────────────
+
+const advancedToggle = byId<HTMLButtonElement>('advanced-toggle');
+const basicFrom = byId<HTMLInputElement>('basic-from');
+const basicTo = byId<HTMLInputElement>('basic-to');
+let advanced = false;
+
+/** Basic's dates show the season range the controls hold. */
+function syncBasicDates() {
+  const { start, end } = seasonRange(controls.get());
+  basicFrom.value = isoDate(start);
+  basicTo.value = isoDate(end);
+}
+
+/**
+ * Basic (the default) or Advanced options. Basic always measures a date range at garden-bed height
+ * on the best surface, so switching to it sets those; switching back shows them as chosen.
+ */
+function setAdvanced(on: boolean, recompute = true) {
+  advanced = on;
+  advancedToggle.setAttribute('aria-checked', String(on));
+  document.documentElement.classList.toggle('basic', !on);
+  if (on) sheet?.collapse();
+  else lotInfo.dataset.sheet = 'expanded'; // no bottom sheet in Basic
+  if (on) return analysis.setBasic(false);
+  const before = controls.get();
+  controls.set({ mode: 'season', observer: 'bed', spots: true });
+  analysis.chooseSource('best');
+  analysis.setChangesEnabled(false);
+  syncBasicDates();
+  analysis.setBasic(true);
+  if (!recompute) return;
+  if (before.observer !== 'bed') void analysis.onControls('observer');
+  else if (before.mode !== 'season') void analysis.onControls('request');
+}
+
+advancedToggle.addEventListener('click', () => {
+  setAdvanced(!advanced);
+  writeUrl(false);
+});
+
+byId<HTMLFormElement>('basic-dates').addEventListener('change', () => {
+  const a = parseIsoDate(basicFrom.value), b = parseIsoDate(basicTo.value);
+  if (!a || !b) return;
+  const [start, end] = isoDate(a) <= isoDate(b) ? [a, b] : [b, a];
+  const growing = PRESETS.growing(start.year);
+  const isGrowing = isoDate(growing.start) === isoDate(start) && isoDate(growing.end) === isoDate(end);
+  controls.set(isGrowing ? { preset: 'growing', year: start.year } : { preset: 'custom', start: isoDate(start), end: isoDate(end) });
+  syncBasicDates();
+  void analysis.onControls('request');
+  writeUrl(false);
+});
+
+setAdvanced(wantsAdvanced(linkState), false);
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
 interface LookupOptions {
@@ -337,6 +398,7 @@ const LINK_DEFAULT_MODE = 'season';
 
 function urlDefaults(): UrlState {
   return {
+    advanced: false,
     mode: LINK_DEFAULT_MODE,
     preset: defaults.preset,
     year: defaults.year,
@@ -364,7 +426,23 @@ function urlStateNow(): UrlState | null {
   const c = controls.get();
   const t = timeline.get();
   const lot = shown.found.candidates[shown.selected];
+  // Basic links carry the lot, the dates and the view; everything else is Basic's fixed choice.
+  if (!advanced)
+    return {
+      address: shown.match.fullAddress,
+      lot: shown.selected > 0 ? lot?.id : undefined,
+      preset: c.preset,
+      year: c.year,
+      start: c.preset === 'custom' ? c.start : undefined,
+      end: c.preset === 'custom' ? c.end : undefined,
+      view: analysis.currentView,
+      photo: analysis.photoEnabled,
+      opacity: analysis.resultsOpacity,
+      debug: debugOn,
+      embed: embedOn,
+    };
   return {
+    advanced: true,
     address: shown.match.fullAddress,
     lot: shown.selected > 0 ? lot?.id : undefined,
     mode: c.mode,
@@ -436,6 +514,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     analysis.setChangesEnabled(s.changes ?? false);
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
     analysis.setPhotoEnabled(s.photo ?? true, s.photo !== undefined);
+    setAdvanced(wantsAdvanced(s), false);
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
       const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;

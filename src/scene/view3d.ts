@@ -101,6 +101,8 @@ export class LotScene {
   private hoverQueued = false;
   /** Called after every render, so the pins on the view can follow the camera. */
   onRender: () => void = () => {};
+  /** The sun marker and its daily arc (off in Basic, which shows an average, not a moment). */
+  private sunVisible = true;
 
   constructor(private host: HTMLElement, private handlers: SceneHandlers, private opts: { lowPower: boolean }) {
     this.canvas = document.createElement('canvas');
@@ -355,7 +357,7 @@ export class LotScene {
 
     const r = this.home.radius;
     const t = this.home.target;
-    this.sunMarker.visible = up;
+    this.sunMarker.visible = up && this.sunVisible;
     this.sunMarker.scale.setScalar(r * 0.018);
     this.sunMarker.position.copy(t).addScaledVector(dir, r);
     if (this.sunPath) {
@@ -366,7 +368,18 @@ export class LotScene {
     }
     const pts = sunPathPoints(sun.path, r).flatMap(([x, y, z]) => [x + t.x, y + t.y, z + t.z]);
     this.sunPath = pts.length >= 6 ? this.line(pts, TOKENS.sun, 2, 0.75) : null;
-    if (this.sunPath) this.scene.add(this.sunPath);
+    if (this.sunPath) {
+      this.sunPath.visible = this.sunVisible;
+      this.scene.add(this.sunPath);
+    }
+    this.invalidate();
+  }
+
+  /** Show or hide the sun marker and its arc (the light itself stays). */
+  setSunVisible(on: boolean) {
+    this.sunVisible = on;
+    if (!on) this.sunMarker.visible = false;
+    if (this.sunPath) this.sunPath.visible = on;
     this.invalidate();
   }
 

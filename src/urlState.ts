@@ -38,6 +38,8 @@ export interface UrlState {
   debug?: boolean;
   /** The compact layout for an iframe on another site (`embed=1`). */
   embed?: boolean;
+  /** Advanced options (`adv=1`); without it the simple Basic view. */
+  advanced?: boolean;
 }
 
 /** The "Elevation data" setting; `hrdem` is a debug value. */
@@ -69,6 +71,7 @@ const KEYS: Record<keyof UrlState, string> = {
   changes: 'chg',
   debug: 'debug',
   embed: 'embed',
+  advanced: 'adv',
 };
 
 const MODES = new Set<Mode>(['season', 'day', 'moment', 'shade']);
@@ -124,6 +127,8 @@ export function decodeHash(hash: string): UrlState {
   if (chg === '1' || chg === '0') out.changes = chg === '1';
   if (get('debug') === '1') out.debug = true;
   if (get('embed') === '1') out.embed = true;
+  const adv = get('advanced');
+  if (adv === '1' || adv === '0') out.advanced = adv === '1';
   const img = get('photo');
   if (img === '1' || img === '0') out.photo = img === '1';
   const op = get('opacity');
@@ -146,6 +151,25 @@ export function decodeHash(hash: string): UrlState {
     if (v !== undefined) out[k] = v;
   }
   return out;
+}
+
+/**
+ * Whether a link should open with Advanced options: when it says so (`adv=1`), or when it uses a
+ * setting only Advanced has (links from before Basic existed, or hand-edited ones).
+ */
+export function wantsAdvanced(s: UrlState): boolean {
+  if (s.advanced !== undefined) return s.advanced;
+  return (
+    (s.mode !== undefined && s.mode !== 'season') ||
+    (s.observer !== undefined && s.observer !== 'bed') ||
+    (s.source !== undefined && s.source !== 'best') ||
+    s.changes === true ||
+    s.classes === false ||
+    s.fullSunH !== undefined ||
+    s.partSunH !== undefined ||
+    s.spots === false ||
+    [s.shadeStart, s.shadeEnd, s.fromTime, s.toTime].some((v) => v !== undefined)
+  );
 }
 
 /** Hash for a state, leaving out anything equal to `defaults` (and empty values). */

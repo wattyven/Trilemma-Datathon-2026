@@ -85,3 +85,51 @@ describe('the sunniest and shadiest spots', () => {
     expect(findSpots(lot(10, 10, () => NaN, { mode: 'shade' }))).toEqual({ sunniest: null, shadiest: null }); // sun down all window
   });
 });
+
+describe('the single most and least sunny spots (tight)', () => {
+  it('pins the maximum cell itself, not a patch near the top', () => {
+    // A lawn at 7 h with one cell at 7.4 h: the patch rule takes the lawn, the tight rule the 7.4 h cell.
+    const input = lot(10, 10, (c, r) => (c === 8 && r === 8 ? 7.4 : r < 5 ? 7 : 2));
+    expect(findSpots(input).sunniest!.value).toBe(7);
+    const tight = findSpots({ ...input, tight: true });
+    expect(tight.sunniest!.value).toBe(7.4);
+    expect(at(input, tight.sunniest!.cell)).toEqual([8, 8]);
+    expect(tight.sunniest!.areaM2).toBe(1);
+  });
+
+  it('among cells tied at the maximum, takes the deepest cell of the largest group', () => {
+    const input = lot(11, 11, (c, r) => ((c >= 3 && c < 8 && r >= 3 && r < 8) || (c === 0 && r === 10) ? 9 : 1), { tight: true });
+    const { sunniest, shadiest } = findSpots(input);
+    expect(at(input, sunniest!.cell)).toEqual([5, 5]);
+    expect(sunniest!.value).toBe(9);
+    expect(shadiest!.value).toBe(1);
+  });
+});
+
+describe('2 m × 2 m spots (blocks)', () => {
+  it('prefers a sunny block over a single sunnier square metre, and reports the block mean', () => {
+    // A 2 × 2 m patch at 9 h; elsewhere one cell at 10 h in a 3 h lawn.
+    const input = lot(10, 10, (c, r) => (c >= 1 && c < 3 && r >= 1 && r < 3 ? 9 : c === 7 && r === 7 ? 10 : 3), { tight: true, blockCells: 2 });
+    const { sunniest } = findSpots(input);
+    expect(sunniest!.value).toBe(9);
+    expect(sunniest!.areaM2).toBe(4);
+    expect(sunniest!.cells).toHaveLength(4);
+    const [c, r] = at(input, sunniest!.cell);
+    expect(c >= 1 && c < 3 && r >= 1 && r < 3).toBe(true);
+  });
+
+  it('pins the block cell closest to its mean, so the month chart agrees', () => {
+    const vals: Record<string, number> = { '4,4': 8, '5,4': 10, '4,5': 9, '5,5': 9.4 };
+    const input = lot(10, 10, (c, r) => vals[`${c},${r}`] ?? 2, { tight: true, blockCells: 2 });
+    const { sunniest } = findSpots(input);
+    expect(sunniest!.value).toBeCloseTo(9.1, 9);
+    expect(input.values[sunniest!.cell]).toBe(9); // |9 − 9.1| beats |9.4 − 9.1|
+  });
+
+  it('falls back to single cells when no block fits (a 1 m strip)', () => {
+    const input = lot(1, 12, (_c, r) => (r < 4 ? 8 : 1), { tight: true, blockCells: 2 });
+    const { sunniest } = findSpots(input);
+    expect(sunniest!.value).toBe(8);
+    expect(sunniest!.areaM2).toBe(4); // four 1 m cells tied at the maximum
+  });
+});

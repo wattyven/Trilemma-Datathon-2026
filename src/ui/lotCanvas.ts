@@ -300,14 +300,17 @@ export class LotCanvas {
       ctx.stroke();
     }
 
-    const [px, py] = toPx(point);
-    ctx.beginPath();
-    ctx.arc(px, py, 4, 0, Math.PI * 2);
-    ctx.fillStyle = ink;
-    ctx.fill();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    // The address point helps while choosing a lot; with results it would read as a third pin.
+    if (!this.layer) {
+      const [px, py] = toPx(point);
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fillStyle = ink;
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
 
     drawNorthArrow(ctx, cssW - 22, 18, ink);
     drawScaleBar(ctx, cssH, s, cssW, ink);

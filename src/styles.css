@@ -47,7 +47,17 @@ a { color: var(--shade); }
 
 h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
 
-.site-header { max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 16px 8px; }
+.site-header { max-width: 1200px; width: 100%; margin: 0 auto; padding: 28px 16px 8px; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
+/* "Advanced mode": a labelled on/off switch, like a dark-mode toggle. */
+.mode-switch {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 36px; margin-top: 4px; padding: 4px 6px 4px 12px;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--mist); border-radius: 999px; font-size: 0.9rem; font-weight: 600;
+}
+.mode-switch:hover { border-color: var(--moss); }
+.mode-switch-track { position: relative; flex: none; width: 44px; height: 24px; border-radius: 12px; background: var(--mist); box-shadow: inset 0 0 0 1px var(--muted); transition: background 0.15s; }
+.mode-switch-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--panel); box-shadow: 0 1px 3px rgba(30, 43, 37, 0.35); transition: transform 0.15s; }
+.mode-switch[aria-checked='true'] .mode-switch-track { background: var(--moss); box-shadow: none; }
+.mode-switch[aria-checked='true'] .mode-switch-knob { transform: translateX(20px); }
 .wordmark { margin: 0; font-size: 2rem; line-height: 1.1; }
 .wordmark::before { content: ''; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.3em; border-radius: 50%; background: var(--sun); vertical-align: 0.05em; }
 .tagline { margin: 6px 0 0; color: var(--muted); }
@@ -118,23 +128,33 @@ button.ghost:hover { border-color: var(--moss); }
 /* Pins on the sunniest and shadiest spots (ui/spotPins.ts), over the 3D view or the map; the HUD stays on top. */
 .spot-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
 .hud { z-index: 2; }
+/* A pin: a small label, a stem, and a dot whose centre is exactly on the spot (flipped when below). */
 .spot-pin {
   position: absolute; left: 0; top: 0; pointer-events: auto;
-  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 10px 3px 7px;
-  font-size: 0.85rem; font-weight: 600; white-space: nowrap; color: var(--ink);
-  background: var(--panel); border: 1px solid var(--cedar); border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(30, 43, 37, 0.25);
+  display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none;
+  color: var(--ink); font-size: 0.78rem; font-weight: 600; line-height: 1.1;
 }
-.spot-pin:hover { background: var(--fog); }
-/* The tail, pointing at the spot (below the pill, or above it when the pill sits below). */
-.spot-pin::after {
-  content: ''; position: absolute; left: var(--tail-x, 50%); top: 100%; transform: translateX(-50%);
-  border: 8px solid transparent; border-bottom: 0; border-top-color: var(--cedar);
+.spot-pin[data-below='true'] { flex-direction: column-reverse; }
+.spot-label {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 2px 8px; white-space: nowrap;
+  background: var(--panel); border: 1px solid var(--cedar); border-radius: 12px; box-shadow: 0 1px 4px rgba(30, 43, 37, 0.25);
+  transform: translateX(var(--label-shift, 0px));
 }
-.spot-pin[data-below='true']::after { top: auto; bottom: 100%; border-top: 0; border-bottom: 8px solid var(--cedar); }
-.spot-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--cedar); }
-.spot-pin[data-kind='sunniest'] .spot-dot { background: var(--sun); }
-.spot-pin[data-kind='shadiest'] .spot-dot { background: var(--shade); }
+.spot-pin:hover .spot-label { background: var(--fog); }
+.spot-pin:focus-visible { outline: none; }
+.spot-pin:focus-visible .spot-label { outline: 3px solid var(--shade); outline-offset: 2px; }
+.spot-stem { width: 2px; height: 10px; background: var(--cedar); }
+.spot-dot { flex: none; display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1.5px var(--cedar); }
+.spot-dot[data-kind='sunniest'] { background: var(--sun); }
+.spot-dot[data-kind='shadiest'] { background: var(--shade); }
+.spot-pin.flash .spot-dot { animation: spot-pulse 0.55s ease-out 3; }
+@keyframes spot-pulse {
+  from { box-shadow: 0 0 0 1.5px var(--cedar), 0 0 0 0 color-mix(in srgb, var(--cedar) 55%, transparent); }
+  to { box-shadow: 0 0 0 1.5px var(--cedar), 0 0 0 16px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spot-pin.flash .spot-dot { box-shadow: 0 0 0 1.5px var(--cedar), 0 0 0 7px color-mix(in srgb, var(--cedar) 45%, transparent); }
+}
 .sun-note { position: absolute; left: 12px; bottom: 12px; margin: 0; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--cedar) 82%, transparent); color: var(--fog); font-size: 0.85rem; }
 
 .timeline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 10px 0 0; font-size: 0.9rem; }
@@ -248,11 +268,38 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .site-footer a { color: inherit; }
 .build { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; font-size: 0.75rem; }
 
+/* Basic (html.basic, the default): the summary and dates on top, then a full-width view. "Advanced
+   options" shows everything else. */
+.basic #result-headline, .basic #result-summary, .basic #sun-controls, .basic #lot-facts, .basic #lot-more, .basic .debug,
+.basic #timeline, .basic #timeline-note, .basic #opacity-wrap, .basic #changes-wrap, .basic #shadows-wrap,
+.basic [data-ui='advanced'], html:not(.basic) [data-ui='basic'],
+html:not(.basic) #basic-summary, html:not(.basic) #basic-dates { display: none !important; }
+.basic .lot { grid-template-columns: 1fr; gap: 12px; }
+/* The panel's pieces join the page's column: address, summary and dates first, then the view, then the rest. */
+.basic .lot-info { display: contents; }
+.basic .lot-info > #lot-heading, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-dates { order: -1; margin-bottom: 0; }
+.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
+.basic .view-stage {
+  width: var(--page-width, 100vw); margin-left: calc(50% - var(--page-width, 100vw) / 2);
+  height: min(72vh, 860px); min-height: 320px; border-radius: 0; border-left: 0; border-right: 0;
+}
+.basic-summary:empty { display: none; }
+.basic-summary .period { margin: 0 0 6px; color: var(--muted); }
+.basic-stats { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 0; font-size: 1.05rem; }
+.basic-stats > div { display: flex; align-items: center; gap: 8px; }
+.basic-stats dt { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.basic-stats dd { margin: 0; }
+.basic-summary .note { margin: 6px 0 0; font-size: 0.875rem; color: var(--muted); }
+.basic-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0; }
+.basic-dates label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.basic-dates input { font: inherit; padding: 4px 6px; border: 1px solid var(--mist); border-radius: 6px; background: var(--panel); color: inherit; }
+
 /* Embedded (embed=1): the view, the result and the modes; the rest stays on the full site. */
 .embed .site-footer, .embed #intro, .embed #locate-row, .embed .debug, .embed .share-row,
 .embed #lot-facts, .embed #lot-more, .embed #lot-notices, .embed #lot-switcher,
 .embed .controls .row, .embed .controls > .hint:not(.mode-hint), .embed #elevation-wrap { display: none !important; }
 .embed.embed-lot .search { display: none; }
+.embed #basic-dates, .embed #advanced-toggle { display: none !important; }
 /* The header stays for screen readers: it's the page's h1. */
 .embed .site-header { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .embed main { padding: 8px 12px 12px; }
@@ -296,6 +343,10 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
     position: sticky; top: 0; background: var(--panel);
   }
   .grabber { width: 40px; height: 4px; border-radius: 2px; background: var(--mist); }
+  /* No bottom sheet in Basic either: the summary sits on top. */
+  .basic main { padding-bottom: 32px; }
+  .basic .lot-info { position: static; max-height: none; overflow: visible; padding: 0; border: 0; box-shadow: none; background: none; }
+  .basic .sheet-handle { display: none; }
   /* No bottom sheet inside an embed: the result and modes come first, then the view. */
   .embed main { padding-bottom: 12px; }
   .embed .lot-info { order: -1; position: static; display: block; max-height: none; overflow: visible; padding: 0; border: 0; box-shadow: none; background: none; }

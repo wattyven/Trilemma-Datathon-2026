@@ -27,8 +27,14 @@
   </head>
   <body>
     <header class="site-header">
-      <h1 class="wordmark">VanShade</h1>
-      <p class="tagline">Find the sunny and shady spots in your yard.</p>
+      <div>
+        <h1 class="wordmark">VanShade</h1>
+        <p class="tagline">Find the sunny and shady spots in your yard.</p>
+      </div>
+      <button type="button" id="advanced-toggle" class="mode-switch" role="switch" aria-checked="false">
+        <span class="mode-switch-label">Advanced mode</span>
+        <span class="mode-switch-track" aria-hidden="true"><span class="mode-switch-knob"></span></span>
+      </button>
     </header>
 
     <main>
@@ -99,15 +105,17 @@
               <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
               <label class="check opacity" id="opacity-wrap" hidden>Colour strength
                 <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Colour strength over the photo" /></label>
-              <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
+              <label class="check" id="shadows-wrap"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
             </div>
           </div>
           <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
             <h2 id="tips-heading">How to read this</h2>
             <ul>
-              <li><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="basic"><strong>Colours</strong> on the lot: lighter spots get more hours of direct sun a day over your dates, darker spots fewer. The legend shows the hours. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="basic"><strong>Max and Min pins</strong> mark the sunniest and the shadiest patch of open ground, about 2 m × 2 m.</li>
+              <li data-ui="advanced"><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="advanced"><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
               <li><strong>Hatched spots</strong> are under a roof or tree.</li>
-              <li><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
               <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
               <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
               <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
@@ -154,6 +162,11 @@
             <span class="grabber" aria-hidden="true"></span><span class="sheet-label">Show details and settings</span>
           </button>
           <h2 id="lot-heading" tabindex="-1"></h2>
+          <div id="basic-summary" class="basic-summary" aria-live="polite"></div>
+          <form id="basic-dates" class="basic-dates" aria-label="Dates to average over" novalidate>
+            <label>From <input type="date" id="basic-from" /></label>
+            <label>To <input type="date" id="basic-to" /></label>
+          </form>
           <p id="result-headline" class="headline" aria-live="polite"></p>
           <p id="result-summary" class="summary"></p>
           <form id="sun-controls" class="controls" hidden>

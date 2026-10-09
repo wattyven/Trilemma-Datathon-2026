@@ -19,6 +19,8 @@ export const fmtTime = (hhmm: string) => {
 };
 /** Hours to the nearest half hour, as a phrase: "about 6 hours", "3–5 hours". */
 const half = (h: number) => Math.round(h * 2) / 2;
+/** Hours to a tenth, with an exact zero as "0": "11.5", "0". */
+const tenth = (h: number) => (h < 0.05 ? '0' : h.toFixed(1));
 /** Where a part of the lot is: "toward the **north-east**", "near the **middle** of the lot". */
 const where = (side: Side) => (side === 'middle' ? 'near the **middle** of the lot' : `toward the **${side}**`);
 const hoursRange = (low: number, high: number) => {
@@ -196,17 +198,30 @@ export const copy = {
     shadeNoSun: "The sun is down for this whole time window, so there's no direct sun to block.",
     mostlyCovered: 'Almost all of this lot is under a roof or trees. To see the sun on a roof or deck, choose "Rooftop or deck surface" under Measure at.',
   },
-  /** The pins on the view: visible text, and the rest of the button's name for screen readers. */
+  /** The pins on the view: a short visible label, and the rest of the button's name for screen readers. */
   spots: {
     pin: (kind: 'sunniest' | 'shadiest', mode: 'season' | 'day' | 'shade', value: number, date: string) => {
       if (mode === 'shade')
-        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} · ${Math.round(value)}% of the time`, more: ': show its sun month by month' };
-      const h = half(value);
+        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} ${Math.round(value)}%`, more: ' of the time: show its sun month by month' };
       return {
-        text: `${kind === 'sunniest' ? 'Sunniest' : 'Shadiest'} · ${h === 0 ? 'under 0.5 h' : `about ${fmtH(h)} h`}`,
-        more: `${mode === 'day' ? ` of direct sun on ${fmtDate(date)}` : ' of direct sun a day'}: show its sun month by month`,
+        text: `${kind === 'sunniest' ? 'Max' : 'Min'} ${tenth(value)} h`,
+        more: ` of direct sun ${mode === 'day' ? `on ${fmtDate(date)}` : 'a day'}, the ${kind === 'sunniest' ? 'most' : 'least'} on the lot: show its sun month by month`,
       };
     },
+  },
+  /** Basic mode's summary: the lot's maximum and minimum average daily hours, and where they are. */
+  basic: {
+    period: (start: string, end: string) => `Average hours of direct sun a day, ${fmtDate(start)} to ${fmtDate(end)}`,
+    max: 'Maximum',
+    min: 'Minimum',
+    hours: (h: number) => `${tenth(h)} hours`,
+    /** "in the [north-east]" / "near the [middle]": the bracketed word is the button. */
+    where: (side: Side) => (side === 'middle' ? ['near the', 'middle'] : ['in the', side]) as [string, string],
+    show: (kind: 'sunniest' | 'shadiest') => `: show the ${kind === 'sunniest' ? 'sunniest' : 'shadiest'} spot on the view`,
+    even: (low: number, high: number) => `Sun is fairly even: ${tenth(low)} to ${tenth(high)} hours a day across the lot.`,
+    mostlyCovered: "Almost all of this lot is under a roof or trees, so there's little open ground to measure. Advanced options can measure on roofs and decks.",
+    legend: 'Hours of direct sun a day',
+    spotSize: 'The maximum and minimum are for patches of open ground about 2 m × 2 m, the size of a small garden bed.',
   },
   inspector: {
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,

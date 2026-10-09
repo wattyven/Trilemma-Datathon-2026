@@ -13,6 +13,19 @@ export interface Layer {
   asClasses: boolean;
   /** Class boundaries when `asClasses` (defaults to 6 h / 3 h). */
   thresholds?: Thresholds;
+  /** Hours: stretch the colours over this range (the lot's own) instead of 0–16 h. */
+  scale?: { min: number; max: number };
+}
+
+/**
+ * A colour range for one lot's hours: its own minimum to maximum, so differences show, but never
+ * narrower than `minSpan` hours (near-equal lots shouldn't look dramatic) and within 0–16 h.
+ */
+export function stretchScale(min: number, max: number, minSpan = 4): { min: number; max: number } {
+  if (!(min <= max)) return { min: 0, max: HOURS_SCALE_MAX };
+  if (max - min >= minSpan) return { min, max };
+  const lo = Math.min(Math.max(0, (min + max) / 2 - minSpan / 2), HOURS_SCALE_MAX - minSpan);
+  return { min: lo, max: lo + minSpan };
 }
 
 export interface CellGrid {
@@ -32,7 +45,8 @@ export function layerColor(layer: Layer, i: number): Rgb {
     const t = layer.thresholds ?? CLASS_THRESHOLDS;
     return CLASS_RGB[v >= t.fullSunH ? 2 : v >= t.partSunH ? 1 : 0];
   }
-  return cividis(v / HOURS_SCALE_MAX);
+  const s = layer.scale;
+  return cividis(s ? Math.min(1, Math.max(0, (v - s.min) / (s.max - s.min || 1))) : v / HOURS_SCALE_MAX);
 }
 
 /** Pixel rectangle covered by cell i (a block when the grid was coarsened). */
