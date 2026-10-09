@@ -204,6 +204,9 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .summary { font-size: 0.85rem; color: var(--muted); }
 .headline { margin: 4px 0 12px; font-size: 1.02rem; line-height: 1.45; }
 .timeline-note { margin: -4px 0 8px; }
+.glossary { margin: 0 0 12px; }
+.glossary dt { font-weight: 650; margin-top: 8px; }
+.glossary dd { margin: 2px 0 0; }
 .more-options { margin-top: 10px; }
 .more-options summary, .lot-more summary, .switcher summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
 .more-options label { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
