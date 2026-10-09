@@ -27,6 +27,7 @@ import { requestFor, type ChangeKind, type ControlState, type Controls } from '.
 import { renderInspector } from './ui/inspector';
 import { HOURS_SCALE_MAX, type Layer, type LotCanvas } from './ui/lotCanvas';
 import { setAnalysisNotices, setFact, setRichText, type LotViewElements } from './ui/lotView';
+import { SpotPins, type PinSpec } from './ui/spotPins';
 import type { Steps } from './ui/status';
 import { minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
 
@@ -59,6 +60,8 @@ export interface AnalysisElements {
   changesWrap: HTMLElement;
   changesToggle: HTMLInputElement;
   changesLabel: HTMLElement;
+  /** The layer over the view that holds the sunniest / shadiest pins. */
+  spotLayer: HTMLElement;
 }
 
 export class NoCoverageError extends Error {}
@@ -98,6 +101,7 @@ export class Analysis {
   private cellPositions: Position[] = [];
   /** The current result's sunniest and shadiest patches (found in render(), for the headline and pins). */
   private spots: Spots = { sunniest: null, shadiest: null };
+  private pins: SpotPins;
   /** The current lot (for restarting a refinement an observer change interrupted). */
   private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
   /** The sharper surface loading (or loaded) after the first result. */
@@ -133,6 +137,8 @@ export class Analysis {
     private lotEls: LotViewElements,
     private els: AnalysisElements,
   ) {
+    this.pins = new SpotPins(els.spotLayer, (cell) => this.pickSpot(cell), () => (this.view === '3d' && !els.sceneHost.hidden ? (this.scene?.canvas ?? null) : null));
+    map.onDraw = () => this.placePins();
     for (const r of els.viewRadios)
       r.addEventListener('change', () => {
         if (!r.checked) return;
@@ -354,6 +360,7 @@ export class Analysis {
     this.els.photoCredit.hidden = true;
     this.loaded = null;
     this.result = null;
+    this.clearPins();
     this.els.inspector.hidden = true;
     this.inspectedCell = null;
     this.els.summary.textContent = '';
@@ -457,6 +464,7 @@ export class Analysis {
     this.compareSeq++;
     this.pickSeq++;
     this.result = null;
+    this.clearPins(); // their cells belong to the old grid
     this.adopt(loaded, true);
     this.buildScene(parcel, true);
     if (this.photo) this.applyPhoto(this.photo);
@@ -549,6 +557,7 @@ export class Analysis {
     );
     this.scene.canvas.setAttribute('aria-label', copy.view.keyboard);
     this.scene.setShadows(this.els.shadowsToggle.checked);
+    this.scene.onRender = () => this.placePins();
   }
 
   private cellGrid(): CellGrid | null {
@@ -596,6 +605,7 @@ export class Analysis {
     for (const r of this.els.viewRadios) r.checked = r.value === (use3d ? '3d' : this.loaded ? 'map' : this.view);
     if (!use3d) this.map.draw();
     else this.scene!.invalidate();
+    this.placePins();
   }
 
   private async load(steps: Steps | null, signal: AbortSignal | undefined, fresh: boolean) {
@@ -725,6 +735,7 @@ export class Analysis {
 
   private render() {
     this.spots = this.findSpots();
+    this.updatePins();
     const layer = this.layer();
     this.map.setLayer(layer);
     this.scene?.setLayer(layer);
@@ -808,12 +819,48 @@ export class Analysis {
     return this.controls.get().observer === 'surface' ? new Uint8Array(l.covered.length) : l.covered;
   }
 
-  /** The sunniest and shadiest patches of the current result (none at a moment or mid-load). */
+  /** The sunniest and shadiest patches of the current result (none at a moment, mid-load, or on a lot that's nearly all roof). */
   private findSpots(): Spots {
+    const none = { sunniest: null, shadiest: null };
     const r = this.result, l = this.loaded;
-    if (!r || !l || r.kind === 'inspect' || r.kind === 'moment') return { sunniest: null, shadiest: null };
+    if (!r || !l || r.kind === 'inspect' || r.kind === 'moment') return none;
+    const covered = this.summaryCovered();
+    let n = 0;
+    for (let i = 0; i < covered.length; i++) n += covered[i] ? 1 : 0;
+    if (covered.length && n / covered.length >= MOSTLY_COVERED) return none;
     const s = l.summary;
-    return findSpots({ mode: r.kind, values: r.values, covered: this.summaryCovered(), px: l.px, py: l.py, step: s.step, cellAreaM2: s.cellSizeM * s.cellSizeM });
+    return findSpots({ mode: r.kind, values: r.values, covered, px: l.px, py: l.py, step: s.step, cellAreaM2: s.cellSizeM * s.cellSizeM });
+  }
+
+  /** Label the pins for the current spots (when the setting is on). */
+  private updatePins() {
+    const r = this.result;
+    if (!r || r.kind === 'inspect' || r.kind === 'moment' || !this.controls.get().spots) return this.clearPins();
+    const date = this.timeline.get().date;
+    const specs: PinSpec[] = [];
+    for (const kind of ['sunniest', 'shadiest'] as const) {
+      const s = this.spots[kind];
+      if (s) specs.push({ kind, cell: s.cell, ...copy.spots.pin(kind, r.kind, s.value, date) });
+    }
+    this.pins.set(specs);
+    this.placePins();
+  }
+
+  private clearPins() {
+    this.pins.clear();
+  }
+
+  /** Put the pins where the visible view shows their cells. */
+  private placePins() {
+    const scene = this.scene;
+    if (this.view === '3d' && scene && !this.els.sceneHost.hidden) this.pins.place((c) => scene.projectCell(c));
+    else this.pins.place((c) => (this.els.mapCanvas.hidden ? null : this.map.projectCell(c)));
+  }
+
+  /** A pin was clicked: put the 3D cursor there and show the spot's sun month by month. */
+  private pickSpot(cell: number) {
+    if (this.view === '3d') this.scene?.setCursor(cell);
+    void this.pick(cell);
   }
 
   /** "What this means": the result in a sentence or three (engine/lotSummary.ts, copy.headline). */

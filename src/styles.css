@@ -115,6 +115,26 @@ button.ghost:hover { border-color: var(--moss); }
 .compass { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--mist); }
 .compass path { fill: var(--cedar); }
 .compass text { font: 600 6px var(--font-body); fill: var(--cedar); }
+/* Pins on the sunniest and shadiest spots (ui/spotPins.ts), over the 3D view or the map; the HUD stays on top. */
+.spot-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+.hud { z-index: 2; }
+.spot-pin {
+  position: absolute; left: 0; top: 0; pointer-events: auto;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 10px 3px 7px;
+  font-size: 0.85rem; font-weight: 600; white-space: nowrap; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--cedar); border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(30, 43, 37, 0.25);
+}
+.spot-pin:hover { background: var(--fog); }
+/* The tail, pointing at the spot (below the pill, or above it when the pill sits below). */
+.spot-pin::after {
+  content: ''; position: absolute; left: var(--tail-x, 50%); top: 100%; transform: translateX(-50%);
+  border: 8px solid transparent; border-bottom: 0; border-top-color: var(--cedar);
+}
+.spot-pin[data-below='true']::after { top: auto; bottom: 100%; border-top: 0; border-bottom: 8px solid var(--cedar); }
+.spot-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--cedar); }
+.spot-pin[data-kind='sunniest'] .spot-dot { background: var(--sun); }
+.spot-pin[data-kind='shadiest'] .spot-dot { background: var(--shade); }
 .sun-note { position: absolute; left: 12px; bottom: 12px; margin: 0; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--cedar) 82%, transparent); color: var(--fog); font-size: 0.85rem; }
 
 .timeline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 10px 0 0; font-size: 0.9rem; }

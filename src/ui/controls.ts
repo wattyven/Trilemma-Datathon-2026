@@ -20,6 +20,8 @@ export interface ControlState {
   toTime: string;
   observer: ObserverId;
   classes: boolean;
+  /** Pins on the sunniest and shadiest spots (day, season, shade finder). */
+  spots: boolean;
   fullSunH: number;
   partSunH: number;
 }
@@ -44,6 +46,7 @@ export function defaultState(today: LocalDate, nowMinute: number): ControlState 
     toTime: '18:00',
     observer: 'bed',
     classes: true, // full / part sun / shade: clearer than the hours ramp for most people
+    spots: true,
     fullSunH: CLASS_THRESHOLDS.fullSunH,
     partSunH: CLASS_THRESHOLDS.partSunH,
   };
@@ -109,7 +112,7 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
       if (el.type === 'checkbox') el.checked = Boolean(state[name]);
       else el.value = String(state[name]);
     };
-    (['preset', 'year', 'start', 'end', 'date', 'time', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime', 'observer', 'classes', 'fullSunH', 'partSunH'] as const).forEach(set);
+    (['preset', 'year', 'start', 'end', 'date', 'time', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime', 'observer', 'classes', 'spots', 'fullSunH', 'partSunH'] as const).forEach(set);
     syncVisibility();
   }
 
@@ -139,6 +142,7 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
       toTime: v('toTime'),
       observer: v('observer') as ObserverId,
       classes: field<HTMLInputElement>('classes')?.checked ?? false,
+      spots: field<HTMLInputElement>('spots')?.checked ?? false,
       ...sanitizeThresholds(Number(v('fullSunH')), Number(v('partSunH'))),
     };
   }
@@ -149,7 +153,7 @@ export function initControls(form: HTMLFormElement, initial: ControlState, onCha
     state = read();
     syncVisibility();
     const name = (ev.target as HTMLInputElement).name;
-    const kind: ChangeKind = name === 'observer' ? 'observer' : ['classes', 'fullSunH', 'partSunH'].includes(name) ? 'display' : 'request';
+    const kind: ChangeKind = name === 'observer' ? 'observer' : ['classes', 'spots', 'fullSunH', 'partSunH'].includes(name) ? 'display' : 'request';
     if (name === 'fullSunH' || name === 'partSunH') write(); // show the cleaned values
     if (JSON.stringify(prev) !== JSON.stringify(state)) onChange(state, kind);
   });

@@ -200,7 +200,7 @@ export const copy = {
   spots: {
     pin: (kind: 'sunniest' | 'shadiest', mode: 'season' | 'day' | 'shade', value: number, date: string) => {
       if (mode === 'shade')
-        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} · ${Math.round(value)}% of the time`, more: ' shaded: show its sun month by month' };
+        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} · ${Math.round(value)}% of the time`, more: ': show its sun month by month' };
       const h = half(value);
       return {
         text: `${kind === 'sunniest' ? 'Sunniest' : 'Shadiest'} · ${h === 0 ? 'under 0.5 h' : `about ${fmtH(h)} h`}`,

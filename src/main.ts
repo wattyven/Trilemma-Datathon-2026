@@ -71,6 +71,7 @@ const analysisEls: AnalysisElements = {
   changesWrap: byId('changes-wrap'),
   changesToggle: byId<HTMLInputElement>('changes-toggle'),
   changesLabel: byId('changes-label'),
+  spotLayer: byId('spot-layer'),
 };
 
 const today = todayInVancouver();
@@ -348,6 +349,7 @@ function urlDefaults(): UrlState {
     debug: false,
     embed: false,
     classes: defaults.classes,
+    spots: defaults.spots,
     fullSunH: defaults.fullSunH,
     partSunH: defaults.partSunH,
     shadeStart: defaults.shadeStart,
@@ -377,6 +379,7 @@ function urlStateNow(): UrlState | null {
     photo: analysis.photoEnabled,
     opacity: analysis.resultsOpacity,
     classes: c.classes,
+    spots: c.spots,
     fullSunH: c.fullSunH,
     partSunH: c.partSunH,
     shadeStart: c.shadeStart,
@@ -422,7 +425,7 @@ async function applyUrl(hash: string): Promise<boolean> {
   restoring = true;
   try {
     const patch: Partial<ControlState> = {};
-    for (const k of ['mode', 'preset', 'year', 'start', 'end', 'observer', 'classes', 'fullSunH', 'partSunH', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime'] as const) {
+    for (const k of ['mode', 'preset', 'year', 'start', 'end', 'observer', 'classes', 'spots', 'fullSunH', 'partSunH', 'shadeStart', 'shadeEnd', 'fromTime', 'toTime'] as const) {
       if (s[k] !== undefined) (patch as Record<string, unknown>)[k] = s[k];
     }
     patch.mode ??= LINK_DEFAULT_MODE;

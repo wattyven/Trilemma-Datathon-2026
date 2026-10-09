@@ -24,10 +24,16 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
 
   // The result in plain words, first thing in the panel.
   await expect(page.locator('#result-headline')).toContainText(/is in direct sun/);
-  // Season shows full / part sun / shade.
+  // No pins at a single moment: each spot is just in sun or in shade.
+  await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(0);
+  // Season shows full / part sun / shade, with pins on the sunniest and shadiest spots.
   await page.locator('input[name="mode"][value="season"]').check();
   await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
+  const sunniest = page.locator('.spot-pin[data-kind="sunniest"]');
+  await expect(sunniest).toBeVisible();
+  await expect(sunniest).toContainText(/^Sunniest · (about [\d.]+|under 0\.5) h/);
+  await expect(page.locator('.spot-pin[data-kind="shadiest"]')).toBeVisible();
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
   // The timeline shows the day's sunrise and sunset, and Now returns to the current time.
   await expect(page.locator('#tl-sun')).toContainText(/Sunrise \d{1,2}:\d\d am · Sunset \d{1,2}:\d\d pm/);
@@ -69,10 +75,20 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await page.locator('#photo-toggle').check();
   await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
 
-  // Keyboard inspector: 12 monthly bars.
+  // A pin opens its spot's months; so does the keyboard inspector: 12 monthly bars.
+  await page.locator('.spot-pin[data-kind="sunniest"]').click();
+  await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
   await page.locator('.scene-canvas').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
+  // The pins follow to the map, and the setting turns them off (and goes into the link).
+  await page.locator('input[name="view"][value="map"]').check({ force: true });
+  await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(2);
+  await page.locator('input[name="spots"]').uncheck();
+  await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(0);
+  await expect.poll(() => page.url()).toMatch(/spots=0/);
+  await page.locator('input[name="spots"]').check();
+  await page.locator('input[name="view"][value="3d"]').check({ force: true });
 
   // The URL carries the address and the mode; a fresh page restores both.
   await page.locator('input[name="mode"][value="day"]').check();

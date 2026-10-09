@@ -107,6 +107,7 @@
             <ul>
               <li><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
               <li><strong>Hatched spots</strong> are under a roof or tree.</li>
+              <li><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
               <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
               <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
               <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
@@ -123,6 +124,7 @@
                 <button type="button" id="reset-view" class="ghost">Reset view</button>
               </div>
             </div>
+            <div id="spot-layer" class="spot-layer"></div>
             <p id="sun-note" class="sun-note" hidden></p>
           </div>
           <p id="photo-credit" class="photo-credit" hidden></p>
@@ -199,6 +201,7 @@
                 </select>
               </label>
               <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full sun / part sun / shade (untick for exact hours)</label>
+              <label data-for="season day shade" class="check"><input type="checkbox" name="spots" /> Mark the sunniest and shadiest spots</label>
             </div>
             <div class="row" data-for="season day" data-when="classes">
               <label>Full sun from <input type="number" name="fullSunH" min="0.5" max="16" step="0.5" inputmode="decimal" /> h</label>

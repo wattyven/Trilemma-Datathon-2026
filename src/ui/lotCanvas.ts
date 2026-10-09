@@ -2,7 +2,7 @@
 // (hillshaded DSM + per-cell results) drawn through the grid → local affine so TRUE north is up.
 // Phase 3 replaces this with the three.js scene.
 import type { PixelWindow } from '../elevation/window';
-import { invertAffine, type GridAffine } from '../geo/gridAffine';
+import { applyAffine, invertAffine, type GridAffine } from '../geo/gridAffine';
 import { frameForGeometry, type LocalFrame } from '../geo/local';
 import { bounds, mapGeometry, polygonsOf, type AreaGeometry, type Position } from '../geo/polygon';
 import { WATER_RGB } from './colors';
@@ -85,6 +85,8 @@ export class LotCanvas {
   private layerOpacity = 1;
   private view = { cx: 0, cy: 0, s: 1, w: 0, h: 0 };
   private ro: ResizeObserver;
+  /** Called after every redraw, so the pins on the view can follow. */
+  onDraw: () => void = () => {};
 
   constructor(private canvas: HTMLCanvasElement, private handlers: CanvasHandlers) {
     this.ro = new ResizeObserver(() => this.draw());
@@ -174,6 +176,16 @@ export class LotCanvas {
     c.height = m.window.height;
     c.getContext('2d')!.putImageData(img, 0, 0);
     return c;
+  }
+
+  /** Where a cell's centre appears on the canvas, in CSS pixels; null without a result grid or off the canvas. */
+  projectCell(cell: number): { x: number; y: number } | null {
+    const m = this.analysis;
+    if (!m || cell < 0 || cell >= m.px.length || !this.view.w) return null;
+    const [x, y] = applyAffine(m.affine, [m.px[cell]!, m.py[cell]!]);
+    const { cx, cy, s, w, h } = this.view;
+    const X = w / 2 + (x - cx) * s, Y = h / 2 - (y - cy) * s;
+    return X >= 0 && Y >= 0 && X <= w && Y <= h ? { x: X, y: Y } : null;
   }
 
   private cellAt(ev: MouseEvent): number | null {
@@ -300,6 +312,7 @@ export class LotCanvas {
     drawNorthArrow(ctx, cssW - 22, 18, ink);
     drawScaleBar(ctx, cssH, s, cssW, ink);
     canvas.dataset.state = this.layer ? 'result' : this.analysis ? 'elevation' : 'lot';
+    this.onDraw();
   }
 }
 

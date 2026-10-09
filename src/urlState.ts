@@ -19,6 +19,8 @@ export interface UrlState {
   observer?: ObserverId;
   view?: View;
   classes?: boolean;
+  /** Pins on the sunniest and shadiest spots. */
+  spots?: boolean;
   fullSunH?: number;
   partSunH?: number;
   shadeStart?: string;
@@ -54,6 +56,7 @@ const KEYS: Record<keyof UrlState, string> = {
   observer: 'o',
   view: 'v',
   classes: 'cls',
+  spots: 'spots',
   fullSunH: 'full',
   partSunH: 'part',
   shadeStart: 'ss',
@@ -128,6 +131,8 @@ export function decodeHash(hash: string): UrlState {
   if (Number.isFinite(opacity) && opacity >= 0.2 && opacity <= 1) out.opacity = Math.round(opacity * 100) / 100;
   const cls = get('classes');
   if (cls === '1' || cls === '0') out.classes = cls === '1';
+  const spots = get('spots');
+  if (spots === '1' || spots === '0') out.spots = spots === '1';
   for (const k of ['start', 'end', 'date', 'shadeStart', 'shadeEnd'] as const) {
     const v = validDate(get(k));
     if (v) out[k] = v;

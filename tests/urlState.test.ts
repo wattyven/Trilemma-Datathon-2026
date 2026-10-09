@@ -15,6 +15,7 @@ const full: UrlState = {
   observer: 'seated',
   view: 'map',
   classes: true,
+  spots: false,
   fullSunH: 5.5,
   partSunH: 2,
   shadeStart: '2027-07-01',
@@ -61,8 +62,10 @@ describe('URL hash state', () => {
     expect(decodeHash('#elev=everything&chg=maybe')).toEqual({});
   });
 
-  it('records turning off a default (the photo, the full / part sun / shade view)', () => {
+  it('records turning off a default (the photo, the full / part sun / shade view, the pins)', () => {
     expect(encodeHash({ photo: false, classes: false }, { photo: true, classes: true })).toBe('#cls=0&img=0');
+    expect(encodeHash({ spots: false }, { spots: true })).toBe('#spots=0');
+    expect(decodeHash('#spots=maybe')).toEqual({});
     expect(encodeHash({ photo: true, classes: true }, { photo: true, classes: true })).toBe('');
   });
 

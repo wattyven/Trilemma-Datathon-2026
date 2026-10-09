@@ -99,6 +99,8 @@ export class LotScene {
   private raycaster = new THREE.Raycaster();
   private downAt: { x: number; y: number } | null = null;
   private hoverQueued = false;
+  /** Called after every render, so the pins on the view can follow the camera. */
+  onRender: () => void = () => {};
 
   constructor(private host: HTMLElement, private handlers: SceneHandlers, private opts: { lowPower: boolean }) {
     this.canvas = document.createElement('canvas');
@@ -392,12 +394,29 @@ export class LotScene {
       this.invalidate();
       return;
     }
-    const p = applyAffine(m.affine, [m.cells.px[cell]!, m.cells.py[cell]!]);
-    const z = bilinear({ width: m.window.width, height: m.window.height, data: m.dsm }, m.cells.px[cell]!, m.cells.py[cell]!);
-    this.cursor.position.set(...localToScene(p, (Number.isNaN(z) ? this.base : z) - this.base + 0.35));
+    this.cursor.position.copy(this.cellSurface(cell, 0.35));
     this.cursor.scale.setScalar(m.cells.step * m.window.res);
     this.cursor.visible = true;
     this.invalidate();
+  }
+
+  /** Where a cell's surface appears on the canvas, in CSS pixels; null without a lot, off screen or behind the camera. */
+  projectCell(cell: number): { x: number; y: number } | null {
+    const m = this.model;
+    if (!m || cell < 0 || cell >= m.cells.px.length) return null;
+    const v = this.cellSurface(cell, 0).project(this.camera);
+    if (v.z < -1 || v.z > 1) return null; // behind the camera (or past the far plane)
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const x = ((v.x + 1) / 2) * w, y = ((1 - v.y) / 2) * h;
+    return x >= 0 && y >= 0 && x <= w && y <= h ? { x, y } : null;
+  }
+
+  /** A cell's surface (DSM) in scene coordinates, `lift` metres up. */
+  private cellSurface(cell: number, lift: number): THREE.Vector3 {
+    const m = this.model!;
+    const px = m.cells.px[cell]!, py = m.cells.py[cell]!;
+    const z = bilinear({ width: m.window.width, height: m.window.height, data: m.dsm }, px, py);
+    return new THREE.Vector3(...localToScene(applyAffine(m.affine, [px, py]), (Number.isNaN(z) ? this.base : z) - this.base + lift));
   }
 
   invalidate() {
@@ -406,6 +425,7 @@ export class LotScene {
     requestAnimationFrame(() => {
       this.pending = false;
       this.renderer.render(this.scene, this.camera);
+      this.onRender();
     });
   }
 
