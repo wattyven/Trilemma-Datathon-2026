@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="See where the sun falls on your Metro Vancouver yard, at any time of year." />
     <meta name="vanshade-build" content="%VITE_BUILD_SHA%" />
+    <meta name="theme-color" content="#E9A23B" />
+    <link rel="canonical" href="%VITE_SITE_URL%" />
+    <!-- Link previews (Open Graph, X/Twitter). Crawlers don't run scripts, so every link shares this card. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VanShade" />
+    <meta property="og:locale" content="en_CA" />
+    <meta property="og:title" content="VanShade: sun and shade for your Metro Vancouver yard" />
+    <meta property="og:description" content="Type an address and see your lot in 3D, with where the sun falls right now, on any day, or over the growing season. Free, with no account." />
+    <meta property="og:url" content="%VITE_SITE_URL%" />
+    <meta property="og:image" content="%VITE_SITE_URL%og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="VanShade: a Vancouver lot in 3D, coloured by full sun, part sun and shade over its aerial photo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <!-- No referrer policy here on purpose: the DataBC WFS only sends CORS headers when a Referer is present. -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e8a33d'/%3E%3Cg stroke='%23e8a33d' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E" />
     <title>VanShade</title>

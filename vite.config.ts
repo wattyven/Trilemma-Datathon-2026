@@ -1,5 +1,9 @@
 import { defineConfig } from 'vitest/config';
 
+// CI passes repository variables even when they're unset (as ""), which would beat .env.
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env;
+if (env && !env.VITE_SITE_URL) delete env.VITE_SITE_URL;
+
 // GitHub Pages serves the site under /<repo>/.
 export default defineConfig({
   base: '/VanShade/',
