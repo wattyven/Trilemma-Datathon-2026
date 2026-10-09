@@ -1,0 +1,38 @@
+{
+  "name": "vanshade",
+  "private": true,
+  "license": "MIT",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Sun and shade mapper for Metro Vancouver yards. Static site, all compute in the browser.",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:tz": "TZ=UTC vitest run && TZ=Asia/Tokyo vitest run",
+    "smoke": "playwright test"
+  },
+  "dependencies": {
+    "copc": "^0.0.9",
+    "geotiff": "^3.0.5",
+    "laz-perf": "^0.0.7",
+    "luxon": "^3.7.2",
+    "proj4": "^2.22.0",
+    "suncalc": "^2.1.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/luxon": "^3.7.6",
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^4.1.11"
+  }
+}

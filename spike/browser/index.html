@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VanShade data spike</title>
+    <style>
+      body { font: 13px/1.4 ui-monospace, Menlo, monospace; margin: 16px; background: #fff; color: #111; }
+      .pass { color: #0a6b2e; } .fail { color: #a11; }
+    </style>
+  </head>
+  <body>
+    <h1>VanShade Phase 0 browser probe</h1>
+    <p>Runs every data-source probe from a real browser origin. Results land in <code>window.__results</code>.</p>
+    <pre id="log"></pre>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

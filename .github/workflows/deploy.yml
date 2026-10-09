@@ -1,0 +1,97 @@
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:tz   # identical results under TZ=UTC and TZ=Asia/Tokyo
+
+      - run: npm run build
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
+          # LidarBC CORS proxy (proxy/lidarbc). A repository variable; unset = the app skips LidarBC.
+          VITE_LIDARBC_PROXY: ${{ vars.VITE_LIDARBC_PROXY }}
+          # The site's address for link previews; unset = .env (the GitHub Pages address).
+          VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+
+      - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
+
+  # One Playwright smoke test of the deployed flow, against the live Pages site.
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Wait until Pages serves this commit
+        env:
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          SHA: ${{ github.sha }}
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS "${PAGE_URL}?build=${i}" | grep -q "content=\"${SHA}\""; then echo "live after try ${i}"; exit 0; fi
+            sleep 10
+          done
+          echo "Pages never served ${SHA}"; exit 1
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test
+        env:
+          BASE_URL: ${{ needs.deploy.outputs.page_url }}
+
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 14

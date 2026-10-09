@@ -1,0 +1,31 @@
+{
+ "type": "Feature",
+ "geometry": {
+  "type": "Point",
+  "crs": {
+   "type": "EPSG",
+   "properties": {
+    "code": 4326
+   }
+  },
+  "coordinates": [
+   -123.1139388,
+   49.261317
+  ]
+ },
+ "properties": {
+  "fullAddress": "2699 Yukon St, Vancouver, BC",
+  "siteName": "",
+  "unitDesignator": "",
+  "civicNumber": 2699,
+  "streetName": "Yukon",
+  "streetType": "St",
+  "streetDirection": "",
+  "localityName": "Vancouver",
+  "localityType": "City",
+  "electoralArea": "",
+  "provinceCode": "BC",
+  "locationPositionalAccuracy": "high",
+  "locationDescriptor": "parcelPoint"
+ }
+}

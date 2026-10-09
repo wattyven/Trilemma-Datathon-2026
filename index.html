@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en-CA">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="See where the sun falls on your Metro Vancouver yard, at any time of year." />
+    <meta name="vanshade-build" content="%VITE_BUILD_SHA%" />
+    <meta name="theme-color" content="#E9A23B" />
+    <link rel="canonical" href="%VITE_SITE_URL%" />
+    <!-- Link previews (Open Graph, X/Twitter). Crawlers don't run scripts, so every link shares this card. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VanShade" />
+    <meta property="og:locale" content="en_CA" />
+    <meta property="og:title" content="VanShade: sun and shade for your Metro Vancouver yard" />
+    <meta property="og:description" content="Type an address and see your lot in 3D, with where the sun falls right now, on any day, or over the growing season. Free, with no account." />
+    <meta property="og:url" content="%VITE_SITE_URL%" />
+    <meta property="og:image" content="%VITE_SITE_URL%og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="VanShade: a Vancouver lot in 3D, coloured by full sun, part sun and shade over its aerial photo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <!-- No referrer policy here on purpose: the DataBC WFS only sends CORS headers when a Referer is present. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e8a33d'/%3E%3Cg stroke='%23e8a33d' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M16 2v4M16 26v4M2 16h4M26 16h4M6 6l3 3M23 23l3 3M6 26l3-3M23 9l3-3'/%3E%3C/g%3E%3C/svg%3E" />
+    <title>VanShade</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <h1 class="wordmark">VanShade</h1>
+      <p class="tagline">Find the sunny and shady spots in your yard.</p>
+    </header>
+
+    <main>
+      <div id="embed-bar" class="embed-bar" hidden>
+        <a id="embed-open" class="embed-open" href="./" target="_blank" rel="noopener">Open in VanShade<span class="visually-hidden"> (opens in a new tab)</span></a>
+        <p class="hint">Contains information licensed under the Open Government Licences of British Columbia and Canada. <button type="button" class="link" data-open-about>About</button></p>
+      </div>
+      <form id="search-form" class="search" role="search" autocomplete="off" novalidate>
+        <label for="address-input">Your address in Metro Vancouver</label>
+        <div class="search-row">
+          <div class="combobox">
+            <input
+              id="address-input"
+              type="text"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="address-options"
+              spellcheck="false"
+              autocapitalize="off"
+              placeholder="e.g. 453 W 12th Ave, Vancouver"
+            />
+            <ul id="address-options" role="listbox" aria-label="Address suggestions" hidden></ul>
+          </div>
+          <button type="submit">Find my lot</button>
+        </div>
+        <p id="locate-row" class="locate-row" hidden>
+          <button type="button" id="locate" class="ghost">Use my location</button>
+          <span class="hint">Uses your device's location once to find the nearest address. It's sent only to BC's address service.</span>
+        </p>
+      </form>
+
+      <ol id="status" class="status" aria-live="polite" hidden></ol>
+      <div id="message" class="message" role="alert" hidden></div>
+
+      <section id="intro" class="intro" aria-labelledby="intro-heading">
+        <div class="intro-text">
+          <h2 id="intro-heading">Where does the sun fall on your lot?</h2>
+          <ol class="how">
+            <li><strong>Type your address</strong> anywhere in Metro Vancouver.</li>
+            <li><strong>See your lot in 3D</strong>, with its real neighbours, trees and buildings, built from laser scans of the city.</li>
+            <li><strong>Find the sunny and shady spots</strong>: sun and shade right now or at any time, and hours of direct sun over a day or the growing season.</li>
+          </ol>
+          <p class="examples">
+            <span>Try an example:</span>
+          <button type="button" class="ghost" data-example="453 W 12th Ave, Vancouver">Vancouver City Hall</button>
+          <button type="button" class="ghost" data-example="4949 Canada Way, Burnaby">Burnaby City Hall</button>
+          <button type="button" class="ghost" data-example="355 W Queens Rd, North Vancouver">District of North Vancouver Hall</button>
+          </p>
+          <p class="hint">Covers the 21 municipalities, Electoral Area A and Tsawwassen First Nation in Metro Vancouver. Free, with no account. Addresses are looked up with BC's public address service; VanShade keeps nothing.</p>
+        </div>
+        <figure class="intro-preview">
+          <img src="preview.jpg" width="640" height="440" alt="Example result: Vancouver City Hall's lot in 3D among its neighbours, with sunny lawns in yellow and shaded areas in dark blue" />
+          <figcaption>Vancouver City Hall: yellow gets full sun, dark blue is shaded.</figcaption>
+        </figure>
+      </section>
+
+      <section id="lot" class="lot" aria-labelledby="lot-heading" hidden>
+        <div class="lot-visual">
+          <div class="view-toolbar">
+            <fieldset class="segmented">
+              <legend class="visually-hidden">View</legend>
+              <label><input type="radio" name="view" value="3d" checked /> 3D</label>
+              <label><input type="radio" name="view" value="map" /> Map</label>
+            </fieldset>
+            <div class="view-options">
+              <label class="check"><input type="checkbox" id="photo-toggle" /> Aerial photo</label>
+              <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
+              <label class="check opacity" id="opacity-wrap" hidden>Colour strength
+                <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Colour strength over the photo" /></label>
+              <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
+            </div>
+          </div>
+          <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
+            <h2 id="tips-heading">How to read this</h2>
+            <ul>
+              <li><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
+              <li><strong>Hatched spots</strong> are under a roof or tree.</li>
+              <li><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
+              <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
+              <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
+              <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
+            </ul>
+            <button type="button" id="tips-close" class="ghost">Got it</button>
+          </section>
+          <div class="view-stage">
+            <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
+            <div id="scene-host" class="scene-host" hidden>
+              <div id="hud" class="hud" hidden>
+                <div id="compass" class="compass" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="30" height="30"><text x="12" y="7" text-anchor="middle">N</text><path d="M12 8.5 L16 21 L12 18.5 L8 21 Z" /></svg>
+                </div>
+                <button type="button" id="reset-view" class="ghost">Reset view</button>
+              </div>
+            </div>
+            <div id="spot-layer" class="spot-layer"></div>
+            <p id="sun-note" class="sun-note" hidden></p>
+          </div>
+          <p id="photo-credit" class="photo-credit" hidden></p>
+          <p id="view-note" class="readout" hidden></p>
+          <div id="timeline" class="timeline" hidden>
+            <label>Date <input type="date" id="tl-date" /></label>
+            <button type="button" id="tl-now" class="ghost">Now</button>
+            <button type="button" id="tl-play" class="ghost" aria-pressed="false">Play the day</button>
+            <label class="slider">Time <input type="range" id="tl-time" min="0" max="1435" step="5" />
+              <output id="tl-time-label" for="tl-time"></output></label>
+            <p id="tl-sun" class="hint tl-sun" hidden></p>
+          </div>
+          <p id="timeline-note" class="hint timeline-note" hidden></p>
+          <div id="legend" class="legend" hidden></div>
+          <p id="readout" class="readout" aria-live="polite"></p>
+          <section id="inspector" class="inspector" aria-live="polite" hidden></section>
+          <p id="caveats" class="caveats">
+            <span>Lot lines are approximate.</span>
+            <span id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</span>
+            <span>Trees count as solid all year.</span>
+            <span>Direct sun only, not weather.</span>
+            <button type="button" class="link" data-open-about>About accuracy</button>
+          </p>
+        </div>
+        <div class="lot-info" id="lot-info" data-sheet="collapsed">
+          <button type="button" id="sheet-handle" class="sheet-handle" aria-expanded="false" aria-controls="lot-info">
+            <span class="grabber" aria-hidden="true"></span><span class="sheet-label">Show details and settings</span>
+          </button>
+          <h2 id="lot-heading" tabindex="-1"></h2>
+          <p id="result-headline" class="headline" aria-live="polite"></p>
+          <p id="result-summary" class="summary"></p>
+          <form id="sun-controls" class="controls" hidden>
+            <fieldset class="modes">
+              <legend>Show</legend>
+              <label><input type="radio" name="mode" value="moment" /> One moment</label>
+              <label><input type="radio" name="mode" value="day" /> One day</label>
+              <label><input type="radio" name="mode" value="season" /> Season</label>
+              <label><input type="radio" name="mode" value="shade" /> Shade finder</label>
+            </fieldset>
+            <p class="hint mode-hint" data-for="moment">Sun and shade at one moment: now, or move the time under the view.</p>
+            <p class="hint mode-hint" data-for="day">Total sun on one day (change the date under the view).</p>
+            <p class="hint mode-hint" data-for="season">Average daily sun over months: best for planning a garden.</p>
+            <p class="hint mode-hint" data-for="shade">How often each spot is shaded at a time of day, over a range of dates: handy for a patio.</p>
+            <div class="row" data-for="season">
+              <label>Season
+                <select name="preset">
+                  <option value="growing">Growing season (Apr–Sep)</option>
+                  <option value="summer">Summer (Jun–Aug)</option>
+                  <option value="winter">Winter (Dec–Feb)</option>
+                  <option value="year">Whole year</option>
+                  <option value="custom">Custom dates</option>
+                </select>
+              </label>
+              <label>Year <input type="number" name="year" min="2000" max="2100" step="1" /></label>
+            </div>
+            <div class="row" data-for="custom">
+              <label>From <input type="date" name="start" /></label>
+              <label>To <input type="date" name="end" /></label>
+            </div>
+            <div class="row" data-for="shade">
+              <label>From <input type="date" name="shadeStart" /></label>
+              <label>To <input type="date" name="shadeEnd" /></label>
+            </div>
+            <div class="row" data-for="shade">
+              <label>Between <input type="time" name="fromTime" step="900" /></label>
+              <label>and <input type="time" name="toTime" step="900" /></label>
+            </div>
+            <div class="row">
+              <label>Measure at
+                <select name="observer">
+                  <option value="bed">Garden bed (0.3 m)</option>
+                  <option value="seated">Seated (1.2 m)</option>
+                  <option value="surface">Rooftop or deck surface</option>
+                </select>
+              </label>
+              <label data-for="season day" class="check"><input type="checkbox" name="classes" /> Show as full sun / part sun / shade (untick for exact hours)</label>
+              <label data-for="season day shade" class="check"><input type="checkbox" name="spots" /> Mark the sunniest and shadiest spots</label>
+            </div>
+            <div class="row" data-for="season day" data-when="classes">
+              <label>Full sun from <input type="number" name="fullSunH" min="0.5" max="16" step="0.5" inputmode="decimal" /> h</label>
+              <label>Part sun from <input type="number" name="partSunH" min="0" max="15.5" step="0.5" inputmode="decimal" /> h</label>
+            </div>
+            <p class="hint" data-for="day moment">Times are Vancouver time.</p>
+            <details id="elevation-wrap" class="more-options" hidden>
+              <summary>More options</summary>
+              <label>3D data
+                <select id="elevation-choice"></select>
+              </label>
+              <p class="hint">Which laser scans build the 3D landscape. "Best of both" is the most detailed and up to date.</p>
+            </details>
+          </form>
+          <p class="share-row">
+            <button type="button" id="share" class="ghost">Copy link</button>
+            <button type="button" id="share-embed" class="ghost">Copy embed code</button>
+            <span id="share-status" class="hint" aria-live="polite"></span>
+          </p>
+          <dl id="lot-facts" class="facts"></dl>
+          <details id="lot-more" class="lot-more">
+            <summary>Lot and data details</summary>
+            <dl id="lot-facts-more" class="facts"></dl>
+          </details>
+          <ul id="lot-notices" class="notices"></ul>
+          <details id="lot-switcher" class="switcher" hidden>
+            <summary id="lot-switcher-summary">Not the right lot?</summary>
+            <fieldset>
+              <legend class="visually-hidden">Choose a lot</legend>
+              <div id="lot-options"></div>
+            </fieldset>
+          </details>
+
+
+          <details class="debug" id="debug" hidden>
+            <summary>Debug details</summary>
+            <label class="check"><input type="checkbox" id="compare-toggle" /> Compare 3D shadows with the shade engine (engine shade is tinted blue)</label>
+            <dl id="debug-facts" class="facts"></dl>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Addresses: BC Address Geocoder. Lot lines: ParcelMap BC (approximate, not a legal survey). Both under the
+        <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.
+        Elevation: NRCan High Resolution Digital Elevation Model and LiDAR point clouds, under the
+        <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>;
+        LidarBC, under the Open Government Licence – British Columbia. Aerial photos: municipal open data (see About).
+        Built with <a href="https://threejs.org/">three.js</a> and <a href="https://github.com/mourner/suncalc">SunCalc</a>.
+        <button type="button" class="link" data-open-about>About VanShade</button>
+      </p>
+      <p class="build">Build <span id="build-sha">%VITE_BUILD_SHA%</span></p>
+    </footer>
+
+    <dialog id="about" class="about" aria-labelledby="about-heading">
+      <form method="dialog" class="about-close"><button class="ghost" aria-label="Close">Close</button></form>
+      <h2 id="about-heading">About VanShade and its accuracy</h2>
+      <p>
+        VanShade works out where direct sunlight falls on a Metro Vancouver lot. It finds the lot from your address, loads 1 m
+        LiDAR elevation for the lot and 200 m around it (roofs, neighbouring buildings, trees and hedges included), and for every
+        square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
+        keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
+        the newer survey wherever something did. "3D data" under More options lets you pick either survey on its own. It then follows the sun across the day or season
+        to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests.
+      </p>
+      <h3>How to use VanShade</h3>
+      <ol>
+        <li><strong>Type your address</strong> and pick it from the list. If the outline isn't your lot, choose another under "Not the right lot?".</li>
+        <li><strong>Read the result</strong>: the sentence at the top of the panel sums it up, and on the lot yellow spots get the most direct sun, dark blue the least.</li>
+        <li><strong>Choose what to show</strong>: one moment (it opens on now), one day, a season average (best for planning a garden), or the shade finder (how often a patio is shaded at a time of day). Click any spot for its sun month by month.</li>
+      </ol>
+      <h3>Words used here</h3>
+      <dl class="glossary">
+        <dt>Direct sun</dt>
+        <dd>Sunlight reaching a spot with nothing in the way. Bright shade and light reflected off walls don't count.</dd>
+        <dt>Roof or tree overhead</dt>
+        <dd>Something more than 2 m tall stands over the spot. At garden-bed height these spots are mostly in shade, so the summary leaves them out.</dd>
+        <dt>Garden bed, seated, rooftop</dt>
+        <dd>Where the sun is measured: 0.3 m above the ground, 1.2 m (about head height sitting down), or just above whatever surface is there, such as a roof or deck.</dd>
+        <dt>Laser scans (LiDAR)</dt>
+        <dd>Measurements of the ground, buildings and trees taken from an aircraft. VanShade uses scans from 2016 and, where they exist, 2024–2025.</dd>
+        <dt>Full sun, part sun, shade</dt>
+        <dd>How the lot is coloured for a whole day or season: full sun is 6 or more hours of direct sun a day, part sun 3 to 6 hours, shade under 3. You can change these numbers, or untick the option to see exact hours.</dd>
+        <dt>Season average</dt>
+        <dd>The average number of hours of direct sun a day over the months you choose.</dd>
+      </dl>
+      <h3>What to keep in mind</h3>
+      <ul>
+        <li><strong>Lot lines are approximate.</strong> They come from ParcelMap BC, which is not a legal survey.</li>
+        <li><strong>The LiDAR has a date.</strong> <span id="about-lidar">Most of Metro Vancouver was flown in 2016.</span> New buildings, removed trees and years of growth since then aren't in it.</li>
+        <li><strong>Trees are treated as solid all year.</strong> Deciduous trees let much more winter light through than shown.</li>
+        <li><strong>This is potential direct sun.</strong> It assumes clear skies; cloud and haze aren't counted. Bright shade and reflected light aren't counted either.</li>
+        <li><strong>Distant hills aren't included.</strong> Only things within about 200 m of the lot can cast shadows, so on the North Shore and other hillsides, winter mornings and evenings may be shadier than shown.</li>
+        <li><strong>Sun position</strong> comes from SunCalc, including the bending of light low near the horizon. Times are Vancouver time.</li>
+        <li><strong>Where you stand matters.</strong> "Garden bed" measures 0.3 m above the ground, "Seated" 1.2 m, and "Rooftop" just above the roof or deck surface. Spots under a roof or tree canopy are hatched; at ground level they're mostly in shade.</li>
+        <li><strong>Big lots are coarser.</strong> Above about 20,000 m², sun is worked out on a 2 m (or coarser) grid.</li>
+      </ul>
+      <h3>Data and credits</h3>
+      <ul>
+        <li>BC Address Geocoder and ParcelMap BC: Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
+        <li>High Resolution Digital Elevation Model (HRDEM) and LiDAR point clouds (CanElevation): Natural Resources Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>.</li>
+        <li>Newer LiDAR surface and ground models (LidarBC, 2024 and 2025): Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
+        <li id="about-imagery">Aerial photos, when switched on, come from each municipality's open data.</li>
+        <li>Libraries: <a href="https://threejs.org/">three.js</a>, <a href="https://github.com/mourner/suncalc">SunCalc</a>, <a href="https://geotiffjs.github.io/">geotiff.js</a>, <a href="https://github.com/proj4js/proj4js">proj4js</a>, <a href="https://moment.github.io/luxon/">Luxon</a>, <a href="https://github.com/connormanning/copc.js">copc.js</a>, <a href="https://github.com/hobuinc/laz-perf">laz-perf</a>. Headings use <a href="https://github.com/undercasetype/Fraunces">Fraunces</a> (SIL Open Font License).</li>
+      </ul>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

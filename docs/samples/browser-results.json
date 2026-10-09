@@ -1,0 +1,284 @@
+{
+  "origin": "http://localhost:5199",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+  "geocoder fetch (CORS)": {
+    "ok": true,
+    "detail": {
+      "ms": 130,
+      "status": 200,
+      "fullAddress": "453 W 12th Ave, Vancouver, BC",
+      "coords": [
+        -123.1139388,
+        49.261317
+      ]
+    }
+  },
+  "geocoder autocomplete fetch": {
+    "ok": true,
+    "detail": {
+      "ms": 100,
+      "status": 200,
+      "rows": [
+        "4949 Canada Way, Burnaby, BC"
+      ]
+    }
+  },
+  "WFS fetch application/json (CORS)": {
+    "ok": true,
+    "detail": {
+      "ms": 113,
+      "status": 200,
+      "hits": 1
+    }
+  },
+  "WFS fetch with referrerPolicy no-referrer (expected to fail)": {
+    "ok": false,
+    "detail": {
+      "ms": 30,
+      "error": "TypeError: Failed to fetch"
+    }
+  },
+  "WFS JSONP <script>": {
+    "ok": true,
+    "detail": {
+      "ms": 56,
+      "hits": 1,
+      "parcelClass": "Subdivision",
+      "rd": "Metro Vancouver Regional District",
+      "contains": true
+    }
+  },
+  "WFS JSONP in sandboxed iframe": {
+    "ok": true,
+    "detail": {
+      "ms": 23,
+      "hits": 1,
+      "parcelClass": "Subdivision",
+      "contains": true
+    }
+  },
+  "STAC search fetch": {
+    "ok": true,
+    "detail": {
+      "ms": 350,
+      "status": 200,
+      "item": "2_3-mosaic-1m",
+      "dsm": "https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/2_3-mosaic-1m-dsm.tif"
+    }
+  },
+  "HRDEM project extent GeoJSON (S3)": {
+    "ok": true,
+    "detail": {
+      "ms": 311,
+      "status": 200,
+      "type": "Feature",
+      "geom": "MultiPolygon"
+    }
+  },
+  "COG parallel cold load DSM+DTM 441 m (geotiff.js)": {
+    "ok": true,
+    "detail": {
+      "ms": 2322,
+      "dsm": {
+        "openMs": 259,
+        "readMs": 1980,
+        "size": "441×441",
+        "centre": 38.58
+      },
+      "dtm": {
+        "openMs": 288,
+        "readMs": 2031,
+        "size": "441×441",
+        "centre": 38.52
+      },
+      "requests": 28,
+      "mib": 8.29,
+      "dsmMinusDtm": 0.06
+    }
+  },
+  "COG detailed probe (sequential, cold)": {
+    "ok": true,
+    "detail": {
+      "ms": 4795,
+      "lonLat": [
+        -123.1139388,
+        49.261317
+      ],
+      "xy3979": [
+        -1978391.55,
+        473532
+      ],
+      "convergenceDeg": 25.325,
+      "dsm": {
+        "desc": {
+          "width": 500000,
+          "height": 500000,
+          "tileWidth": 512,
+          "tileHeight": 512,
+          "compression": 5,
+          "predictor": 1,
+          "sampleFormat": {
+            "0": 3
+          },
+          "bitsPerSample": {
+            "0": 32
+          },
+          "nodata": -32767,
+          "origin": [
+            -2000000,
+            500000,
+            0
+          ],
+          "resolution": [
+            1,
+            -1,
+            0
+          ],
+          "imageCount": 11
+        },
+        "open": {
+          "ms": 181,
+          "requests": 2,
+          "bytes": 5072,
+          "ranges": [
+            "bytes=0-1023 → 206 1024B",
+            "bytes=200-4247 → 206 4048B"
+          ]
+        },
+        "centre3x3": {
+          "values": [
+            38.56,
+            38.55,
+            38.54,
+            38.65,
+            38.58,
+            38.55,
+            38.9,
+            38.73,
+            38.64
+          ],
+          "ms": 390,
+          "requests": 3,
+          "bytes": 1119230
+        },
+        "window": {
+          "size": "441×441",
+          "ms": 797,
+          "requests": 10,
+          "bytes": 4429881,
+          "stats": {
+            "valid": 194481,
+            "nodata": 0,
+            "min": 17.8,
+            "max": 98.98,
+            "mean": 44.79
+          }
+        },
+        "warm": {
+          "ms": 180,
+          "requests": 4,
+          "bytes": 4429845
+        }
+      },
+      "dtm": {
+        "desc": {
+          "width": 500000,
+          "height": 500000,
+          "tileWidth": 512,
+          "tileHeight": 512,
+          "compression": 5,
+          "predictor": 1,
+          "sampleFormat": {
+            "0": 3
+          },
+          "bitsPerSample": {
+            "0": 32
+          },
+          "nodata": -32767,
+          "origin": [
+            -2000000,
+            500000,
+            0
+          ],
+          "resolution": [
+            1,
+            -1,
+            0
+          ],
+          "imageCount": 11
+        },
+        "open": {
+          "ms": 184,
+          "requests": 2,
+          "bytes": 5072,
+          "ranges": [
+            "bytes=0-1023 → 206 1024B",
+            "bytes=200-4247 → 206 4048B"
+          ]
+        },
+        "centre3x3": {
+          "values": [
+            38.51,
+            38.5,
+            38.5,
+            38.54,
+            38.52,
+            38.51,
+            38.72,
+            38.6,
+            38.54
+          ],
+          "ms": 319,
+          "requests": 3,
+          "bytes": 1094873
+        },
+        "window": {
+          "size": "441×441",
+          "ms": 727,
+          "requests": 10,
+          "bytes": 4255892,
+          "stats": {
+            "valid": 194481,
+            "nodata": 0,
+            "min": 16.77,
+            "max": 50.22,
+            "mean": 37.09
+          }
+        },
+        "warm": {
+          "ms": 177,
+          "requests": 4,
+          "bytes": 4255856
+        }
+      },
+      "dsmMinusDtmAtPoint": 0.06
+    }
+  },
+  "WCS final URL GetCoverage 64 m (CORS)": {
+    "ok": true,
+    "detail": {
+      "ms": 632,
+      "status": 200,
+      "size": "64×64",
+      "resolution": [
+        1,
+        -1,
+        0
+      ],
+      "first": 50.25
+    }
+  },
+  "WCS spec URL (308 redirect) GetCapabilities": {
+    "ok": false,
+    "detail": {
+      "ms": 69,
+      "error": "TypeError: Failed to fetch"
+    }
+  },
+  "consoleErrors": [
+    "Access to fetch at 'https://openmaps.gov.bc.ca/geo/pub/wfs?service=WFS&version=2.0.0&request=GetFeature&typeNames=WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW&outputFormat=application%2Fjson&srsName=EPSG:4326&count=5&propertyName=PARCEL_NAME,PARCEL_CLASS,REGIONAL_DISTRICT,SHAPE&CQL_FILTER=INTERSECTS(SHAPE%2CSRID%3D4326%3BPOINT(-123.1139388%2049.261317))' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+    "Failed to load resource: net::ERR_FAILED",
+    "Access to fetch at 'https://datacube.services.geo.ca/ows/elevation?service=WCS&request=GetCapabilities' from origin 'http://localhost:5199' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+    "Failed to load resource: net::ERR_FAILED"
+  ]
+}

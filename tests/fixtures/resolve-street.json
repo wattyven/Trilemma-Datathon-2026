@@ -1,0 +1,62 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.1589045,
+          49.2611072
+        ]
+      },
+      "properties": {
+        "fullAddress": "W 12th Ave, Vancouver, BC",
+        "score": 77,
+        "matchPrecision": "STREET",
+        "precisionPoints": 78,
+        "faults": [
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": "",
+        "civicNumberSuffix": "",
+        "streetName": "12th",
+        "streetType": "Ave",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "W",
+        "isStreetDirectionPrefix": "true",
+        "streetQualifier": "",
+        "localityName": "Vancouver",
+        "streetAddress": "W 12th Ave",
+        "localityType": "City",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "coarse",
+        "locationDescriptor": "streetPoint",
+        "siteID": "",
+        "blockID": "",
+        "fullSiteDescriptor": "",
+        "accessNotes": "",
+        "siteStatus": "",
+        "siteRetireDate": "",
+        "changeDate": "",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

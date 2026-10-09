@@ -1,0 +1,75 @@
+=== geocoder addresses.json
+  GET  HTTP/1.1 200 
+  GET  x-ratelimit-limit-minute: 3000
+  GET  ratelimit-limit: 3000
+  GET  access-control-allow-origin: https://wattyven.github.io
+  GET  access-control-allow-credentials: true
+  GET  access-control-expose-headers: Origin,Authorization,Access-Control-Allow-Origin,Access-Control-Allow-Methods,apikey
+  OPT  HTTP/1.1 200 OK
+  OPT  access-control-allow-origin: https://wattyven.github.io
+  OPT  access-control-allow-credentials: true
+  OPT  access-control-allow-headers: Origin,Authorization,Access-Control-Allow-Origin,Access-Control-Allow-Methods,apikey
+  OPT  access-control-allow-methods: HEAD,PUT,POST,GET
+=== WFS GetFeature json
+  GET  HTTP/1.1 200 OK
+  GET  x-ratelimit-limit-second: 60000
+  GET  ratelimit-limit: 60000
+  GET  access-control-allow-credentials: true
+  OPT  HTTP/1.1 200 OK
+  OPT  access-control-allow-credentials: true
+  OPT  access-control-allow-headers: X-Requested-With,Referer,Origin,Content-Type,SOAPAction,Authorization,Accept
+  OPT  access-control-allow-methods: GET,POST,OPTIONS,HEAD
+  OPT  access-control-max-age: 1000
+=== WFS GetFeature json +Referer (as browsers send)
+  GET  HTTP/1.1 200 OK
+  GET  ratelimit-limit: 60000
+  GET  x-ratelimit-limit-second: 60000
+  GET  access-control-allow-origin: https://wattyven.github.io
+  GET  access-control-allow-credentials: true
+  OPT  HTTP/1.1 200 OK
+  OPT  access-control-allow-credentials: true
+  OPT  access-control-allow-headers: X-Requested-With,Referer,Origin,Content-Type,SOAPAction,Authorization,Accept
+  OPT  access-control-allow-methods: GET,POST,OPTIONS,HEAD
+  OPT  access-control-max-age: 1000
+=== WFS GetFeature jsonp
+  GET  HTTP/1.1 200 OK
+  GET  x-ratelimit-limit-second: 60000
+  GET  ratelimit-limit: 60000
+  GET  access-control-allow-credentials: true
+  OPT  HTTP/1.1 200 OK
+  OPT  access-control-allow-credentials: true
+  OPT  access-control-allow-headers: X-Requested-With,Referer,Origin,Content-Type,SOAPAction,Authorization,Accept
+  OPT  access-control-allow-methods: GET,POST,OPTIONS,HEAD
+  OPT  access-control-max-age: 1000
+=== STAC search
+  GET  HTTP/2 200 
+  GET  access-control-allow-origin: *
+  OPT  HTTP/2 403 
+=== COG (S3) range
+  GET  HTTP/1.1 206 Partial Content
+  GET  Access-Control-Allow-Origin: *
+  GET  Access-Control-Allow-Methods: HEAD, GET
+  GET  Access-Control-Expose-Headers: ETag, x-amz-meta-custom-header
+  GET  Access-Control-Max-Age: 3000
+  GET  Accept-Ranges: bytes
+  GET  Content-Range: bytes 0-1023/133335592634
+  OPT  HTTP/1.1 200 OK
+  OPT  Access-Control-Allow-Origin: *
+  OPT  Access-Control-Allow-Methods: HEAD, GET
+  OPT  Access-Control-Allow-Headers: range
+  OPT  Access-Control-Expose-Headers: ETag, x-amz-meta-custom-header
+  OPT  Access-Control-Max-Age: 3000
+=== WCS documented URL (redirects)
+  GET  HTTP/2 308 
+  GET  location: https://datacube.services.geo.ca/wrapper/ogc/elevation-hrdem-mosaic?service=WCS&request=GetCapabilities
+  OPT  HTTP/2 308 
+=== WCS final URL
+  GET  HTTP/2 200 
+  GET  access-control-allow-origin: https://wattyven.github.io
+  GET  access-control-allow-credentials: true
+  OPT  HTTP/2 200 
+  OPT  access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+  OPT  access-control-max-age: 600
+  OPT  access-control-allow-credentials: true
+  OPT  access-control-allow-origin: https://wattyven.github.io
+  OPT  access-control-allow-headers: range

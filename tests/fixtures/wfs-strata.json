@@ -1,0 +1,665 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_688c",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744522,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585123
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_688d",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744516,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585117
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_688e",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744507,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585108
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_688f",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744504,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585105
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6890",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744508,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585109
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6891",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744496,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585097
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6892",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744501,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2023-09-15Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585102
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6893",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744520,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585121
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6894",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744519,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2019-01-12Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585120
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-509cbb71_1a11e9d979a_6895",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.0164475,
+              49.20302628
+            ],
+            [
+              -123.0173609,
+              49.20315539
+            ],
+            [
+              -123.01736362,
+              49.20169398
+            ],
+            [
+              -123.01736396,
+              49.20151325
+            ],
+            [
+              -123.01771492,
+              49.20128377
+            ],
+            [
+              -123.01624402,
+              49.20095768
+            ],
+            [
+              -123.01624069,
+              49.20122643
+            ],
+            [
+              -123.01623429,
+              49.20174439
+            ],
+            [
+              -123.01646128,
+              49.20174436
+            ],
+            [
+              -123.0164475,
+              49.20302628
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 2744521,
+        "PLAN_NUMBER": "NWS3458",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Building Strata",
+        "OWNER_TYPE": "Private",
+        "MUNICIPALITY": "Burnaby, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2023-09-15Z",
+        "FEATURE_AREA_SQM": 16392.5604,
+        "OBJECTID": 280585122
+      }
+    }
+  ],
+  "totalFeatures": 30,
+  "numberMatched": 30,
+  "numberReturned": 10,
+  "timeStamp": "2026-10-09T03:33:56.648Z",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  }
+}

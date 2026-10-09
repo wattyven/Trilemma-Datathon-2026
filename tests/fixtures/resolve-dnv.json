@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.0780745,
+          49.3360657
+        ]
+      },
+      "properties": {
+        "fullAddress": "355 W Queens Rd, District of North Vancouver, BC",
+        "score": 98,
+        "matchPrecision": "CIVIC_NUMBER",
+        "precisionPoints": 100,
+        "faults": [
+          {
+            "value": "N VANCOUVER",
+            "element": "LOCALITY",
+            "fault": "isAlias",
+            "penalty": 1
+          },
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "siteName": "",
+        "unitDesignator": "",
+        "unitNumber": "",
+        "unitNumberSuffix": "",
+        "civicNumber": 355,
+        "civicNumberSuffix": "",
+        "streetName": "Queens",
+        "streetType": "Rd",
+        "isStreetTypePrefix": "false",
+        "streetDirection": "W",
+        "isStreetDirectionPrefix": "true",
+        "streetQualifier": "",
+        "localityName": "District of North Vancouver",
+        "streetAddress": "355 W Queens Rd",
+        "localityType": "District Municipality",
+        "electoralArea": "",
+        "provinceCode": "BC",
+        "locationPositionalAccuracy": "high",
+        "locationDescriptor": "parcelPoint",
+        "siteID": "f44da78f-7437-4d0c-bf2c-7492f1c55e08",
+        "blockID": 166190,
+        "fullSiteDescriptor": "",
+        "accessNotes": "\"",
+        "siteStatus": "active",
+        "siteRetireDate": "9999-12-31",
+        "changeDate": "2026-07-07",
+        "isOfficial": "true"
+      }
+    }
+  ]
+}

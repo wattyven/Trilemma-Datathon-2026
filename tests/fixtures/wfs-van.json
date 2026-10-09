@@ -1,0 +1,80 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "WHSE_CADASTRE.PMBC_PARCEL_FABRIC_POLY_SVW.fid-35b26df0_1a117e2fb9d_5bab",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -123.11313797,
+              49.26051237
+            ],
+            [
+              -123.11307735,
+              49.26213306
+            ],
+            [
+              -123.11471443,
+              49.26215938
+            ],
+            [
+              -123.11474961,
+              49.26176335
+            ],
+            [
+              -123.11477716,
+              49.26102038
+            ],
+            [
+              -123.1147955,
+              49.26052602
+            ],
+            [
+              -123.11475558,
+              49.26049818
+            ],
+            [
+              -123.11356946,
+              49.26047902
+            ],
+            [
+              -123.11320798,
+              49.26047318
+            ],
+            [
+              -123.11313797,
+              49.26051237
+            ]
+          ]
+        ]
+      },
+      "geometry_name": "SHAPE",
+      "properties": {
+        "PARCEL_FABRIC_POLY_ID": 1675517,
+        "PLAN_NUMBER": "VAP1530",
+        "PID_FORMATTED": null,
+        "PARCEL_STATUS": "Active",
+        "PARCEL_CLASS": "Subdivision",
+        "OWNER_TYPE": "Local Government",
+        "MUNICIPALITY": "Vancouver, City of",
+        "REGIONAL_DISTRICT": "Metro Vancouver Regional District",
+        "WHEN_UPDATED": "2025-08-12Z",
+        "FEATURE_AREA_SQM": 22247.9487,
+        "OBJECTID": 279953156
+      }
+    }
+  ],
+  "totalFeatures": 1,
+  "numberMatched": 1,
+  "numberReturned": 1,
+  "timeStamp": "2026-10-07T20:12:02.064Z",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::4326"
+    }
+  }
+}

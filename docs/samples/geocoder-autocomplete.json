@@ -1,0 +1,76 @@
+{
+  "type": "FeatureCollection",
+  "queryAddress": "453 W 12",
+  "searchTimestamp": "2026-10-07T12:44:06",
+  "executionTime": 11.41,
+  "version": "4.5.4",
+  "baseDataDate": "2026-07-07T20:10:43Z",
+  "crs": {
+    "type": "EPSG",
+    "properties": {
+      "code": 4326
+    }
+  },
+  "interpolation": "adaptive",
+  "echo": "true",
+  "locationDescriptor": "parcelPoint",
+  "setBack": 0,
+  "minScore": 0,
+  "maxResults": 5,
+  "disclaimer": "https://www2.gov.bc.ca/gov/content?id=79F93E018712422FBC8E674A67A70535",
+  "privacyStatement": "https://www2.gov.bc.ca/gov/content?id=9E890E16955E4FF4BF3B0E07B4722932",
+  "copyrightNotice": "Copyright © 2024 Province of British Columbia",
+  "copyrightLicense": "https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "crs": {
+          "type": "EPSG",
+          "properties": {
+            "code": 4326
+          }
+        },
+        "coordinates": [
+          -123.1139388,
+          49.261317
+        ]
+      },
+      "properties": {
+        "fullAddress": "453 W 12th Ave, Vancouver, BC",
+        "score": 83,
+        "matchPrecision": "CIVIC_NUMBER",
+        "precisionPoints": 100,
+        "faults": [
+          {
+            "value": "",
+            "element": "LOCALITY",
+            "fault": "missing",
+            "penalty": 10
+          },
+          {
+            "value": "",
+            "element": "STREET_TYPE",
+            "fault": "missing",
+            "penalty": 6
+          },
+          {
+            "value": "",
+            "element": "PROVINCE",
+            "fault": "missing",
+            "penalty": 1
+          }
+        ],
+        "localityType": "City",
+        "electoralArea": "",
+        "locationPositionalAccuracy": "high",
+        "locationDescriptor": "parcelPoint",
+        "siteID": "5cd8f57c-4146-477c-af7c-d210cd855c96",
+        "blockID": 2718750,
+        "accessNotes": "\"",
+        "siteStatus": "active"
+      }
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+{
+  "numberMatched": 3,
+  "features": [
+    {
+      "id": "BC-Vancouver_Island_Sunshine_Coast_2018-1m",
+      "properties": {
+        "created": "2024-01-16T14:29:37Z",
+        "updated": "2026-01-21T15:35:25.033239Z",
+        "datetime": "2019-10-01T12:00:00Z",
+        "proj:epsg": 3979,
+        "collection": "hrdem-lidar",
+        "proj:shape": [
+          430547,
+          300978
+        ],
+        "proj:geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -1948138,
+                377288
+              ],
+              [
+                -1948138,
+                807835
+              ],
+              [
+                -2249116,
+                807835
+              ],
+              [
+                -2249116,
+                377288
+              ],
+              [
+                -1948138,
+                377288
+              ]
+            ]
+          ]
+        },
+        "proj:transform": [
+          -2249116,
+          1,
+          0,
+          807835,
+          0,
+          -1
+        ]
+      },
+      "assets": [
+        "dsm",
+        "dtm",
+        "extent",
+        "dsm-vrt",
+        "dtm-vrt",
+        "coverage",
+        "thumbnail"
+      ]
+    },
+    {
+      "id": "BC-Lower_Mainland_2016-1m",
+      "properties": {
+        "created": "2024-01-16T14:29:33Z",
+        "updated": "2026-01-21T02:46:45.607712Z",
+        "datetime": "2016-09-12T12:00:00Z",
+        "proj:epsg": 3979,
+        "collection": "hrdem-lidar",
+        "proj:shape": [
+          101050,
+          161217
+        ],
+        "proj:geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -1843342,
+                402958
+              ],
+              [
+                -1843342,
+                504008
+              ],
+              [
+                -2004559,
+                504008
+              ],
+              [
+                -2004559,
+                402958
+              ],
+              [
+                -1843342,
+                402958
+              ]
+            ]
+          ]
+        },
+        "proj:transform": [
+          -2004559,
+          1,
+          0,
+          504008,
+          0,
+          -1
+        ]
+      },
+      "assets": [
+        "dsm",
+        "dtm",
+        "extent",
+        "dsm-vrt",
+        "dtm-vrt",
+        "coverage",
+        "thumbnail"
+      ]
+    },
+    {
+      "id": "VILLE_VANCOUVER-VILLE_VANCOUVER-1m",
+      "properties": {
+        "created": "2024-01-16T14:29:10Z",
+        "updated": "2026-01-21T03:01:11.528772Z",
+        "datetime": "2013-02-19T12:00:00Z",
+        "proj:epsg": 3979,
+        "collection": "hrdem-lidar",
+        "proj:shape": [
+          35645,
+          30868
+        ],
+        "proj:geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [
+              [
+                -1965153,
+                455067
+              ],
+              [
+                -1965153,
+                490712
+              ],
+              [
+                -1996021,
+                490712
+              ],
+              [
+                -1996021,
+                455067
+              ],
+              [
+                -1965153,
+                455067
+              ]
+            ]
+          ]
+        },
+        "proj:transform": [
+          -1996021,
+          1,
+          0,
+          490712,
+          0,
+          -1
+        ]
+      },
+      "assets": [
+        "dsm",
+        "dtm",
+        "extent",
+        "dsm-vrt",
+        "dtm-vrt",
+        "coverage",
+        "thumbnail"
+      ]
+    }
+  ]
+}
