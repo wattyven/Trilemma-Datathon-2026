@@ -39,6 +39,7 @@ const lotEls: LotViewElements = {
   options: byId('lot-options'),
 };
 const analysisEls: AnalysisElements = {
+  headline: byId('result-headline'),
   legend: byId('legend'),
   readout: byId('readout'),
   summary: byId('result-summary'),

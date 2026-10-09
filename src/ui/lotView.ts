@@ -56,6 +56,11 @@ export function setFact(els: LotViewElements, key: string, label: string, value:
   dd.textContent = value;
 }
 
+/** Text with `**emphasis**` markers, rendered as <strong> (never as HTML). */
+export function setRichText(el: HTMLElement, text: string) {
+  el.replaceChildren(...text.split('**').map((part, i) => (i % 2 ? Object.assign(document.createElement('strong'), { textContent: part }) : document.createTextNode(part))));
+}
+
 /** Notices that come from the elevation analysis rather than the parcel. */
 export function setAnalysisNotices(els: LotViewElements, texts: string[]) {
   els.notices.querySelectorAll('li[data-notice="analysis"]').forEach((li) => li.remove());

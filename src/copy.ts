@@ -1,9 +1,28 @@
 // Every user-facing string. Written for a gardener, not a GIS analyst.
 import type { ParcelNotice } from './data/parcels';
+import type { Side } from './engine/lotSummary';
 
 const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 const fmtH = (h: number) => (Number.isInteger(h) ? String(h) : h.toFixed(1));
 const compass = (azDeg: number) => COMPASS[Math.round((((azDeg % 360) + 360) % 360) / 45) % 8]!;
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "2026-10-08" → "8 October". */
+export const fmtDate = (iso: string) => {
+  const [, m, d] = iso.split('-').map(Number);
+  return m && d ? `${d} ${MONTHS[m - 1]}` : iso;
+};
+/** "16:40" → "4:40 pm". */
+export const fmtTime = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (h === undefined || m === undefined) return hhmm;
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+};
+/** Hours to the nearest half hour, as a phrase: "about 6 hours", "3–5 hours". */
+const half = (h: number) => Math.round(h * 2) / 2;
+const hoursRange = (low: number, high: number) => {
+  const lo = half(low), hi = half(high);
+  return hi - lo < 0.75 ? `about ${fmtH(half((low + high) / 2))} hours` : `${fmtH(lo)}–${fmtH(hi)} hours`;
+};
 
 export const copy = {
   steps: {
@@ -102,14 +121,49 @@ export const copy = {
     height: (z: number) => `observer at ${z.toFixed(1)} m`,
     hint: 'Hover over the lot for details; click a spot for its month-by-month sun.',
   },
+  // A second, quieter line under the headline: what the numbers compare with.
   summary: {
-    season: (days: number, meanH: number) =>
-      `Averaged over ${days} sample days. Open, flat ground here would get ${meanH.toFixed(1)} h of sun a day.`,
-    day: (daylightH: number) => `${daylightH.toFixed(1)} h between sunrise and sunset.`,
+    season: (_days: number, meanH: number) => `For comparison, open ground with nothing around it would get ${meanH.toFixed(1)} hours of sun a day.`,
+    day: (daylightH: number) => `There are ${daylightH.toFixed(1)} hours between sunrise and sunset that day.`,
     moment: (alt: number, az: number) =>
       alt <= 0 ? 'The sun is below the horizon.' : `The sun is ${Math.round(alt)}° above the horizon, in the ${compass(az)}.`,
-    shade: (sunUpPct: number, days: number) => `Over ${days} sample days, the sun is up for ${Math.round(sunUpPct)}% of this time window.`,
+    shade: (sunUpPct: number, _days: number) => `The sun is up for ${Math.round(sunUpPct)}% of this time window.`,
     recalculating: 'Recalculating…',
+  },
+  /** The plain-language headline (`**…**` marks the words to emphasise). */
+  headline: {
+    classNames: ['shade', 'part sun', 'full sun'] as const,
+    periods: {
+      growing: 'from April to September',
+      summer: 'from June to August',
+      winter: 'from December to February',
+      year: 'over the whole year',
+    } as Record<string, string>,
+    customPeriod: (start: string, end: string) => `from ${fmtDate(start)} to ${fmtDate(end)}`,
+    // On roofs and decks (the "Rooftop or deck surface" height), the subject isn't open ground.
+    season: (low: number, high: number, cls: string, period: string, onSurface = false) =>
+      `${onSurface ? 'Most surfaces on this lot (roofs, decks and ground) get' : 'Most of the open ground here gets'} **${hoursRange(low, high)} of direct sun a day** (${cls}) ${period}.`,
+    day: (low: number, high: number, cls: string, date: string, onSurface = false) =>
+      `${onSurface ? 'Most surfaces on this lot (roofs, decks and ground) get' : 'Most of the open ground here gets'} **${hoursRange(low, high)} of direct sun** on ${fmtDate(date)} (${cls}).`,
+    sides: (sunny: Side, sunnyH: number, shady: Side) => {
+      if (sunny === 'spread' && shady === 'spread') return 'Sun is fairly even across the lot.';
+      if (sunny === 'spread') return `The **${shady}** side is shadiest.`;
+      const first = `The sunniest part is toward the **${sunny}** (about ${fmtH(half(sunnyH))} h)`;
+      return shady !== 'spread' && shady !== sunny ? `${first}; the **${shady}** side is shadiest.` : `${first}.`;
+    },
+    covered: (share: number) => `About ${Math.round(100 * share)}% of the lot is under a roof or trees and isn't counted.`,
+    moment: (share: number, time: string, date: string, onSurface = false) =>
+      `At ${fmtTime(time)} on ${fmtDate(date)}, **${Math.round(100 * share)}% of ${onSurface ? "the lot's surfaces" : 'the open ground'}** is in direct sun.`,
+    momentSide: (side: Side) => `The sunny part is toward the **${side}**.`,
+    momentNight: (time: string, date: string) => `At ${fmtTime(time)} on ${fmtDate(date)}, the sun is down.`,
+    shade: (side: Side, pct: number, from: string, to: string, start: string, end: string) => {
+      const when = `Between ${fmtTime(from)} and ${fmtTime(to)}, ${fmtDate(start)} to ${fmtDate(end)}`;
+      return side === 'spread'
+        ? `${when}, shade is fairly even across the lot: about **${Math.round(pct)}% of the time**.`
+        : `${when}, the shadiest part is toward the **${side}**, in shade about **${Math.round(pct)}% of the time**.`;
+    },
+    shadeNoSun: "The sun is down for this whole time window, so there's no direct sun to block.",
+    mostlyCovered: 'Almost all of this lot is under a roof or trees. To see the sun on a roof or deck, choose "Rooftop or deck surface" under Measure at.',
   },
   inspector: {
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,

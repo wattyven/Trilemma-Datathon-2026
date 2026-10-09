@@ -189,7 +189,10 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .controls input[type='number'] { width: 6em; }
 .controls input[type='radio'], .controls input[type='checkbox'] { padding: 0; accent-color: var(--moss); }
 .hint { margin: 4px 0 0; font-size: 0.8rem; color: var(--muted); }
-.summary { font-size: 0.9rem; }
+.summary { font-size: 0.85rem; color: var(--muted); }
+.headline { margin: 4px 0 12px; font-size: 1.02rem; line-height: 1.45; }
+.headline:empty { display: none; }
+.headline strong { font-weight: 650; }
 .debug { margin-top: 14px; font-size: 0.85rem; color: var(--muted); }
 .debug summary { cursor: pointer; }
 .debug .check { margin: 8px 0; }
@@ -203,13 +206,13 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
   .lot { grid-template-columns: 1fr; gap: 12px; }
   .view-stage { height: 55vh; min-height: 300px; }
   .search-row { flex-direction: column; }
-  main { padding-bottom: 11rem; } /* room for the collapsed sheet */
+  main { padding-bottom: 12.5rem; } /* room for the collapsed sheet */
 
   /* The info column becomes a bottom sheet. */
   .lot-info {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
     display: flex; flex-direction: column;
-    max-height: 9.5rem; overflow: hidden;
+    max-height: 11rem; overflow: hidden;
     padding: 0 16px 16px; background: var(--panel);
     border-top: 1px solid var(--mist); border-radius: 14px 14px 0 0;
     box-shadow: 0 -8px 24px rgba(30, 43, 37, 0.12);
@@ -218,7 +221,8 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
   .lot-info > * { order: 3; }
   .lot-info > .sheet-handle { order: 0; }
   .lot-info > h2 { order: 1; margin: 2px 0 4px; font-size: 1.05rem; }
-  .lot-info > .summary { order: 2; margin: 0 0 8px; }
+  .lot-info > .headline { order: 2; margin: 0 0 8px; }
+  .lot-info[data-sheet='collapsed'] > .headline { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .sheet-handle {
     display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%;
     padding: 8px 0 6px; border: 0; background: none; color: var(--muted); font-size: 0.8rem;

@@ -15,6 +15,7 @@ import { vintageFor, type Vintage } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
 import { daySamples, momentSample, type SunSample } from './engine/sun';
+import { MOSTLY_COVERED, summarizeLot } from './engine/lotSummary';
 import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
@@ -24,11 +25,12 @@ import { CEDAR_RGB, CLASS_RGB, SHADE_RGB, SUN_RGB, cividisGradient, css } from '
 import { requestFor, type ChangeKind, type ControlState, type Controls } from './ui/controls';
 import { renderInspector } from './ui/inspector';
 import { HOURS_SCALE_MAX, type Layer, type LotCanvas } from './ui/lotCanvas';
-import { setAnalysisNotices, setFact, type LotViewElements } from './ui/lotView';
+import { setAnalysisNotices, setFact, setRichText, type LotViewElements } from './ui/lotView';
 import type { Steps } from './ui/status';
 import { minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
 
 export interface AnalysisElements {
+  headline: HTMLElement;
   legend: HTMLElement;
   readout: HTMLElement;
   summary: HTMLElement;
@@ -90,6 +92,8 @@ export class Analysis {
   private inspectedCell: number | null = null;
   private threads = 1;
   private pickSeq = 0;
+  /** Each cell's position in local metres, for the headline (refreshed with the grid). */
+  private cellPositions: Position[] = [];
   /** The current lot (for restarting a refinement an observer change interrupted). */
   private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
   /** The sharper surface loading (or loaded) after the first result. */
@@ -343,6 +347,7 @@ export class Analysis {
     this.els.inspector.hidden = true;
     this.inspectedCell = null;
     this.els.summary.textContent = '';
+    this.els.headline.textContent = '';
     this.els.readout.textContent = '';
     this.els.legend.hidden = true;
     this.els.hud.hidden = true;
@@ -586,6 +591,8 @@ export class Analysis {
   private adopt(loaded: LoadedMessage, fresh: boolean) {
     this.loaded = loaded;
     const s = loaded.summary;
+    const toLocal = gridToLocalAffine(s.window, this.map.frame);
+    this.cellPositions = Array.from(loaded.px, (px, i) => applyAffine(toLocal, [px, loaded.py[i]!]));
     this.timings = { ...this.timings, elevationMs: s.timings.elevationMs, horizonMs: s.timings.horizonMs };
     this.threads = s.timings.threads;
     if (fresh) {
@@ -756,6 +763,42 @@ export class Analysis {
       : r.kind === 'moment' ? t.moment(r.altDeg, r.azTrueDeg)
       : r.kind === 'shade' ? t.shade(r.windowHours ? (100 * r.sunUpHours) / r.windowHours : 0, r.days)
       : '';
+    setRichText(this.els.headline, this.headlineText());
+  }
+
+  /** "What this means": the result in a sentence or three (engine/lotSummary.ts, copy.headline). */
+  private headlineText(): string {
+    const r = this.result, l = this.loaded;
+    if (!r || !l || r.kind === 'inspect') return '';
+    const s = this.state(), h = copy.headline;
+    // Standing on roofs and decks, the covered cells are exactly what's being measured.
+    const onSurface = s.observer === 'surface';
+    const mode = r.kind;
+    const sum = summarizeLot({
+      mode,
+      values: r.values,
+      covered: onSurface ? new Uint8Array(l.covered.length) : l.covered,
+      positions: this.cellPositions,
+      thresholds: { fullSunH: s.fullSunH, partSunH: s.partSunH },
+    });
+    if (sum.coveredShare >= MOSTLY_COVERED) return h.mostlyCovered;
+    const parts: string[] = [];
+    if (mode === 'moment') {
+      if (r.altDeg <= 0) parts.push(h.momentNight(s.time, s.date));
+      else {
+        parts.push(h.moment(sum.sunShare, s.time, s.date, onSurface));
+        if (sum.sunniest) parts.push(h.momentSide(sum.sunniest.side));
+      }
+    } else if (mode === 'shade') {
+      parts.push(sum.shadiest ? h.shade(sum.shadiest.side, sum.shadiest.value, s.fromTime, s.toTime, s.shadeStart, s.shadeEnd) : h.shadeNoSun);
+    } else if (sum.sunniest && sum.shadiest) {
+      const cls = h.classNames[sum.medianClass];
+      const period = s.preset === 'custom' ? h.customPeriod(s.start, s.end) : (h.periods[s.preset] ?? '');
+      parts.push(mode === 'day' ? h.day(sum.low, sum.high, cls, s.date, onSurface) : h.season(sum.low, sum.high, cls, period, onSurface));
+      parts.push(h.sides(sum.sunniest.side, sum.sunniest.value, sum.shadiest.side));
+    }
+    if (!onSurface && sum.coveredShare >= 0.05 && parts.length) parts.push(h.covered(sum.coveredShare));
+    return parts.join(' ');
   }
 
   private valueText(cell: number): string {

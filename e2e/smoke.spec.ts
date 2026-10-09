@@ -14,6 +14,8 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
   await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
+  // The result in plain words, first thing in the panel.
+  await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
   await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
@@ -73,6 +75,8 @@ test('mobile: the panel is a bottom sheet @mobile', async ({ page }) => {
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');
   await expect(page.locator(RESULT)).toBeVisible();
+  // The collapsed sheet leads with the plain-language result.
+  await expect(page.locator('#result-headline')).toBeInViewport();
   const handle = page.locator('#sheet-handle');
   await expect(handle).toBeVisible();
   await expect(handle).toHaveAttribute('aria-expanded', 'false');
