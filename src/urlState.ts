@@ -27,8 +27,7 @@ export interface UrlState {
   shadeEnd?: string;
   fromTime?: string;
   toTime?: string;
-  /** Aerial photo on, and the results' opacity over it (0.2–1). */
-  photo?: boolean;
+  /** The results' opacity over the aerial photo (0.2–1). The photo itself is always on (old `img=` links are ignored). */
   opacity?: number;
   /** Which elevation surface to use (default "best of both"). */
   source?: Source;
@@ -65,7 +64,6 @@ const KEYS: Record<keyof UrlState, string> = {
   shadeEnd: 'se',
   fromTime: 'wf',
   toTime: 'wt',
-  photo: 'img',
   opacity: 'op',
   source: 'elev',
   changes: 'chg',
@@ -129,8 +127,6 @@ export function decodeHash(hash: string): UrlState {
   if (get('embed') === '1') out.embed = true;
   const adv = get('advanced');
   if (adv === '1' || adv === '0') out.advanced = adv === '1';
-  const img = get('photo');
-  if (img === '1' || img === '0') out.photo = img === '1';
   const op = get('opacity');
   const opacity = op === null || op === '' ? NaN : Number(op);
   if (Number.isFinite(opacity) && opacity >= 0.2 && opacity <= 1) out.opacity = Math.round(opacity * 100) / 100;

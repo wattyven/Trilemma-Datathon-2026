@@ -75,7 +75,7 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
   - It swaps the new surface in with `swapIn()`, which keeps the camera, remaps the inspected cell and retires results computed on the old grid. Anything that depends on the grid (photo UVs, cell indices, the change overlay) must be redone after a swap.
   - Switching surfaces reuses the worker's downloads (`elevation/cache.ts`, an LRU that hands out copies because builders write into their arrays).
   - A grid's metres per pixel is `window.res`. Never assume 1 m (mesh steps, camera distance, cursor, hillshade slopes all scale with it).
-- Aerial photos are on by default (`img=0` turns them off) and fetched once a lot's first result is up; results go see-through (`op=`) only over the photo.
+- Aerial photos are always on, in Basic and Advanced, wherever the municipality publishes them: there's no setting, and old links' `img=` is ignored. They're fetched once a lot's first result is up. Results go see-through (`op=`, the Advanced "Colour strength" slider) only while a photo is on screen; over the plain model they stay solid.
 - **First-time and non-technical users come first.**
   - The result panel opens with a plain-language headline (`Analysis.headlineText()`, `copy.headline`).
   - Technical facts (lot type, plan, LiDAR rows) live in the "Lot and data details" disclosure (`setFact(..., more = true)`); the surface choice sits under "More options".

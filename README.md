@@ -91,7 +91,7 @@ how VanShade follows it:
 - **Analysis:** a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each part), then
   your own questions, such as "Where should I plant vegetables?". It answers from the numbers VanShade shows for the lot.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
-  North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), the photo sits under the results.
+  North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), the photo always sits under the results.
 - **Copy link:** the address, lot, dates and settings are in the URL (`adv=1` for Advanced mode). Shared links show a
   preview card in chat apps and social media.
 - **Copy embed code:** an `<iframe>` for the current lot, for a blog or a garden club page, with a link to the full site.

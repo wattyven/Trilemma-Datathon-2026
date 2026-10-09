@@ -53,7 +53,6 @@ export interface AnalysisElements {
   resetView: HTMLButtonElement;
   caveatLidar: HTMLElement;
   aboutLidar: HTMLElement;
-  photoToggle: HTMLInputElement;
   opacityInput: HTMLInputElement;
   opacityWrap: HTMLElement;
   photoCredit: HTMLElement;
@@ -133,15 +132,12 @@ export class Analysis {
   private baseVintage: Vintage | null = null;
   private changesOn = false;
   private jurisdiction = '';
-  /** On by default; `photoChosen` says whether the visitor (or their link) asked for it. */
-  private photoOn = true;
-  private photoChosen = false;
   private opacity: number = IMAGERY.defaultOpacity;
   private photo: Photo | null = null;
   private photoSeq = 0;
   /** Called when the user switches between 3D and map (for the shareable URL). */
   onViewChange: (v: View) => void = () => {};
-  /** Called when the aerial photo or its opacity changes (for the shareable URL). */
+  /** Called when the results' opacity over the aerial photo changes (for the shareable URL). */
   onPhotoChange: () => void = () => {};
   /** Called when the elevation choice or the change overlay changes (for the shareable URL). */
   onSourceChange: () => void = () => {};
@@ -166,12 +162,7 @@ export class Analysis {
     els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(!this.basic && els.shadowsToggle.checked));
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
     els.resetView.addEventListener('click', () => this.scene?.resetView());
-    els.photoToggle.addEventListener('change', () => {
-      this.setPhotoEnabled(els.photoToggle.checked);
-      this.onPhotoChange();
-    });
-    els.photoToggle.checked = this.photoOn;
-    els.opacityWrap.hidden = !this.photoOn;
+    els.opacityWrap.hidden = true; // until a photo is on screen
     els.opacityInput.addEventListener('input', () => {
       this.setResultsOpacity(Number(els.opacityInput.value));
       this.onPhotoChange();
@@ -281,22 +272,8 @@ export class Analysis {
     if (this.result) this.renderLegend(this.layer());
   }
 
-  get photoEnabled(): boolean {
-    return this.photoOn;
-  }
-
   get resultsOpacity(): number {
     return this.opacity;
-  }
-
-  /** Aerial photo under the results, in both views (also restores a shared link). */
-  setPhotoEnabled(on: boolean, chosen = true) {
-    this.photoOn = on;
-    this.photoChosen = chosen;
-    this.els.photoToggle.checked = on;
-    this.els.opacityWrap.hidden = !on;
-    this.applyOpacity();
-    void this.updatePhoto();
   }
 
   setResultsOpacity(opacity: number) {
@@ -307,7 +284,7 @@ export class Analysis {
 
   /** Results are see-through only over the photo; on the plain model they stay solid. */
   private applyOpacity() {
-    const op = this.photoOn ? this.opacity : 1;
+    const op = this.photo ? this.opacity : 1;
     this.scene?.setResultsOpacity(op);
     this.map.setLayerOpacity(op);
   }
@@ -316,13 +293,15 @@ export class Analysis {
     this.photo = null;
     this.scene?.setPhoto(null);
     this.map.setPhoto(null);
+    this.els.opacityWrap.hidden = true;
+    this.applyOpacity();
   }
 
   private async updatePhoto() {
     const seq = ++this.photoSeq;
     const credit = this.els.photoCredit;
     const lot = this.lot;
-    if (!this.photoOn || !this.loaded || !lot) {
+    if (!this.loaded || !lot) {
       this.clearPhoto();
       credit.hidden = true;
       return;
@@ -331,7 +310,7 @@ export class Analysis {
     const source = imageryFor(this.jurisdiction);
     if (!source) {
       this.clearPhoto();
-      credit.textContent = this.photoChosen ? copy.imagery.gap(this.jurisdiction) : copy.imagery.gapQuiet(this.jurisdiction);
+      credit.textContent = copy.imagery.gap(this.jurisdiction);
       return;
     }
     credit.textContent = copy.imagery.loading;
@@ -360,6 +339,8 @@ export class Analysis {
     this.photo = photo;
     this.scene?.setPhoto({ image: photo.image, uv: gridToPhotoUv(l.summary.window, photo.box) });
     this.map.setPhoto({ image: photo.image, affine: photoToLocal(photo.box, photo.image.width, photo.image.height, this.map.frame) });
+    this.els.opacityWrap.hidden = false;
+    this.applyOpacity();
   }
 
   /** Run the whole pipeline for a lot already drawn on the map. */
@@ -1162,7 +1143,7 @@ export class Analysis {
       ['Cells', `${s.cells.toLocaleString('en-CA')} at ${s.cellSizeM} m${s.dropped ? ` (${s.dropped} nodata dropped)` : ''}`],
       ['Window', `${s.window.width * s.window.res} × ${s.window.height * s.window.res} m, ${(100 * s.bufferNodataFrac).toFixed(1)}% nodata`],
       ['LiDAR', this.vintageText || '…'],
-      ['Aerial photo', this.photo ? `${this.photo.source.id}, ${this.photo.image.width} × ${this.photo.image.height} px` : this.photoOn ? 'none' : 'off'],
+      ['Aerial photo', this.photo ? `${this.photo.source.id}, ${this.photo.image.width} × ${this.photo.image.height} px` : 'none'],
       ['3D', this.scene ? `WebGL${isLowPower() ? ', low-power settings' : ''}` : this.sceneUnavailable ? 'unavailable' : '…'],
       ['Timings', Object.entries(this.timings).map(([k, v]) => `${k.replace(/Ms$/, '')} ${v} ms`).join(', ') + (this.threads > 1 ? ` (horizon on ${this.threads} threads)` : '')],
     ];

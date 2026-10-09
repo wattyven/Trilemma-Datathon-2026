@@ -23,7 +23,6 @@ const full: UrlState = {
   shadeEnd: '2027-08-15',
   fromTime: '13:00',
   toTime: '18:30',
-  photo: true,
   opacity: 0.55,
   source: 'detailed',
   changes: true,
@@ -63,11 +62,14 @@ describe('URL hash state', () => {
     expect(decodeHash('#elev=everything&chg=maybe')).toEqual({});
   });
 
-  it('records turning off a default (the photo, the full / part sun / shade view, the pins)', () => {
-    expect(encodeHash({ photo: false, classes: false }, { photo: true, classes: true })).toBe('#cls=0&img=0');
-    expect(encodeHash({ spots: false }, { spots: true })).toBe('#spots=0');
+  it('records turning off a default (the full / part sun / shade view, the pins)', () => {
+    expect(encodeHash({ classes: false, spots: false }, { classes: true, spots: true })).toBe('#cls=0&spots=0');
     expect(decodeHash('#spots=maybe')).toEqual({});
-    expect(encodeHash({ photo: true, classes: true }, { photo: true, classes: true })).toBe('');
+    expect(encodeHash({ classes: true, spots: true }, { classes: true, spots: true })).toBe('');
+  });
+
+  it('ignores the old aerial photo setting: the photo is always on', () => {
+    expect(decodeHash('#a=453+W+12th+Ave&img=0')).toEqual({ address: '453 W 12th Ave' });
   });
 
   it('starts new visitors on the sun right now, with full / part sun / shade for days and seasons', () => {

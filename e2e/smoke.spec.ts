@@ -87,15 +87,13 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect.poll(() => page.url()).toMatch(/cs=2026-06-01&ce=2026-06-30/);
   expect(page.url()).not.toMatch(/[#&](adv|t|m)=/);
 
-  // The pins follow to the map; the aerial photo is on by default and its setting goes into the link.
+  // The pins follow to the map. The aerial photo is always on, with no setting and nothing in the link.
   await page.locator('input[name="view"][value="map"]').check({ force: true });
   await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(2);
   await page.locator('input[name="view"][value="3d"]').check({ force: true });
-  await expect(page.locator('#photo-toggle')).toBeChecked();
-  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
-  await page.locator('#photo-toggle').uncheck();
-  await expect.poll(() => page.url()).toMatch(/img=0/);
-  await page.locator('#photo-toggle').check();
+  await expect(page.locator('#photo-toggle')).toHaveCount(0);
+  await expect(page.locator('#photo-credit-item')).toContainText('City of Vancouver');
+  expect(page.url()).not.toMatch(/[#&]img=/);
 
   // A fresh page restores the lot and the dates in Basic.
   const shared = await context.newPage();

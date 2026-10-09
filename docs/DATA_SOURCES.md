@@ -480,7 +480,7 @@ the body isn't the requested size, it's fetched again with `cache: 'reload'`.
 
 ### 7.6 Aerial photos
 
-Optional (the "Aerial photo" toggle). They come from the municipalities' own orthophoto services. All 11 are keyless, send
+Always on where a municipality publishes them (there's no setting). They come from the municipalities' own orthophoto services. All 11 are keyless, send
 CORS headers (they echo the origin; Delta sends `*`) and answer Web Mercator requests. `spike/18-imagery-check.ts` re-checks
 them all.
 
@@ -499,14 +499,14 @@ them all.
 | White Rock | `maps.whiterockcity.ca/…/opendata/Ortho2025/ImageServer/exportImage` | 2025, 7.5 cm | The City's Open Data Policy 801 releases its open data under its Open Government Licence. The service sits in its `opendata` folder but has no licence text of its own. |
 
 - **Gaps:** Richmond, the City of North Vancouver, New Westminster, West Vancouver, Port Moody, Pitt Meadows, Bowen Island and
-  the villages. These say "No open aerial photo is published for …".
+  the villages. These say "No aerial photo is published for …; showing the 3D model."
 - **Excluded:**
   - Esri World Imagery: proprietary licence, and it needs a token for basemap use.
   - BC ImageX: Access Only, `ACAO: (null)`, and the imagery is from 1999–2009.
   - `maps.vancouver.ca`: CORS is limited to vanmap.
   - Metro Vancouver's regional 7.5 cm mosaic: MrSID downloads only.
 - **Request:** the lot box + 48 m, either as one export at about 0.15 m per pixel (capped at 2,048 px) or as 16–25 z19
-  tiles. Requests happen only while the photo is switched on.
+  tiles, once per lot after the first result.
 - **Placement:** in 3D the photo drapes over the high-detail terrain around the lot through a second set of texture
   coordinates, a grid → photo affine within 2 cm of proj4. On the map, it replaces the shaded relief.
 - **Lean:** these are orthophotos, not true orthos, so tall buildings lean a little in them.

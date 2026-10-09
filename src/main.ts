@@ -63,7 +63,6 @@ const analysisEls: AnalysisElements = {
   resetView: byId<HTMLButtonElement>('reset-view'),
   caveatLidar: byId('caveat-lidar'),
   aboutLidar: byId('about-lidar'),
-  photoToggle: byId<HTMLInputElement>('photo-toggle'),
   opacityInput: byId<HTMLInputElement>('results-opacity'),
   opacityWrap: byId('opacity-wrap'),
   photoCredit: byId('photo-credit'),
@@ -478,7 +477,6 @@ function urlDefaults(): UrlState {
     year: defaults.year,
     observer: defaults.observer,
     view: '3d',
-    photo: true,
     opacity: IMAGERY.defaultOpacity,
     source: 'best',
     changes: false,
@@ -510,7 +508,6 @@ function urlStateNow(): UrlState | null {
       start: c.preset === 'custom' ? c.start : undefined,
       end: c.preset === 'custom' ? c.end : undefined,
       view: analysis.currentView,
-      photo: analysis.photoEnabled,
       opacity: analysis.resultsOpacity,
       debug: debugOn,
       embed: embedOn,
@@ -528,7 +525,6 @@ function urlStateNow(): UrlState | null {
     time: minuteLabel(t.minute),
     observer: c.observer,
     view: analysis.currentView,
-    photo: analysis.photoEnabled,
     opacity: analysis.resultsOpacity,
     classes: c.classes,
     spots: c.spots,
@@ -587,7 +583,6 @@ async function applyUrl(hash: string): Promise<boolean> {
     analysis.chooseSource(s.source ?? 'best');
     analysis.setChangesEnabled(s.changes ?? false);
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
-    analysis.setPhotoEnabled(s.photo ?? true, s.photo !== undefined);
     setAdvanced(wantsAdvanced(s), false);
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
