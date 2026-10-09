@@ -103,10 +103,29 @@ describe('headline wording', async () => {
     expect(h.shade('middle', 82, '13:00', '18:00', '2026-06-01', '2026-08-31')).toContain('the shadiest part is near the **middle** of the lot, in shade');
   });
 
-  it('labels the pins in plain words, with the rest of the name for screen readers', () => {
-    expect(copy.spots.pin('sunniest', 'season', 7.3, '2026-10-08')).toEqual({ text: 'Sunniest · about 7.5 h', more: ' of direct sun a day: show its sun month by month' });
-    expect(copy.spots.pin('shadiest', 'day', 0.1, '2026-10-08')).toEqual({ text: 'Shadiest · under 0.5 h', more: ' of direct sun on 8 October: show its sun month by month' });
-    expect(copy.spots.pin('shadiest', 'shade', 84.6, '2026-10-08').text).toBe('Most shade · 85% of the time');
-    expect(copy.spots.pin('sunniest', 'shade', 10, '2026-10-08').text).toBe('Least shade · 10% of the time');
+  it('labels the pins briefly, with the rest of the name for screen readers', () => {
+    expect(copy.spots.pin('sunniest', 'season', 7.34, '2026-10-08')).toEqual({ text: 'Max 7.3 h', more: ' of direct sun a day, the most on the lot: show its sun month by month' });
+    expect(copy.spots.pin('shadiest', 'day', 0.1, '2026-10-08')).toEqual({ text: 'Min 0.1 h', more: ' of direct sun on 8 October, the least on the lot: show its sun month by month' });
+    expect(copy.spots.pin('shadiest', 'shade', 84.6, '2026-10-08').text).toBe('Most shade 85%');
+    expect(copy.spots.pin('sunniest', 'shade', 10, '2026-10-08').text).toBe('Least shade 10%');
+  });
+
+  it('words typical weather as an extra line', () => {
+    const w = copy.weather;
+    expect(w.hours(6.12)).toBe('about 6.1 hours with typical weather');
+    expect(w.range(2.4, 4.1)).toBe('With typical weather, expect about 2.5–4 hours.');
+    expect(w.source('Vancouver airport', '1981–2000')).toBe('Typical weather: sunshine records at Vancouver airport (1981–2000), adjusted for local cloud with Open-Meteo.');
+    expect(copy.summary.season(27, 14.6, 7.7)).toBe('For comparison, open ground with nothing around it would get 14.6 hours of sun a day (about 7.7 with typical weather).');
+  });
+
+  it('words the Basic summary plainly', () => {
+    const b = copy.basic;
+    expect(b.period('2026-04-01', '2026-09-30')).toBe('Average hours of direct sun a day, 1 April to 30 September');
+    expect(b.hours(11.46)).toBe('11.5 hours');
+    expect(b.hours(0.02)).toBe('0 hours');
+    expect(copy.spots.pin('shadiest', 'season', 0, '2026-10-08').text).toBe('Min 0 h');
+    expect(b.where('north-east')).toEqual(['in the', 'north-east']);
+    expect(b.where('middle')).toEqual(['near the', 'middle']);
+    expect(b.even(11.9, 12.3)).toBe('Sun is fairly even: 11.9 to 12.3 hours a day across the lot.');
   });
 });

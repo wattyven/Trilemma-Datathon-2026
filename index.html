@@ -27,15 +27,14 @@
   </head>
   <body>
     <header class="site-header">
-      <h1 class="wordmark">VanShade</h1>
-      <p class="tagline">Find the sunny and shady spots in your yard.</p>
-    </header>
-
-    <main>
-      <div id="embed-bar" class="embed-bar" hidden>
-        <a id="embed-open" class="embed-open" href="./" target="_blank" rel="noopener">Open in VanShade<span class="visually-hidden"> (opens in a new tab)</span></a>
-        <p class="hint">Contains information licensed under the Open Government Licences of British Columbia and Canada. <button type="button" class="link" data-open-about>About</button></p>
+      <div class="brand">
+        <h1 class="wordmark"><a href="./" id="home-link">VanShade</a></h1>
+        <p class="tagline">Find the sunny and shady spots in your yard.</p>
       </div>
+      <button type="button" id="advanced-toggle" class="mode-switch" role="switch" aria-checked="false">
+        <span class="mode-switch-label">Advanced mode</span>
+        <span class="mode-switch-track" aria-hidden="true"><span class="mode-switch-knob"></span></span>
+      </button>
       <form id="search-form" class="search" role="search" autocomplete="off" novalidate>
         <label for="address-input">Your address in Metro Vancouver</label>
         <div class="search-row">
@@ -60,6 +59,13 @@
           <span class="hint">Uses your device's location once to find the nearest address. It's sent only to BC's address service.</span>
         </p>
       </form>
+    </header>
+
+    <main>
+      <div id="embed-bar" class="embed-bar" hidden>
+        <a id="embed-open" class="embed-open" href="./" target="_blank" rel="noopener">Open in VanShade<span class="visually-hidden"> (opens in a new tab)</span></a>
+        <p class="hint">Contains information licensed under the Open Government Licences of British Columbia and Canada. <button type="button" class="link" data-open-about>About</button></p>
+      </div>
 
       <ol id="status" class="status" aria-live="polite" hidden></ol>
       <div id="message" class="message" role="alert" hidden></div>
@@ -99,15 +105,17 @@
               <label class="check" id="changes-wrap" hidden><input type="checkbox" id="changes-toggle" /> <span id="changes-label">Show changes</span></label>
               <label class="check opacity" id="opacity-wrap" hidden>Colour strength
                 <input type="range" id="results-opacity" min="0.2" max="1" step="0.05" value="0.5" aria-label="Colour strength over the photo" /></label>
-              <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
+              <label class="check" id="shadows-wrap"><input type="checkbox" id="shadows-toggle" checked /> Shadows</label>
             </div>
           </div>
           <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
             <h2 id="tips-heading">How to read this</h2>
             <ul>
-              <li><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="basic"><strong>Colours</strong> on the lot: lighter spots get more hours of direct sun a day over your dates, darker spots fewer. The legend shows the hours. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="basic"><strong>Max and Min pins</strong> mark the sunniest and the shadiest patch of open ground, about 2 m × 2 m.</li>
+              <li data-ui="advanced"><strong>Colours</strong> on the lot: yellow is in direct sun at the time shown, dark blue is in shade. For a whole day or season, yellow is full sun, grey part sun and dark blue shade. They're drawn over the aerial photo where there is one.</li>
+              <li data-ui="advanced"><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
               <li><strong>Hatched spots</strong> are under a roof or tree.</li>
-              <li><strong>Pins</strong> mark the sunniest and shadiest spots for a day, a season or the shade finder.</li>
               <li data-pointer="fine"><strong>Move around</strong>: drag to turn the view, scroll to zoom, right-drag to slide.</li>
               <li data-pointer="coarse"><strong>Move around</strong>: drag sideways to turn the view, pinch to zoom, two fingers to tilt. Scroll the page as usual.</li>
               <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
@@ -145,7 +153,7 @@
             <span>Lot lines are approximate.</span>
             <span id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</span>
             <span>Trees count as solid all year.</span>
-            <span>Direct sun only, not weather.</span>
+            <span>The main numbers are for clear days.</span>
             <button type="button" class="link" data-open-about>About accuracy</button>
           </p>
         </div>
@@ -154,6 +162,12 @@
             <span class="grabber" aria-hidden="true"></span><span class="sheet-label">Show details and settings</span>
           </button>
           <h2 id="lot-heading" tabindex="-1"></h2>
+          <p id="basic-head" class="basic-head"><span id="basic-period"></span><button type="button" class="info-button" id="numbers-open" aria-label="About these numbers" title="About these numbers" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5" /><circle cx="10" cy="6.2" r="1.1" fill="currentColor" /><path d="M10 9v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg></button></p>
+          <div id="basic-summary" class="basic-summary" aria-live="polite"></div>
+          <form id="basic-dates" class="basic-dates" aria-label="Dates to average over" novalidate>
+            <label>From <input type="date" id="basic-from" /></label>
+            <label>To <input type="date" id="basic-to" /></label>
+          </form>
           <p id="result-headline" class="headline" aria-live="polite"></p>
           <p id="result-summary" class="summary"></p>
           <form id="sun-controls" class="controls" hidden>
@@ -227,6 +241,7 @@
             <dl id="lot-facts-more" class="facts"></dl>
           </details>
           <ul id="lot-notices" class="notices"></ul>
+          <ul id="credit-notices" class="notices credit-notices"><li id="photo-credit-item" hidden></li></ul>
           <details id="lot-switcher" class="switcher" hidden>
             <summary id="lot-switcher-summary">Not the right lot?</summary>
             <fieldset>
@@ -272,6 +287,8 @@
         Elevation: NRCan High Resolution Digital Elevation Model and LiDAR point clouds, under the
         <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>;
         LidarBC, under the Open Government Licence – British Columbia. Aerial photos: municipal open data (see About).
+        Typical weather: Environment and Climate Change Canada climate normals (Open Government Licence – Canada) and
+        <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0).
         Built with <a href="https://threejs.org/">three.js</a> and <a href="https://github.com/mourner/suncalc">SunCalc</a>.
         <button type="button" class="link" data-open-about>About VanShade</button>
       </p>
@@ -310,13 +327,15 @@
         <dd>How the lot is coloured for a whole day or season: full sun is 6 or more hours of direct sun a day, part sun 3 to 6 hours, shade under 3. You can change these numbers, or untick the option to see exact hours.</dd>
         <dt>Season average</dt>
         <dd>The average number of hours of direct sun a day over the months you choose.</dd>
+        <dt>Typical weather</dt>
+        <dd>The hours of direct sun you'd expect with an average year's cloud, month by month. They come from the sunshine recorded at Vancouver or Abbotsford airport, adjusted for local cloud with a weather model. The main numbers stay "on clear days", the way plant labels count full sun.</dd>
       </dl>
       <h3>What to keep in mind</h3>
       <ul>
         <li><strong>Lot lines are approximate.</strong> They come from ParcelMap BC, which is not a legal survey.</li>
         <li><strong>The LiDAR has a date.</strong> <span id="about-lidar">Most of Metro Vancouver was flown in 2016.</span> New buildings, removed trees and years of growth since then aren't in it.</li>
         <li><strong>Trees are treated as solid all year.</strong> Deciduous trees let much more winter light through than shown.</li>
-        <li><strong>This is potential direct sun.</strong> It assumes clear skies; cloud and haze aren't counted. Bright shade and reflected light aren't counted either.</li>
+        <li><strong>The main numbers are potential direct sun.</strong> They assume clear skies; bright shade and reflected light aren't counted. "With typical weather" lines scale them by how often the sun shone in an average year; that's an average, not a forecast, and fog and mountain cloud vary more than it shows.</li>
         <li><strong>Distant hills aren't included.</strong> Only things within about 200 m of the lot can cast shadows, so on the North Shore and other hillsides, winter mornings and evenings may be shadier than shown.</li>
         <li><strong>Sun position</strong> comes from SunCalc, including the bending of light low near the horizon. Times are Vancouver time.</li>
         <li><strong>Where you stand matters.</strong> "Garden bed" measures 0.3 m above the ground, "Seated" 1.2 m, and "Rooftop" just above the roof or deck surface. Spots under a roof or tree canopy are hatched; at ground level they're mostly in shade.</li>
@@ -328,8 +347,15 @@
         <li>High Resolution Digital Elevation Model (HRDEM) and LiDAR point clouds (CanElevation): Natural Resources Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>.</li>
         <li>Newer LiDAR surface and ground models (LidarBC, 2024 and 2025): Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
         <li id="about-imagery">Aerial photos, when switched on, come from each municipality's open data.</li>
+        <li>Typical weather: sunshine normals for Vancouver and Abbotsford airports from Environment and Climate Change Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>; local cloud from <a href="https://open-meteo.com/">Open-Meteo.com</a> historical weather (ECMWF and Copernicus ERA5), <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</li>
         <li>Libraries: <a href="https://threejs.org/">three.js</a>, <a href="https://github.com/mourner/suncalc">SunCalc</a>, <a href="https://geotiffjs.github.io/">geotiff.js</a>, <a href="https://github.com/proj4js/proj4js">proj4js</a>, <a href="https://moment.github.io/luxon/">Luxon</a>, <a href="https://github.com/connormanning/copc.js">copc.js</a>, <a href="https://github.com/hobuinc/laz-perf">laz-perf</a>. Headings use <a href="https://github.com/undercasetype/Fraunces">Fraunces</a> (SIL Open Font License).</li>
       </ul>
+    </dialog>
+
+    <dialog id="numbers-info" class="about" aria-labelledby="numbers-heading">
+      <form method="dialog" class="about-close"><button class="ghost" aria-label="Close">Close</button></form>
+      <h2 id="numbers-heading">About these numbers</h2>
+      <div id="numbers-body"></div>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>

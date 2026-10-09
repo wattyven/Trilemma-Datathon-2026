@@ -36,13 +36,21 @@ try {
   await desk.goto(base + LOT);
   await desk.locator(RESULT).waitFor({ timeout: 90_000 });
   await desk.waitForTimeout(2500);
-  await audit(desk, 'result, desktop');
+  await audit(desk, 'result (Basic), desktop');
+  const adv = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await adv.goto(`${base}${LOT}&adv=1&m=season`);
+  await adv.locator(RESULT).waitFor({ timeout: 90_000 });
+  await adv.waitForTimeout(2500);
+  await audit(adv, 'result (Advanced, Season), desktop');
 
   const mob = await (await browser.newContext({ ...devices['Pixel 7'] })).newPage();
   await mob.goto(base + LOT);
   await mob.locator(RESULT).waitFor({ timeout: 90_000 });
   await mob.waitForTimeout(2500);
-  await audit(mob, 'result, phone');
+  await audit(mob, 'result (Basic), phone');
+  await mob.locator('#advanced-toggle').click();
+  await mob.waitForTimeout(800);
+  await audit(mob, 'result (Advanced), phone');
   await mob.locator('#sheet-handle').click();
   await mob.waitForTimeout(400);
   const small = await mob.evaluate(() =>

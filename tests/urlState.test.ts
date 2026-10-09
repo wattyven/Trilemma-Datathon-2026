@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultState, sanitizeThresholds } from '../src/ui/controls';
-import { decodeHash, encodeHash, type UrlState } from '../src/urlState';
+import { decodeHash, encodeHash, wantsAdvanced, type UrlState } from '../src/urlState';
 
 const full: UrlState = {
   address: '355 W Queens Rd, District of North Vancouver, BC',
@@ -16,6 +16,7 @@ const full: UrlState = {
   view: 'map',
   classes: true,
   spots: false,
+  advanced: true,
   fullSunH: 5.5,
   partSunH: 2,
   shadeStart: '2027-07-01',
@@ -86,6 +87,15 @@ describe('URL hash state', () => {
     expect(decodeHash('#debug=1')).toEqual({ debug: true });
     expect(decodeHash('#debug=0&debug=yes')).toEqual({});
     expect(encodeHash({ debug: false }, { debug: false })).toBe('');
+  });
+
+  it('opens Basic unless the link asks for Advanced or uses a setting only Advanced has', () => {
+    expect(wantsAdvanced(decodeHash('#a=453+W+12th+Ave&cs=2026-05-01&ce=2026-08-31&p=custom'))).toBe(false);
+    expect(wantsAdvanced(decodeHash('#a=x&adv=1'))).toBe(true);
+    expect(wantsAdvanced(decodeHash('#a=x&m=moment&adv=0'))).toBe(false); // the link says Basic
+    for (const extra of ['m=moment', 'm=day', 'm=shade', 'o=seated', 'elev=newest', 'chg=1', 'cls=0', 'full=8', 'spots=0', 'wf=12%3A00'])
+      expect(wantsAdvanced(decodeHash(`#a=x&${extra}`))).toBe(true);
+    expect(wantsAdvanced(decodeHash('#a=x&m=season&o=bed&elev=best&d=2026-06-21&t=15%3A30'))).toBe(false); // a time alone is fine
   });
 
   it('tolerates a missing or junk hash', () => {

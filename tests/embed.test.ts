@@ -25,8 +25,7 @@ describe('embedding', () => {
   });
 
   it('matches the example in the README', () => {
-    const { debug: _, ...shown } = state;
-    const code = embedSnippet(PAGE, shown, { mode: 'season' }, 'VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC');
+    const code = embedSnippet(PAGE, { address: state.address }, { mode: 'season' }, 'VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC');
     expect(readme).toContain(code);
   });
 

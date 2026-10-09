@@ -2,27 +2,122 @@ import { expect, test } from '@playwright/test';
 
 const RESULT = '.scene-canvas[data-state="result"]';
 
-test('search → 3D sun results → inspector → shareable link', async ({ page, context }) => {
+test('Basic: search → maximum and minimum hours → pins → dates → shareable link', async ({ page, context }) => {
   await page.goto('./');
   await expect(page.locator('#intro')).toBeVisible();
 
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');
   await expect(page.locator(RESULT)).toBeVisible();
-
-  // Results, legend, caveats and attribution.
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
-  await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
-  // "One moment" (now, or midday after dark) is the default view, and the link says so.
-  await expect(page.locator('input[name="mode"][value="moment"]')).toBeChecked();
-  await expect(page.locator('#legend')).toContainText('In direct sun');
-  await expect.poll(() => page.url()).toMatch(/m=moment/);
   // A first visit explains how to read the view, once.
   await expect(page.locator('#tips')).toBeVisible();
   await page.locator('#tips-close').click();
   await expect(page.locator('#tips')).toBeHidden();
 
-  // The result in plain words, first thing in the panel.
+  // Basic is the default: the lot's maximum and minimum average daily hours, and one setting, the dates.
+  await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
+  const summary = page.locator('#basic-summary');
+  await expect(page.locator('#basic-period')).toHaveText(/Average hours of direct sun a day, 1 April to 30 September/);
+  await expect(summary).toContainText(/Maximum:\s*([\d.]+) hours, in the/);
+  await expect(summary).toContainText(/Minimum:\s*([\d.]+) hours, (in|near) the/);
+  // Typical weather as an extra line; its source and the other fine print in the "About these numbers" pop-up.
+  await expect(summary).toContainText(/about ([\d.]+) hours with typical weather/);
+  const numbers = page.locator('#numbers-info');
+  await expect(numbers).toBeHidden();
+  await page.locator('#numbers-open').click();
+  await expect(numbers).toBeVisible();
+  await expect(numbers).toContainText('Typical weather: sunshine records at Vancouver airport');
+  await expect(numbers).toContainText('about 2 m × 2 m');
+  await page.keyboard.press('Escape');
+  await expect(numbers).toBeHidden();
+  // In Basic the 3D / Map switch and the legend sit inside the map, and the map fits the window.
+  await expect(page.locator('.view-stage .view-toolbar')).toBeVisible();
+  await expect(page.locator('.view-stage #legend')).toBeVisible();
+  await expect(page.locator('#basic-from')).toHaveValue(/^\d{4}-04-01$/);
+  await expect(page.locator('#sun-controls')).toBeHidden(); // modes, Measure at, 3D data: Advanced only
+  await expect(page.locator('#timeline')).toBeHidden();
+  await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
+  await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
+  await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
+
+  // Pins mark the sunniest and shadiest square metre; the summary's direction highlights one.
+  const max = page.locator('.spot-pin[data-kind="sunniest"]');
+  await expect(max).toBeVisible();
+  await expect(max).toContainText(/^Max ([\d.]+|0) h/);
+  await expect(page.locator('.spot-pin[data-kind="shadiest"]')).toContainText(/^Min ([\d.]+|0) h/);
+  await summary.locator('button').first().click();
+  await expect(max).toHaveClass(/flash/);
+  // A pin opens its spot's months.
+  await max.click();
+  await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
+
+  // New dates recompute, and go into the link (no time, no Advanced settings).
+  await page.locator('#basic-from').fill('2026-06-01');
+  await page.locator('#basic-to').fill('2026-06-30');
+  await page.locator('#basic-to').dispatchEvent('change');
+  await expect(page.locator('#basic-period')).toContainText('1 June to 30 June');
+  await expect.poll(() => page.url()).toMatch(/cs=2026-06-01&ce=2026-06-30/);
+  expect(page.url()).not.toMatch(/[#&](adv|t|m)=/);
+
+  // The pins follow to the map; the aerial photo is on by default and its setting goes into the link.
+  await page.locator('input[name="view"][value="map"]').check({ force: true });
+  await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(2);
+  await page.locator('input[name="view"][value="3d"]').check({ force: true });
+  await expect(page.locator('#photo-toggle')).toBeChecked();
+  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
+  await page.locator('#photo-toggle').uncheck();
+  await expect.poll(() => page.url()).toMatch(/img=0/);
+  await page.locator('#photo-toggle').check();
+
+  // A fresh page restores the lot and the dates in Basic.
+  const shared = await context.newPage();
+  await shared.goto(page.url());
+  await expect(shared.locator(RESULT)).toBeVisible();
+  await expect(shared.locator('#basic-period')).toContainText('1 June to 30 June');
+  await expect(shared.locator('#tips')).toBeHidden(); // already dismissed in this browser
+  // Links that use a setting only Advanced has (like older links with a mode) open in Advanced.
+  const older = await context.newPage();
+  await older.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC&m=day');
+  await expect(older.locator(RESULT)).toBeVisible();
+  await expect(older.locator('input[name="mode"][value="day"]')).toBeChecked();
+  await expect(older.locator('#advanced-toggle')).toHaveAttribute('aria-checked', 'true');
+  await older.close();
+
+  // About accuracy opens and closes.
+  await shared.locator('#caveats [data-open-about]').click();
+  await expect(shared.locator('#about')).toBeVisible();
+  await shared.keyboard.press('Escape');
+  await expect(shared.locator('#about')).toBeHidden();
+
+  // With a lot showing, the address bar sits in the header row beside the name, still usable.
+  await expect(page.locator('html')).toHaveClass(/\bhas-lot\b/);
+  const bar = (await page.locator('#address-input').boundingBox())!, name = (await page.locator('#home-link').boundingBox())!;
+  expect(Math.abs(bar.y + bar.height / 2 - (name.y + name.height / 2))).toBeLessThan(20);
+  await expect(page.locator('#address-input')).toBeEditable();
+  // The title goes back to the start page; Back returns to the lot.
+  await page.locator('#home-link').click();
+  await expect(page.locator('#intro')).toBeVisible();
+  await expect(page.locator('#lot')).toBeHidden();
+  await expect(page.locator('html')).not.toHaveClass(/\bhas-lot\b/);
+  expect(new URL(page.url()).hash).toBe('');
+  await page.goBack();
+  await expect(page.locator(RESULT)).toBeVisible();
+});
+
+test('Advanced: modes, time, 3D data, inspector and links', async ({ page, context }) => {
+  await page.goto('./#adv=1');
+  await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
+  await page.locator('#address-input').press('Enter');
+  await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('html')).not.toHaveClass(/\bbasic\b/);
+  await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
+  await page.locator('#tips-close').click();
+
+  // "One moment" (now, or midday after dark) is Advanced's default view, and the link says so.
+  await expect(page.locator('input[name="mode"][value="moment"]')).toBeChecked();
+  await expect(page.locator('#legend')).toContainText('In direct sun');
+  await expect.poll(() => page.url()).toMatch(/m=moment.*adv=1/);
   await expect(page.locator('#result-headline')).toContainText(/is in direct sun/);
   // No pins at a single moment: each spot is just in sun or in shade.
   await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(0);
@@ -30,11 +125,10 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await page.locator('input[name="mode"][value="season"]').check();
   await expect(page.locator('#legend')).toContainText('Full sun (6+ h)');
   await expect(page.locator('#result-headline')).toContainText(/hours of direct sun a day/);
-  const sunniest = page.locator('.spot-pin[data-kind="sunniest"]');
-  await expect(sunniest).toBeVisible();
-  await expect(sunniest).toContainText(/^Sunniest · (about [\d.]+|under 0\.5) h/);
+  await expect(page.locator('#result-headline')).toContainText(/With typical weather, expect about/);
+  await expect(page.locator('#result-summary')).toContainText(/with typical weather/);
+  await expect(page.locator('.spot-pin[data-kind="sunniest"]')).toContainText(/^Max ([\d.]+|0) h/);
   await expect(page.locator('.spot-pin[data-kind="shadiest"]')).toBeVisible();
-  await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
   // The timeline shows the day's sunrise and sunset, and Now returns to the current time.
   await expect(page.locator('#tl-sun')).toContainText(/Sunrise \d{1,2}:\d\d am · Sunset \d{1,2}:\d\d pm/);
   const sunrise = await page.locator('#tl-time').getAttribute('min');
@@ -47,14 +141,14 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator('#tl-time-label')).not.toHaveText(atSunrise!);
   // Debug details only with debug=1.
   await expect(page.locator('#debug')).toBeHidden();
-  await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
+  await expect(page.locator('#opacity-wrap')).toBeVisible();
 
   // The first result is the 1 m HRDEM surface; a sharper one then swaps in: the 2016 point cloud
   // at 0.5 m, or, where the build has the LidarBC proxy, "best of both" with 2025 LidarBC.
   const surface = page.locator('dd[data-key="surface"]');
   await expect(surface).toContainText(/0\.5 m grid from the 2016 LiDAR point cloud|0\.5 m from 2016 LiDAR/, { timeout: 90_000 });
   await expect(page.locator(RESULT)).toBeVisible();
-  // With both surveys, the "Elevation data" choice switches surfaces without reloading the page.
+  // With both surveys, the "3D data" choice switches surfaces without reloading the page.
   if (await page.locator('#elevation-wrap').isVisible()) {
     await page.locator('#elevation-wrap > summary').click(); // under "More options"
     await page.locator('#elevation-choice').selectOption('newest');
@@ -65,57 +159,35 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
     await expect(page.locator(RESULT)).toBeVisible();
   }
 
-  // The aerial photo is on by default, with its credit line; turning it off goes into the link.
-  await expect(page.locator('#photo-toggle')).toBeChecked();
-  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
-  await expect(page.locator('#opacity-wrap')).toBeVisible();
-  await page.locator('#photo-toggle').uncheck();
-  await expect(page.locator('#photo-credit')).toBeHidden();
-  await expect.poll(() => page.url()).toMatch(/img=0/);
-  await page.locator('#photo-toggle').check();
-  await expect(page.locator('#photo-credit')).toContainText('City of Vancouver');
-
-  // A pin opens its spot's months; so does the keyboard inspector: 12 monthly bars.
-  await page.locator('.spot-pin[data-kind="sunniest"]').click();
-  await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
+  // Keyboard inspector: 12 monthly bars.
   await page.locator('.scene-canvas').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
-  // The pins follow to the map, and the setting turns them off (and goes into the link).
-  await page.locator('input[name="view"][value="map"]').check({ force: true });
-  await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(2);
+  // The pins setting turns them off (and goes into the link).
   await page.locator('input[name="spots"]').uncheck();
   await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(0);
   await expect.poll(() => page.url()).toMatch(/spots=0/);
   await page.locator('input[name="spots"]').check();
-  await page.locator('input[name="view"][value="3d"]').check({ force: true });
 
-  // The URL carries the address and the mode; a fresh page restores both.
+  // The URL carries the mode; a fresh page restores it in Advanced.
   await page.locator('input[name="mode"][value="day"]').check();
   await expect.poll(() => page.url()).toMatch(/a=453\+W\+12th\+Ave.*m=day/);
   const shared = await context.newPage();
   await shared.goto(page.url());
   await expect(shared.locator(RESULT)).toBeVisible();
-  await expect(shared.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   await expect(shared.locator('input[name="mode"][value="day"]')).toBeChecked();
-  await expect(shared.locator('#tips')).toBeHidden(); // already dismissed in this browser
-  // Links from before "One moment" became the default have no m=; they meant Season.
-  const legacy = await context.newPage();
-  await legacy.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC');
-  await expect(legacy.locator(RESULT)).toBeVisible();
-  await expect(legacy.locator('input[name="mode"][value="season"]')).toBeChecked();
-  await legacy.close();
+  await shared.close();
 
-  // About accuracy opens and closes.
-  await shared.locator('#caveats [data-open-about]').click();
-  await expect(shared.locator('#about')).toBeVisible();
-  await shared.keyboard.press('Escape');
-  await expect(shared.locator('#about')).toBeHidden();
+  // Back to Basic: the summary returns, and the link drops Advanced.
+  await page.locator('#advanced-toggle').click(); // the "Advanced mode" switch
+  await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
+  await expect(page.locator('#basic-summary')).toContainText(/Maximum:\s*([\d.]+) hours/);
+  await expect.poll(() => page.url()).not.toMatch(/adv=1/);
 });
 
 test('embed: "Copy embed code" gives an iframe that works on another page', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC&m=moment&d=2026-06-21&t=15%3A30');
+  await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC&p=custom&cs=2026-06-01&ce=2026-06-30');
   await expect(page.locator(RESULT)).toBeVisible();
   await page.locator('#share-embed').click();
   await expect(page.locator('#share-status')).toContainText('Embed code copied');
@@ -129,17 +201,18 @@ test('embed: "Copy embed code" gives an iframe that works on another page', asyn
   const frame = host.frameLocator('iframe');
   await expect(frame.locator(RESULT)).toBeVisible();
   await expect(frame.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
-  await expect(frame.locator('#result-headline')).toContainText('At 3:30 pm on 21 June');
-  await expect(frame.locator('input[name="mode"][value="moment"]')).toBeChecked();
+  await expect(frame.locator('#basic-period')).toContainText('1 June to 30 June');
+  await expect(frame.locator('#basic-summary')).toContainText(/Maximum:\s*([\d.]+) hours/);
+  await expect(frame.locator('#basic-dates')).toBeHidden(); // the embedding page fixed the dates
   // The compact layout: no site header (kept for screen readers only), search or tips; a link back
   // to the full site.
-  expect(await frame.locator('.site-header').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
+  expect(await frame.locator('.site-header .brand').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
   await expect(frame.locator('#search-form')).toBeHidden();
   await expect(frame.locator('#tips')).toBeHidden();
   await expect(frame.locator('#embed-bar')).toContainText('Open Government Licences');
   const open = frame.locator('#embed-open');
   await expect(open).toHaveAttribute('target', '_blank');
-  await expect(open).toHaveAttribute('href', /#a=453\+W\+12th\+Ave.*m=moment/);
+  await expect(open).toHaveAttribute('href', /#a=453\+W\+12th\+Ave.*cs=2026-06-01/);
   await expect(open).not.toHaveAttribute('href', /embed=/);
   await host.close();
 });
@@ -168,16 +241,20 @@ test('out-of-area addresses get a clear message', async ({ page }) => {
   await expect(page.locator('#message')).toContainText('Metro Vancouver only');
 });
 
-test('mobile: the panel is a bottom sheet @mobile', async ({ page }) => {
+test('mobile: Basic stacks the summary over the view; Advanced uses a bottom sheet @mobile', async ({ page }) => {
   await page.goto('./');
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');
   await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('#basic-summary')).toBeInViewport();
+  await expect(page.locator('#sheet-handle')).toBeHidden();
+
+  await page.locator('#advanced-toggle').click(); // the "Advanced mode" switch
   // The collapsed sheet leads with the plain-language result.
-  await expect(page.locator('#result-headline')).toBeInViewport();
   const handle = page.locator('#sheet-handle');
   await expect(handle).toBeVisible();
   await expect(handle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#result-headline')).toBeInViewport();
   await expect(page.locator('#sun-controls')).not.toBeInViewport();
   await handle.click();
   await expect(handle).toHaveAttribute('aria-expanded', 'true');

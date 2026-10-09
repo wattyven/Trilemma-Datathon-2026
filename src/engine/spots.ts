@@ -30,12 +30,24 @@ export interface SpotsInput {
   py: ArrayLike<number>;
   step: number;
   cellAreaM2: number;
+  /**
+   * The single most and least sunny spots instead of broad patches: cells within a hair (TIGHT) of
+   * the lot's maximum and minimum, then the largest group of those and its deepest cell.
+   */
+  tight?: boolean;
+  /**
+   * With `tight`: compare blocks of this many cells a side (about 2 m × 2 m, a small garden bed),
+   * valued at their mean, instead of single cells. Falls back to cells where no block fits.
+   */
+  blockCells?: number;
 }
 
 /** Below this difference between the sunniest and shadiest ground (95th and 5th percentiles), sun counts as even: no spots. */
 export const EVEN_BELOW: Record<SpotMode, number> = { season: 1, day: 1, shade: 10 };
 /** The widest a band can be: values this close to the top (or bottom) count as sunniest (or shadiest). */
 const BAND: Record<SpotMode, number> = { season: 0.5, day: 0.5, shade: 5 };
+/** With `tight`, values this close to the maximum (or minimum) count as ties. */
+const TIGHT: Record<SpotMode, number> = { season: 0.05, day: 0.05, shade: 0.5 };
 
 export function quantile(sorted: number[], q: number): number {
   if (!sorted.length) return NaN;
@@ -50,16 +62,6 @@ export function findSpots(input: SpotsInput): Spots {
   for (let i = 0; i < values.length; i++) if (!covered[i] && values[i] === values[i]) open.push(i);
   if (!open.length) return none;
 
-  // "Sunnier" is more hours, or less of the time in shade.
-  const g = (i: number) => (mode === 'shade' ? -values[i]! : values[i]!);
-  const sorted = open.map(g).sort((a, b) => a - b);
-  // Bands near the top and the bottom. Percentiles rather than counts: unobstructed cells all share
-  // exactly the same top value, so a "top quarter" can't be told apart from the rest, and a small
-  // sunny patch would vanish into a quarter of the lot.
-  const hi = quantile(sorted, 0.95), lo = quantile(sorted, 0.05);
-  if (hi - lo < EVEN_BELOW[mode]) return none;
-  const band = Math.min(BAND[mode], (hi - lo) / 4);
-
   // The cell lattice: cells sit `step` pixels apart, some missing (outside the lot or without data).
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const i of open) {
@@ -70,6 +72,39 @@ export function findSpots(input: SpotsInput): Spots {
   }
   const w = Math.round((maxX - minX) / step) + 1, h = Math.round((maxY - minY) / step) + 1;
   const key = (i: number) => Math.round((py[i]! - minY) / step) * w + Math.round((px[i]! - minX) / step);
+
+  // Blocks of open ground k cells a side, each known by its north-west cell and valued at its mean.
+  const k = input.tight ? Math.max(1, Math.round(input.blockCells ?? 1)) : 1;
+  const blocks = new Map<number, number[]>();
+  if (k > 1) {
+    const openAt = new Int32Array(w * h).fill(-1);
+    for (const i of open) openAt[key(i)] = i;
+    for (const i of open) {
+      const c0 = key(i) % w, r0 = Math.floor(key(i) / w);
+      if (c0 + k > w || r0 + k > h) continue;
+      const cells: number[] = [];
+      for (let dr = 0; dr < k; dr++)
+        for (let dc = 0; dc < k; dc++) {
+          const j = openAt[(r0 + dr) * w + c0 + dc]!;
+          if (j >= 0) cells.push(j);
+        }
+      if (cells.length === k * k) blocks.set(i, cells);
+    }
+  }
+  const blockMean = new Map<number, number>();
+  for (const [a, cells] of blocks) blockMean.set(a, cells.reduce((s, j) => s + values[j]!, 0) / cells.length);
+  const candidates = blocks.size ? [...blocks.keys()] : open;
+  const value = (i: number) => blockMean.get(i) ?? values[i]!;
+
+  // "Sunnier" is more hours, or less of the time in shade.
+  const g = (i: number) => (mode === 'shade' ? -value(i) : value(i));
+  const sorted = candidates.map(g).sort((a, b) => a - b);
+  // Bands near the top and the bottom. Percentiles rather than counts: unobstructed cells all share
+  // exactly the same top value, so a "top quarter" can't be told apart from the rest, and a small
+  // sunny patch would vanish into a quarter of the lot.
+  const hi = quantile(sorted, input.tight ? 1 : 0.95), lo = quantile(sorted, input.tight ? 0 : 0.05);
+  if (hi - lo < EVEN_BELOW[mode]) return none;
+  const band = input.tight ? TIGHT[mode] : Math.min(BAND[mode], (hi - lo) / 4);
 
   /** The largest 4-connected patch of `cells`, with its pin cell. */
   const largestPatch = (cells: number[]): Spot | null => {
@@ -127,11 +162,22 @@ export function findSpots(input: SpotsInput): Spots {
       if (dk > dp || (dk === dp && Math.hypot(px[i]! - cx, py[i]! - cy) < Math.hypot(px[p]! - cx, py[p]! - cy))) pin = k;
     }
     const cell = at[pin]!;
-    return { cell, value: values[cell]!, areaM2: cellsOf.length * cellAreaM2, cells: cellsOf };
+    return { cell, value: value(cell), areaM2: cellsOf.length * cellAreaM2, cells: cellsOf };
+  };
+
+  /** A chosen block: its mean, and a pin on the block cell closest to that mean (so its month chart agrees). */
+  const asBlock = (s: Spot | null): Spot | null => {
+    const cells = s && blocks.get(s.cell);
+    if (!s || !cells) return s;
+    const m = blockMean.get(s.cell)!;
+    const cx = cells.reduce((t, j) => t + px[j]!, 0) / cells.length, cy = cells.reduce((t, j) => t + py[j]!, 0) / cells.length;
+    const score = (j: number) => Math.abs(values[j]! - m) * 1000 + Math.hypot(px[j]! - cx, py[j]! - cy);
+    const pin = cells.reduce((a, j) => (score(j) < score(a) ? j : a));
+    return { cell: pin, value: m, areaM2: cells.length * cellAreaM2, cells };
   };
 
   return {
-    sunniest: largestPatch(open.filter((i) => g(i) >= hi - band)),
-    shadiest: largestPatch(open.filter((i) => g(i) <= lo + band)),
+    sunniest: asBlock(largestPatch(candidates.filter((i) => g(i) >= hi - band))),
+    shadiest: asBlock(largestPatch(candidates.filter((i) => g(i) <= lo + band))),
   };
 }

@@ -19,6 +19,8 @@ export const fmtTime = (hhmm: string) => {
 };
 /** Hours to the nearest half hour, as a phrase: "about 6 hours", "3–5 hours". */
 const half = (h: number) => Math.round(h * 2) / 2;
+/** Hours to a tenth, with an exact zero as "0": "11.5", "0". */
+const tenth = (h: number) => (h < 0.05 ? '0' : h.toFixed(1));
 /** Where a part of the lot is: "toward the **north-east**", "near the **middle** of the lot". */
 const where = (side: Side) => (side === 'middle' ? 'near the **middle** of the lot' : `toward the **${side}**`);
 const hoursRange = (low: number, high: number) => {
@@ -152,7 +154,8 @@ export const copy = {
   },
   // A second, quieter line under the headline: what the numbers compare with.
   summary: {
-    season: (_days: number, meanH: number) => `For comparison, open ground with nothing around it would get ${meanH.toFixed(1)} hours of sun a day.`,
+    season: (_days: number, meanH: number, typicalH?: number) =>
+      `For comparison, open ground with nothing around it would get ${meanH.toFixed(1)} hours of sun a day${typicalH !== undefined ? ` (about ${typicalH.toFixed(1)} with typical weather)` : ''}.`,
     day: (daylightH: number) => `There are ${daylightH.toFixed(1)} hours between sunrise and sunset that day.`,
     moment: (alt: number, az: number) =>
       alt <= 0 ? 'The sun is below the horizon.' : `The sun is ${Math.round(alt)}° above the horizon, in the ${compass(az)}.`,
@@ -196,17 +199,40 @@ export const copy = {
     shadeNoSun: "The sun is down for this whole time window, so there's no direct sun to block.",
     mostlyCovered: 'Almost all of this lot is under a roof or trees. To see the sun on a roof or deck, choose "Rooftop or deck surface" under Measure at.',
   },
-  /** The pins on the view: visible text, and the rest of the button's name for screen readers. */
+  /** The pins on the view: a short visible label, and the rest of the button's name for screen readers. */
   spots: {
     pin: (kind: 'sunniest' | 'shadiest', mode: 'season' | 'day' | 'shade', value: number, date: string) => {
       if (mode === 'shade')
-        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} · ${Math.round(value)}% of the time`, more: ': show its sun month by month' };
-      const h = half(value);
+        return { text: `${kind === 'sunniest' ? 'Least shade' : 'Most shade'} ${Math.round(value)}%`, more: ' of the time: show its sun month by month' };
       return {
-        text: `${kind === 'sunniest' ? 'Sunniest' : 'Shadiest'} · ${h === 0 ? 'under 0.5 h' : `about ${fmtH(h)} h`}`,
-        more: `${mode === 'day' ? ` of direct sun on ${fmtDate(date)}` : ' of direct sun a day'}: show its sun month by month`,
+        text: `${kind === 'sunniest' ? 'Max' : 'Min'} ${tenth(value)} h`,
+        more: ` of direct sun ${mode === 'day' ? `on ${fmtDate(date)}` : 'a day'}, the ${kind === 'sunniest' ? 'most' : 'least'} on the lot: show its sun month by month`,
       };
     },
+  },
+  /** Basic mode's summary: the lot's maximum and minimum average daily hours, and where they are. */
+  basic: {
+    period: (start: string, end: string) => `Average hours of direct sun a day, ${fmtDate(start)} to ${fmtDate(end)}`,
+    max: 'Maximum',
+    min: 'Minimum',
+    hours: (h: number) => `${tenth(h)} hours`,
+    /** "in the [north-east]" / "near the [middle]": the bracketed word is the button. */
+    where: (side: Side) => (side === 'middle' ? ['near the', 'middle'] : ['in the', side]) as [string, string],
+    show: (kind: 'sunniest' | 'shadiest') => `: show the ${kind === 'sunniest' ? 'sunniest' : 'shadiest'} spot on the view`,
+    even: (low: number, high: number) => `Sun is fairly even: ${tenth(low)} to ${tenth(high)} hours a day across the lot.`,
+    mostlyCovered: "Almost all of this lot is under a roof or trees, so there's little open ground to measure. Advanced options can measure on roofs and decks.",
+    legend: 'Hours of direct sun a day',
+    spotSize: 'The maximum and minimum are for patches of open ground about 2 m × 2 m, the size of a small garden bed.',
+  },
+  /** Typical weather: the clear-day hours scaled by how often the sun actually shines (an extra line, never the main number). */
+  weather: {
+    hours: (h: number) => `about ${tenth(h)} hours with typical weather`,
+    short: (h: number) => `about ${tenth(h)} h a day with typical weather`,
+    range: (low: number, high: number) => {
+      const lo = half(low), hi = half(high);
+      return hi - lo < 0.75 ? `With typical weather, expect about ${fmtH(half((low + high) / 2))} hours.` : `With typical weather, expect about ${fmtH(lo)}–${fmtH(hi)} hours.`;
+    },
+    source: (station: string, period: string) => `Typical weather: sunshine records at ${station} (${period}), adjusted for local cloud with Open-Meteo.`,
   },
   inspector: {
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const,
@@ -222,6 +248,7 @@ export const copy = {
     asText: 'Show the months as a table',
     monthHeader: 'Month',
     hoursHeader: 'Hours of sun a day',
+    typicalHeader: 'With typical weather',
     covered: 'Roof or tree overhead',
     height: (z: number) => `Measured at ${z.toFixed(1)} m above sea level`,
     context: {
@@ -232,7 +259,7 @@ export const copy = {
       shade: (from: string, to: string, start: string, end: string) => `Shade finder: ${from}–${to}, ${start} to ${end}`,
     },
     presets: { growing: 'Growing season', summer: 'Summer', winter: 'Winter', year: 'Whole year' } as Record<string, string>,
-    hint: 'Click a spot on the lot (or focus the view and use the arrow keys, then Enter) to see its sun month by month.',
+    hint: 'Click a spot on the lot to see its sun month by month.',
   },
   timeline: {
     play: 'Play the day',

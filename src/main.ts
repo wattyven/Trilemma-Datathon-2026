@@ -7,11 +7,11 @@ import { isAbortError } from './data/http';
 import { embedSnippet, fullSiteUrl } from './embed';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
-import { nowMinuteInVancouver, todayInVancouver } from './engine/sun';
+import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver } from './engine/sun';
 import { IMAGERY_SOURCES } from './imagery/sources';
-import { initAbout } from './ui/about';
+import { initAbout, initDialog } from './ui/about';
 import { initAnalysisChat } from './ui/analysisChat';
-import { defaultState, initControls, type ControlState } from './ui/controls';
+import { defaultState, initControls, seasonRange, type ControlState } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
@@ -19,7 +19,7 @@ import { initSheet } from './ui/sheet';
 import { initTips } from './ui/tips';
 import { showSteps, type StepId, type Steps } from './ui/status';
 import { Timeline, initialTimeline, minuteLabel } from './ui/timeline';
-import { decodeHash, encodeHash, type UrlState } from './urlState';
+import { decodeHash, encodeHash, wantsAdvanced, type UrlState } from './urlState';
 
 const byId = <T extends HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -73,6 +73,10 @@ const analysisEls: AnalysisElements = {
   changesToggle: byId<HTMLInputElement>('changes-toggle'),
   changesLabel: byId('changes-label'),
   spotLayer: byId('spot-layer'),
+  basicSummary: byId('basic-summary'),
+  basicPeriod: byId('basic-period'),
+  numbersOpen: byId<HTMLButtonElement>('numbers-open'),
+  numbersBody: byId('numbers-body'),
 };
 
 const today = todayInVancouver();
@@ -145,12 +149,114 @@ analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
+initDialog(byId<HTMLDialogElement>('numbers-info'), [byId('numbers-open')]);
+
+// Basic lists the aerial photo's credit as a bullet under the lot notices; Advanced keeps it under the view.
+const photoCredit = byId('photo-credit'), photoCreditItem = byId('photo-credit-item');
+new MutationObserver(() => {
+  photoCreditItem.textContent = photoCredit.textContent;
+  photoCreditItem.hidden = photoCredit.hidden || !photoCredit.textContent;
+}).observe(photoCredit, { attributes: true, attributeFilter: ['hidden'], childList: true, characterData: true, subtree: true });
 const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId('lot-heading'));
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
 });
-if (embedOn) byId('lot-info').dataset.sheet = 'expanded'; // no bottom sheet inside an embed
-else initSheet(byId('lot-info'), byId<HTMLButtonElement>('sheet-handle'));
+const lotInfo = byId('lot-info');
+const sheet = embedOn ? null : initSheet(lotInfo, byId<HTMLButtonElement>('sheet-handle'));
+
+// The full-width view in Basic needs the page's width without the scrollbar (100vw includes it).
+const setPageWidth = () => document.documentElement.style.setProperty('--page-width', `${document.documentElement.clientWidth}px`);
+new ResizeObserver(setPageWidth).observe(document.documentElement);
+setPageWidth();
+
+// ── Basic and Advanced ───────────────────────────────────────────────────────────
+
+// Basic puts the 3D / Map toolbar and the legend inside the map, and sizes the map to fit the
+// window (on screens wider than a phone); Advanced keeps them above and below it.
+const stage = document.querySelector<HTMLElement>('.view-stage')!;
+const toolbar = document.querySelector<HTMLElement>('.view-toolbar')!;
+const legend = byId('legend');
+const toolbarHome = document.createComment('toolbar'), legendHome = document.createComment('legend');
+toolbar.before(toolbarHome);
+legend.before(legendHome);
+const wide = window.matchMedia('(min-width: 721px)');
+
+function placeOverlays(basic: boolean) {
+  if (basic) stage.append(toolbar, legend);
+  else {
+    toolbarHome.after(toolbar);
+    legendHome.after(legend);
+  }
+}
+
+/** Basic on a laptop or desktop: the whole map within the window, below the summary. */
+function fitView() {
+  if (advanced || !wide.matches || byId('lot').hidden) {
+    stage.style.height = '';
+    return;
+  }
+  const top = stage.getBoundingClientRect().top + window.scrollY;
+  stage.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
+}
+window.addEventListener('resize', fitView);
+const refit = new ResizeObserver(fitView);
+for (const id of ['basic-summary', 'basic-head', 'basic-dates', 'lot-heading']) refit.observe(byId(id));
+refit.observe(document.querySelector('.site-header')!);
+
+const advancedToggle = byId<HTMLButtonElement>('advanced-toggle');
+const basicFrom = byId<HTMLInputElement>('basic-from');
+const basicTo = byId<HTMLInputElement>('basic-to');
+let advanced = false;
+
+/** Basic's dates show the season range the controls hold. */
+function syncBasicDates() {
+  const { start, end } = seasonRange(controls.get());
+  basicFrom.value = isoDate(start);
+  basicTo.value = isoDate(end);
+}
+
+/**
+ * Basic (the default) or Advanced options. Basic always measures a date range at garden-bed height
+ * on the best surface, so switching to it sets those; switching back shows them as chosen.
+ */
+function setAdvanced(on: boolean, recompute = true) {
+  advanced = on;
+  advancedToggle.setAttribute('aria-checked', String(on));
+  document.documentElement.classList.toggle('basic', !on);
+  placeOverlays(!on);
+  queueMicrotask(fitView);
+  if (on) sheet?.collapse();
+  else lotInfo.dataset.sheet = 'expanded'; // no bottom sheet in Basic
+  if (on) return analysis.setBasic(false);
+  const before = controls.get();
+  controls.set({ mode: 'season', observer: 'bed', spots: true });
+  analysis.chooseSource('best');
+  analysis.setChangesEnabled(false);
+  syncBasicDates();
+  analysis.setBasic(true);
+  if (!recompute) return;
+  if (before.observer !== 'bed') void analysis.onControls('observer');
+  else if (before.mode !== 'season') void analysis.onControls('request');
+}
+
+advancedToggle.addEventListener('click', () => {
+  setAdvanced(!advanced);
+  writeUrl(false);
+});
+
+byId<HTMLFormElement>('basic-dates').addEventListener('change', () => {
+  const a = parseIsoDate(basicFrom.value), b = parseIsoDate(basicTo.value);
+  if (!a || !b) return;
+  const [start, end] = isoDate(a) <= isoDate(b) ? [a, b] : [b, a];
+  const growing = PRESETS.growing(start.year);
+  const isGrowing = isoDate(growing.start) === isoDate(start) && isoDate(growing.end) === isoDate(end);
+  controls.set(isGrowing ? { preset: 'growing', year: start.year } : { preset: 'custom', start: isoDate(start), end: isoDate(end) });
+  syncBasicDates();
+  void analysis.onControls('request');
+  writeUrl(false);
+});
+
+setAdvanced(wantsAdvanced(linkState), false);
 
 type LookupInput = { kind: 'match'; match: GeocodeMatch } | { kind: 'text'; text: string };
 interface LookupOptions {
@@ -247,6 +353,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   analysisChat.reset();
   lotCanvas.clear();
   intro.hidden = true;
+  document.documentElement.classList.add('has-lot'); // the address bar tucks into the header
   shown = null;
 
   if (req.kind === 'text' && !req.text) {
@@ -366,6 +473,7 @@ const LINK_DEFAULT_MODE = 'season';
 
 function urlDefaults(): UrlState {
   return {
+    advanced: false,
     mode: LINK_DEFAULT_MODE,
     preset: defaults.preset,
     year: defaults.year,
@@ -393,7 +501,23 @@ function urlStateNow(): UrlState | null {
   const c = controls.get();
   const t = timeline.get();
   const lot = shown.found.candidates[shown.selected];
+  // Basic links carry the lot, the dates and the view; everything else is Basic's fixed choice.
+  if (!advanced)
+    return {
+      address: shown.match.fullAddress,
+      lot: shown.selected > 0 ? lot?.id : undefined,
+      preset: c.preset,
+      year: c.year,
+      start: c.preset === 'custom' ? c.start : undefined,
+      end: c.preset === 'custom' ? c.end : undefined,
+      view: analysis.currentView,
+      photo: analysis.photoEnabled,
+      opacity: analysis.resultsOpacity,
+      debug: debugOn,
+      embed: embedOn,
+    };
   return {
+    advanced: true,
     address: shown.match.fullAddress,
     lot: shown.selected > 0 ? lot?.id : undefined,
     mode: c.mode,
@@ -465,6 +589,7 @@ async function applyUrl(hash: string): Promise<boolean> {
     analysis.setChangesEnabled(s.changes ?? false);
     analysis.setResultsOpacity(s.opacity ?? IMAGERY.defaultOpacity);
     analysis.setPhotoEnabled(s.photo ?? true, s.photo !== undefined);
+    setAdvanced(wantsAdvanced(s), false);
     const sameLot = shown && shown.match.fullAddress === s.address;
     if (sameLot && shown) {
       const idx = s.lot !== undefined ? shown.found.candidates.findIndex((c) => c.id === s.lot) : 0;
@@ -483,7 +608,33 @@ async function applyUrl(hash: string): Promise<boolean> {
   return true;
 }
 
-window.addEventListener('popstate', () => void applyUrl(location.hash));
+/** Back to the start page: no lot, the intro, an empty address bar (the VanShade title, or Back to it). */
+function goHome(push: boolean) {
+  current?.abort();
+  current = null;
+  shown = null;
+  lastLookup = null;
+  clearMessage();
+  statusList.hidden = true;
+  hideLot(lotEls);
+  lotCanvas.clear();
+  intro.hidden = false;
+  document.documentElement.classList.remove('has-lot');
+  search.setValue('');
+  if (push && location.hash) history.pushState(null, '', location.pathname + location.search);
+  window.scrollTo(0, 0);
+  input.focus();
+}
+
+byId<HTMLAnchorElement>('home-link').addEventListener('click', (e) => {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; // a new tab or window: let the link work
+  e.preventDefault();
+  goHome(true);
+});
+
+window.addEventListener('popstate', async () => {
+  if (!(await applyUrl(location.hash))) goHome(false);
+});
 
 // ── Copy link ────────────────────────────────────────────────────────────────────
 

@@ -15,23 +15,24 @@ import { vintageFor, type Vintage } from './elevation/vintage';
 import { EngineError, ShadeEngine } from './engine/client';
 import { heatmapStep } from './engine/grid';
 import type { ComputeResult, ElevationSpec, HrdemSpec, LoadedMessage } from './engine/protocol';
-import { daySamples, momentSample, type SunSample } from './engine/sun';
-import { MOSTLY_COVERED, summarizeLot } from './engine/lotSummary';
-import { findSpots, type Spots } from './engine/spots';
+import { daySamples, isoDate, momentSample, type LocalDate, type SunSample } from './engine/sun';
+import { MOSTLY_COVERED, sideOf, summarizeLot } from './engine/lotSummary';
+import { findSpots, quantile, type Spot, type Spots } from './engine/spots';
+import { localSunshine, type Sunshine } from './weather/sunshine';
 import { applyAffine, gridToLocalAffine } from './geo/gridAffine';
 import { mapGeometry, polygonsOf, type Position } from './geo/polygon';
 import type { LotScene } from './scene/view3d';
 import { isLowPower, webglAvailable } from './scene/webgl';
-import { hatchMaskRgba, layerColor, maskBounds, paintCellsRgba, type CellGrid } from './ui/cellPaint';
+import { hatchMaskRgba, layerColor, maskBounds, paintCellsRgba, stretchScale, type CellGrid } from './ui/cellPaint';
 import { CEDAR_RGB, CLASS_RGB, SHADE_RGB, SUN_RGB, cividisGradient, css } from './ui/colors';
-import { requestFor, type ChangeKind, type ControlState, type Controls } from './ui/controls';
+import { requestFor, seasonRange, type ChangeKind, type ControlState, type Controls } from './ui/controls';
 import { renderInspector } from './ui/inspector';
 import { HOURS_SCALE_MAX, type Layer, type LotCanvas } from './ui/lotCanvas';
 import { setAnalysisNotices, setFact, setRichText, type LotViewElements } from './ui/lotView';
-import { SpotPins, type PinSpec } from './ui/spotPins';
+import { SpotPins, type PinSpec, type SpotKind } from './ui/spotPins';
 import type { Steps } from './ui/status';
 import type { InsightFacts } from './insight';
-import { minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
+import { dayMinuteRange, middayMinute, minuteLabel, type Timeline, type TimelineState } from './ui/timeline';
 
 export interface AnalysisElements {
   headline: HTMLElement;
@@ -64,6 +65,18 @@ export interface AnalysisElements {
   changesLabel: HTMLElement;
   /** The layer over the view that holds the sunniest / shadiest pins. */
   spotLayer: HTMLElement;
+  /** Basic mode's maximum / minimum summary, its dates line beside the address, and the "About these numbers" pop-up. */
+  basicSummary: HTMLElement;
+  basicPeriod: HTMLElement;
+  numbersOpen: HTMLButtonElement;
+  numbersBody: HTMLElement;
+}
+
+/** The date halfway between two dates (calendar maths only). */
+function middleDate(a: LocalDate, b: LocalDate): LocalDate {
+  const day = (d: LocalDate) => Date.UTC(d.year, d.month - 1, d.day) / 86_400_000;
+  const mid = new Date(Math.round((day(a) + day(b)) / 2) * 86_400_000);
+  return { year: mid.getUTCFullYear(), month: mid.getUTCMonth() + 1, day: mid.getUTCDate() };
 }
 
 export class NoCoverageError extends Error {}
@@ -112,6 +125,8 @@ export class Analysis {
   /** The current result's sunniest and shadiest patches (found in render(), for the headline and pins). */
   private spots: Spots = { sunniest: null, shadiest: null };
   private pins: SpotPins;
+  /** Basic mode (the default): the summary, dates and a full-width view; false shows Advanced options. */
+  private basic = true;
   /** The current lot (for restarting a refinement an observer change interrupted). */
   private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
   /** The sharper surface loading (or loaded) after the first result. */
@@ -157,7 +172,7 @@ export class Analysis {
         this.setView(r.value as View);
         this.onViewChange(this.view);
       });
-    els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(els.shadowsToggle.checked));
+    els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(!this.basic && els.shadowsToggle.checked));
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
     els.resetView.addEventListener('click', () => this.scene?.resetView());
     els.photoToggle.addEventListener('change', () => {
@@ -374,6 +389,9 @@ export class Analysis {
     this.loaded = null;
     this.result = null;
     this.clearPins();
+    this.els.basicSummary.replaceChildren();
+    this.els.basicPeriod.textContent = '';
+    this.els.numbersOpen.hidden = true;
     this.els.inspector.hidden = true;
     this.inspectedCell = null;
     this.els.summary.textContent = '';
@@ -569,7 +587,8 @@ export class Analysis {
       { lowPower: isLowPower() },
     );
     this.scene.canvas.setAttribute('aria-label', copy.view.keyboard);
-    this.scene.setShadows(this.els.shadowsToggle.checked);
+    this.scene.setShadows(!this.basic && this.els.shadowsToggle.checked);
+    this.scene.setSunVisible(!this.basic);
     this.scene.onRender = () => this.placePins();
   }
 
@@ -673,10 +692,18 @@ export class Analysis {
     return { ...this.controls.get(), date: t.date, time: minuteLabel(t.minute) };
   }
 
+  /** Typical weather at the lot (the nearer airport's sunshine record, adjusted locally). */
+  private weather(): Sunshine | null {
+    return this.lotRequest ? localSunshine(this.lotRequest.lonLat) : null;
+  }
+
   private async compute(signal?: AbortSignal) {
     if (!this.loaded) return;
     const seq = ++this.computeSeq;
-    const { result, ms } = await engine().compute(requestFor(this.state()), signal);
+    const request = requestFor(this.state());
+    const w = this.weather();
+    if (request.kind === 'season' && w) request.sunshine = w.shares;
+    const { result, ms } = await engine().compute(request, signal);
     if (seq !== this.computeSeq) return; // superseded
     this.result = result;
     this.timings = { ...this.timings, computeMs: ms };
@@ -719,6 +746,15 @@ export class Analysis {
     const req = this.lotRequest;
     if (!req) return;
     const [lon, lat] = req.lonLat;
+    if (this.basic) {
+      // An average has no single moment: light the 3D view from midday in the middle of the dates.
+      const { start, end } = seasonRange(this.controls.get());
+      const mid = middleDate(start, end);
+      const sun = momentSample(mid, middayMinute(dayMinuteRange(mid, lat, lon)), lat, lon);
+      this.scene?.setSun({ azTrueDeg: sun.azTrueDeg, altDeg: sun.altDeg, path: [] });
+      this.els.sunNote.hidden = true;
+      return;
+    }
     const t = this.timeline.get();
     const date = this.timeline.localDate();
     const sun = momentSample(date, t.minute, lat, lon);
@@ -743,6 +779,10 @@ export class Analysis {
     if (!r || r.kind === 'inspect') return null;
     const kind = r.kind === 'moment' ? 'moment' : r.kind === 'shade' ? 'percent' : 'hours';
     const c = this.controls.get();
+    if (this.basic && kind === 'hours') {
+      const { low, high } = this.openRange();
+      return { kind, values: r.values, asClasses: false, scale: stretchScale(low, high) };
+    }
     return { kind, values: r.values, asClasses: kind === 'hours' && c.classes, thresholds: { fullSunH: c.fullSunH, partSunH: c.partSunH } };
   }
 
@@ -754,6 +794,8 @@ export class Analysis {
     this.scene?.setLayer(layer);
     this.renderLegend(layer);
     this.renderSummary();
+    this.renderBasicSummary();
+    if (this.basic) this.updateSun(); // its light follows the dates
     // The time slider always moves the 3D sun, but only changes the colours in "One moment".
     const mode = this.controls.get().mode;
     const note = mode === 'season' || mode === 'shade' ? copy.timelineNote.average : mode === 'day' ? copy.timelineNote.day : '';
@@ -855,8 +897,8 @@ export class Analysis {
         return;
       }
       const grid: CellGrid = { width: w.width, height: w.height, px: area.px, py: area.py, covered: area.covered, step: area.step };
-      const kind = area.valueKind === 'moment' ? 'moment' : area.valueKind === 'shade' ? 'percent' : 'hours';
-      const layer = { kind, values: area.values, asClasses: false };
+      const kind: Layer['kind'] = area.valueKind === 'moment' ? 'moment' : area.valueKind === 'shade' ? 'percent' : 'hours';
+      const layer: Layer = { kind, values: area.values, asClasses: false };
       this.scene.setHeatmap(paintCellsRgba(grid, (i) => ({ rgb: layerColor(layer, i), alpha: 230 }), false));
       if (note) {
         note.hidden = false;
@@ -949,7 +991,11 @@ export class Analysis {
       if (layer.kind === 'percent') ramp.style.transform = 'scaleX(-1)'; // more shade = darker
       const ticks = document.createElement('span');
       ticks.className = 'ticks';
-      const labels = layer.kind === 'percent' ? ['0%', '50%', '100%'] : ['0', String(HOURS_SCALE_MAX / 2), `${HOURS_SCALE_MAX} h`];
+      const sc = layer.scale;
+      const labels =
+        layer.kind === 'percent' ? ['0%', '50%', '100%']
+        : sc ? [sc.min.toFixed(1), ((sc.min + sc.max) / 2).toFixed(1), `${sc.max.toFixed(1)} h`]
+        : ['0', String(HOURS_SCALE_MAX / 2), `${HOURS_SCALE_MAX} h`];
       ticks.append(...labels.map((t) => Object.assign(document.createElement('span'), { textContent: t })));
       bar.append(label, ramp, ticks);
       L.append(bar);
@@ -968,7 +1014,7 @@ export class Analysis {
     if (!r) return;
     const t = copy.summary;
     this.els.summary.textContent =
-      r.kind === 'season' ? t.season(r.days, r.meanDaylightH)
+      r.kind === 'season' ? t.season(r.days, r.meanDaylightH, r.meanTypicalH)
       : r.kind === 'day' ? t.day(r.daylightH)
       : r.kind === 'moment' ? t.moment(r.altDeg, r.azTrueDeg)
       : r.kind === 'shade' ? t.shade(r.windowHours ? (100 * r.sunUpHours) / r.windowHours : 0, r.days)
@@ -992,7 +1038,123 @@ export class Analysis {
     for (let i = 0; i < covered.length; i++) n += covered[i] ? 1 : 0;
     if (covered.length && n / covered.length >= MOSTLY_COVERED) return none;
     const s = l.summary;
-    return findSpots({ mode: r.kind, values: r.values, covered, px: l.px, py: l.py, step: s.step, cellAreaM2: s.cellSizeM * s.cellSizeM });
+    // Basic compares about 2 m × 2 m patches (a small garden bed), whatever the grid's cell size.
+    const blockCells = this.basic ? Math.max(1, Math.round(2 / s.cellSizeM)) : undefined;
+    return findSpots({ mode: r.kind, values: r.values, covered, px: l.px, py: l.py, step: s.step, cellAreaM2: s.cellSizeM * s.cellSizeM, tight: this.basic, blockCells });
+  }
+
+  /** The lowest and highest value on open ground, the share under roofs or trees, and the open cells' positions. */
+  private openRange(): { low: number; high: number; coveredShare: number; open: Position[] } {
+    const r = this.result, l = this.loaded;
+    const out = { low: Infinity, high: -Infinity, coveredShare: 0, open: [] as Position[] };
+    if (!r || !l || r.kind === 'inspect') return out;
+    const covered = this.summaryCovered();
+    let n = 0;
+    for (let i = 0; i < r.values.length; i++) {
+      if (covered[i]) {
+        n++;
+        continue;
+      }
+      const v = r.values[i]!;
+      if (v !== v) continue;
+      if (v < out.low) out.low = v;
+      if (v > out.high) out.high = v;
+      out.open.push(this.cellPositions[i]!);
+    }
+    out.coveredShare = r.values.length ? n / r.values.length : 0;
+    return out;
+  }
+
+  /** The values of open cells (not under a roof or tree, with data). */
+  private openValues(values: ArrayLike<number>): number[] {
+    const covered = this.summaryCovered();
+    const out: number[] = [];
+    for (let i = 0; i < values.length; i++) if (!covered[i] && values[i] === values[i]) out.push(values[i]!);
+    return out;
+  }
+
+  /** A spot's typical-weather hours: the mean over its cells, like its clear-day value. */
+  private typicalAt(spot: Spot): number | null {
+    const r = this.result;
+    if (r?.kind !== 'season' || !r.typical) return null;
+    return spot.cells.reduce((s, i) => s + r.typical![i]!, 0) / spot.cells.length;
+  }
+
+  /** Basic mode: "Maximum: 11.5 hours, in the north-east", the same for the minimum, and the dates. */
+  private renderBasicSummary() {
+    const el = this.els.basicSummary;
+    el.replaceChildren();
+    this.els.basicPeriod.textContent = '';
+    this.els.numbersOpen.hidden = true;
+    const r = this.result;
+    if (!this.basic || !r || r.kind !== 'season') return;
+    const b = copy.basic;
+    const { start, end } = seasonRange(this.controls.get());
+    const p = (className: string, textContent: string) => Object.assign(document.createElement('p'), { className, textContent });
+    this.els.basicPeriod.textContent = b.period(isoDate(start), isoDate(end));
+    const range = this.openRange();
+    if (range.coveredShare >= MOSTLY_COVERED || !range.open.length) {
+      el.append(p('note', b.mostlyCovered));
+      return;
+    }
+    const { sunniest, shadiest } = this.spots;
+    // The figures, with "About these numbers" at the end of the same row.
+    const row = Object.assign(document.createElement('div'), { className: 'basic-stats-row' });
+    el.append(row);
+    if (!sunniest || !shadiest) row.append(p('even', b.even(range.low, range.high)));
+    else {
+      const dl = Object.assign(document.createElement('dl'), { className: 'basic-stats' });
+      for (const [kind, spot] of [['sunniest', sunniest], ['shadiest', shadiest]] as const) {
+        const dt = document.createElement('dt');
+        const dot = Object.assign(document.createElement('span'), { className: 'spot-dot' });
+        dot.dataset.kind = kind;
+        dot.setAttribute('aria-hidden', 'true');
+        dt.append(dot, `${kind === 'sunniest' ? b.max : b.min}:`);
+        const [before, word] = b.where(sideOf([this.cellPositions[spot.cell]!], range.open, 'middle'));
+        const show = Object.assign(document.createElement('button'), { type: 'button', className: 'link', textContent: word });
+        show.append(Object.assign(document.createElement('span'), { className: 'visually-hidden', textContent: b.show(kind) }));
+        show.addEventListener('click', () => this.highlightSpot(kind));
+        const dd = document.createElement('dd');
+        dd.append(Object.assign(document.createElement('strong'), { textContent: b.hours(spot.value) }), `, ${before} `, show);
+        const typical = this.typicalAt(spot);
+        if (typical !== null && typical >= 0.05) dd.append(Object.assign(document.createElement('span'), { className: 'typical', textContent: copy.weather.hours(typical) }));
+        const item = document.createElement('div');
+        item.append(dt, dd);
+        dl.append(item);
+      }
+      row.append(dl);
+    }
+    // The fine print goes in the "About these numbers" pop-up, so the summary stays two lines.
+    const notes: string[] = [];
+    if (sunniest && shadiest) notes.push(b.spotSize);
+    const w = this.weather();
+    if (w && r.typical) notes.push(copy.weather.source(w.station.short, w.station.period));
+    if (range.coveredShare >= 0.05) notes.push(copy.headline.covered(range.coveredShare));
+    this.els.numbersBody.replaceChildren(...notes.map((t) => p('', t)));
+    this.els.numbersOpen.hidden = !notes.length;
+  }
+
+  /** Point at a spot: pulse its pin, put the 3D ring there and bring the view into sight. */
+  highlightSpot(kind: SpotKind) {
+    const s = this.spots[kind];
+    if (!s) return;
+    if (this.view === '3d') this.scene?.setCursor(s.cell);
+    this.pins.highlight(kind);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    this.els.spotLayer.closest('.view-stage')?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  get isBasic(): boolean {
+    return this.basic;
+  }
+
+  /** Basic or Advanced: what the 3D view shows (no cast shadows or sun arc in Basic), the colours and the summary. */
+  setBasic(on: boolean) {
+    this.basic = on;
+    this.scene?.setShadows(!on && this.els.shadowsToggle.checked);
+    this.scene?.setSunVisible(!on);
+    this.updateSun();
+    if (this.result) this.render();
   }
 
   /** Label the pins for the current spots (when the setting is on). */
@@ -1056,6 +1218,10 @@ export class Analysis {
       const cls = h.classNames[sum.medianClass];
       const period = s.preset === 'custom' ? h.customPeriod(s.start, s.end) : (h.periods[s.preset] ?? '');
       parts.push(mode === 'day' ? h.day(sum.low, sum.high, cls, s.date, onSurface) : h.season(sum.low, sum.high, cls, period, onSurface));
+      if (r.kind === 'season' && r.typical) {
+        const t = this.openValues(r.typical).sort((x, y) => x - y);
+        if (t.length) parts.push(copy.weather.range(quantile(t, 0.25), quantile(t, 0.75)));
+      }
       parts.push(h.sides(sum.sunniest.side, sum.sunniest.value, sum.shadiest.side));
     }
     if (!onSurface && sum.coveredShare >= 0.05 && parts.length) parts.push(h.covered(sum.coveredShare));
@@ -1088,12 +1254,15 @@ export class Analysis {
     const s = this.state();
     const date = this.timeline.localDate();
     try {
-      const { result } = await engine().compute({ kind: 'inspect', cell, date, year: s.year });
+      const { result } = await engine().compute({ kind: 'inspect', cell, date, year: s.year, sunshine: this.weather()?.shares });
       if (result.kind !== 'inspect' || seq !== this.pickSeq) return;
+      const r = this.result;
+      const typical = r?.kind === 'season' && r.typical ? copy.weather.short(r.typical[cell]!) : '';
       renderInspector(this.els.inspector, {
         heading: this.valueText(cell),
-        details: [this.contextText(s), l.covered[cell] ? copy.inspector.covered : '', copy.inspector.height(l.z0[cell]!)].filter(Boolean),
+        details: [typical, this.contextText(s), l.covered[cell] ? copy.inspector.covered : '', copy.inspector.height(l.z0[cell]!)].filter(Boolean),
         monthlyHours: result.inspection.monthlyHours,
+        monthlyTypical: r?.kind === 'season' ? result.inspection.monthlyTypical : undefined,
         strip: result.inspection.strip,
         dateLabel: s.date,
         year: s.year,

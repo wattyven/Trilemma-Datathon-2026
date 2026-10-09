@@ -8,6 +8,7 @@ import {
   momentMask,
   prepareSamples,
   seasonAverage,
+  seasonAverages,
   shadeFinder,
   sunHours,
 } from '../src/engine/outputs';
@@ -50,6 +51,18 @@ describe('open ground', () => {
     for (const v of avg) expect(v).toBeCloseTo(mean, 4);
     expect(mean).toBeGreaterThan(13);
     expect(mean).toBeLessThan(15);
+  });
+
+  it('season with typical weather: each day weighted by its sunshine share; clear values unchanged', () => {
+    const { start, end } = PRESETS.growing(2026);
+    const dates = dateRange(start, end, 7);
+    const days = dates.map((d) => prep(d, 15));
+    const factors = dates.map((d) => (d.month < 7 ? 0.4 : 0.6));
+    const { clear, typical } = seasonAverages(openH, days, factors);
+    const expected = days.reduce((a, s, i) => a + hoursOf(s.filter((x) => x.altDeg > 0)) * factors[i]!, 0) / days.length;
+    for (const v of typical!) expect(v).toBeCloseTo(expected, 3);
+    expect(Array.from(clear)).toEqual(Array.from(seasonAverage(openH, days)));
+    expect(seasonAverages(openH, days).typical).toBeUndefined();
   });
 
   it('shade finder: 0% shaded', () => {

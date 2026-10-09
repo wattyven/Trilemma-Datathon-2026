@@ -8,9 +8,10 @@ import type { SourceInfo } from '../engine/protocol';
 import { heatmapStep, maxValue, NoLidarError, nodataFraction, selectCells, selectWindowCells, withObserver, type CellSet, type Observer, type Raster } from '../engine/grid';
 import { computeHorizons, splitRanges, type HorizonParams } from '../engine/horizon';
 import type { HorizonJob, HorizonReply } from './horizon.worker';
-import { inspectCell, momentMask, prepareSamples, seasonAverage, shadeFinder, sunHours, type Horizons } from '../engine/outputs';
+import { inspectCell, momentMask, prepareSamples, seasonAverages, shadeFinder, sunHours, type Horizons } from '../engine/outputs';
 import type { AreaMessage, ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadRequest, ToWorker } from '../engine/protocol';
 import { dateRange, daySamples, momentSample, type LocalDate } from '../engine/sun';
+import { dayFactor } from '../weather/sunshine';
 
 // The project compiles against the DOM lib; describe just the worker-scope bits we use.
 interface WorkerScope {
@@ -228,9 +229,14 @@ function compute(req: ComputeRequest, horizons?: Horizons): ComputeResult {
       return { kind: 'day', values: sunHours(h, samples), daylightH: daylight(samples) };
     }
     case 'season': {
-      const days = dateRange(req.start, req.end, SUN.seasonEveryDays).map((d) => prep(d, SUN.seasonStepMin));
-      const meanDaylightH = days.length ? days.reduce((a, s) => a + daylight(s), 0) / days.length : 0;
-      return { kind: 'season', values: seasonAverage(h, days), days: days.length, meanDaylightH };
+      const dates = dateRange(req.start, req.end, SUN.seasonEveryDays);
+      const days = dates.map((d) => prep(d, SUN.seasonStepMin));
+      const mean = (f: (i: number) => number) => (days.length ? days.reduce((a, s, i) => a + daylight(s) * f(i), 0) / days.length : 0);
+      const factors = req.sunshine ? dates.map((d) => dayFactor(req.sunshine!, d)) : undefined;
+      const { clear, typical } = seasonAverages(h, days, factors);
+      const out: ComputeResult = { kind: 'season', values: clear, days: days.length, meanDaylightH: mean(() => 1) };
+      if (typical && factors) Object.assign(out, { typical, meanTypicalH: mean((i) => factors[i]!) });
+      return out;
     }
     case 'shade': {
       const days = dateRange(req.start, req.end, SUN.seasonEveryDays);
@@ -240,10 +246,10 @@ function compute(req: ComputeRequest, horizons?: Horizons): ComputeResult {
       return { kind: 'shade', values: r.shadedPct, sunUpHours: r.sunUpHours, windowHours, days: days.length };
     }
     case 'inspect': {
-      const months = Array.from({ length: 12 }, (_, m) =>
-        [1, 8, 15, 22].map((day) => prep({ year: req.year, month: m + 1, day }, SUN.seasonStepMin)),
-      );
-      return { kind: 'inspect', cell: req.cell, inspection: inspectCell(h, req.cell, months, prep(req.date, SUN.dayStepMin)) };
+      const DAYS = [1, 8, 15, 22];
+      const months = Array.from({ length: 12 }, (_, m) => DAYS.map((day) => prep({ year: req.year, month: m + 1, day }, SUN.seasonStepMin)));
+      const factors = req.sunshine ? Array.from({ length: 12 }, (_, m) => DAYS.map((day) => dayFactor(req.sunshine!, { year: req.year, month: m + 1, day }))) : undefined;
+      return { kind: 'inspect', cell: req.cell, inspection: inspectCell(h, req.cell, months, prep(req.date, SUN.dayStepMin), factors) };
     }
   }
 }

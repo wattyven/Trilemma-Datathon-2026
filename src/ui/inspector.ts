@@ -85,6 +85,8 @@ export interface InspectorData {
   heading: string; // e.g. "6.4 h of direct sun a day"
   details: string[]; // e.g. ["Roof or tree overhead", "Measured at 38.6 m"]
   monthlyHours: number[];
+  /** The same with typical weather, for a second column in the table view. */
+  monthlyTypical?: number[];
   strip: { time: number; sunlit: boolean }[];
   dateLabel: string;
   year: number;
@@ -162,14 +164,15 @@ export function renderInspector(root: HTMLElement, d: InspectorData) {
   const summary = document.createElement('summary');
   summary.textContent = copy.inspector.asText;
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th scope="col"></th><th scope="col"></th></tr></thead>';
-  table.tHead!.rows[0]!.cells[0]!.textContent = copy.inspector.monthHeader;
-  table.tHead!.rows[0]!.cells[1]!.textContent = copy.inspector.hoursHeader;
+  const head = table.createTHead().insertRow();
+  for (const label of [copy.inspector.monthHeader, copy.inspector.hoursHeader, ...(d.monthlyTypical ? [copy.inspector.typicalHeader] : [])])
+    head.appendChild(Object.assign(document.createElement('th'), { scope: 'col', textContent: label }));
   const tbody = table.createTBody();
-  m.bars.forEach((b) => {
+  m.bars.forEach((b, i) => {
     const tr = tbody.insertRow();
     tr.insertCell().textContent = b.month;
     tr.insertCell().textContent = b.hours.toFixed(1);
+    if (d.monthlyTypical) tr.insertCell().textContent = (d.monthlyTypical[i] ?? 0).toFixed(1);
   });
   details.append(summary, table);
 

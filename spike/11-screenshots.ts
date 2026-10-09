@@ -29,25 +29,17 @@ const tipsSeen = () => localStorage.setItem('vanshade:tips-seen-v1', '1'); // RE
 
 const browser = await chromium.launch({ args });
 try {
-  // Desktop: empty state, then a lot in Season view with the inspector open, then About.
+  // Desktop: empty state, then a lot in Basic with a pin's months open, then About.
   const desk = await browser.newPage({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 1 });
   await desk.addInitScript(tipsSeen);
   await desk.goto(base);
   await desk.screenshot({ path: join(OUT_DIR, 'review-intro.png') });
   await search(desk, '453 W 12th Ave, Vancouver');
-  await desk.locator('input[name="mode"][value="season"]').check(); // the default is One moment
   await refined(desk);
-  await desk.locator('#tl-date').fill('2026-06-21');
-  await desk.locator('#tl-date').dispatchEvent('change');
-  await desk.locator('#tl-time').evaluate((el: HTMLInputElement) => {
-    el.value = String(16 * 60);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await desk.locator('.scene-canvas').focus();
-  for (const k of ['ArrowRight', 'ArrowRight', 'ArrowDown', 'Enter']) await desk.keyboard.press(k);
+  await desk.locator('.spot-pin[data-kind="sunniest"]').click();
   await desk.locator('#inspector svg.chart').waitFor();
   await desk.waitForTimeout(500);
-  await desk.locator('.scene-canvas').blur();
+  await desk.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await desk.evaluate(() => window.scrollTo(0, 0)); // the inspector opens below the fold
   await desk.waitForTimeout(300);
   await desk.screenshot({ path: join(DOCS, 'desktop.png') });
@@ -58,7 +50,8 @@ try {
   await desk.screenshot({ path: join(OUT_DIR, 'review-about.png') });
   await desk.keyboard.press('Escape');
 
-  // Classes with custom thresholds.
+  // Advanced mode: classes with custom thresholds.
+  await desk.locator('#advanced-toggle').click();
   await desk.locator('input[name="classes"]').check();
   await desk.locator('input[name="fullSunH"]').fill('8');
   await desk.locator('input[name="fullSunH"]').dispatchEvent('change');
@@ -79,11 +72,13 @@ try {
   const ctx = await browser.newContext({ ...devices['Pixel 7'] });
   const mob = await ctx.newPage();
   await mob.addInitScript(tipsSeen);
-  await mob.goto(`${base}#${new URLSearchParams({ a: '355 W Queens Rd, District of North Vancouver, BC', m: 'moment', d: '2026-06-21', t: '15:30' })}`);
+  await mob.goto(`${base}#${new URLSearchParams({ a: '355 W Queens Rd, District of North Vancouver, BC' })}`); // Basic
   await refined(mob);
-  await mob.locator('.view-toolbar').evaluate((el) => el.scrollIntoView({ block: 'start' })); // the view, with the sheet below
+  await mob.locator('#lot-heading').evaluate((el) => el.scrollIntoView({ block: 'start' })); // the summary, with the view below
   await mob.waitForTimeout(500);
   await mob.screenshot({ path: join(DOCS, 'mobile.png') });
+  // Advanced mode on a phone: the bottom sheet, expanded.
+  await mob.locator('#advanced-toggle').click();
   await mob.locator('#sheet-handle').click();
   await mob.waitForTimeout(300);
   await mob.screenshot({ path: join(OUT_DIR, 'review-mobile-expanded.png') });

@@ -59,9 +59,10 @@ export interface LoadRequest {
 export type ComputeRequest =
   | { kind: 'moment'; date: LocalDate; minuteOfDay: number }
   | { kind: 'day'; date: LocalDate }
-  | { kind: 'season'; start: LocalDate; end: LocalDate }
+  /** `sunshine`: typical share of daylight with sunshine, January to December, for weather-adjusted hours too. */
+  | { kind: 'season'; start: LocalDate; end: LocalDate; sunshine?: number[] }
   | { kind: 'shade'; start: LocalDate; end: LocalDate; window: DayWindow }
-  | { kind: 'inspect'; cell: number; date: LocalDate; year: number };
+  | { kind: 'inspect'; cell: number; date: LocalDate; year: number; sunshine?: number[] };
 
 export interface LoadedSummary {
   window: PixelWindow;
@@ -96,7 +97,8 @@ export interface LoadedMessage {
 export type ComputeResult =
   | { kind: 'moment'; values: Uint8Array; altDeg: number; azTrueDeg: number; time: number }
   | { kind: 'day'; values: Float32Array; daylightH: number }
-  | { kind: 'season'; values: Float32Array; days: number; meanDaylightH: number }
+  /** `typical`, `meanTypicalH`: the same with typical weather, when the request gave sunshine shares. */
+  | { kind: 'season'; values: Float32Array; days: number; meanDaylightH: number; typical?: Float32Array; meanTypicalH?: number }
   | { kind: 'shade'; values: Float32Array; sunUpHours: number; windowHours: number; days: number }
   | { kind: 'inspect'; cell: number; inspection: CellInspection };
 
