@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-CA">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -82,8 +82,8 @@
               <label class="check"><input type="checkbox" id="shadows-toggle" checked /> Real-time shadows</label>
             </div>
           </div>
-          <aside id="tips" class="tips" aria-labelledby="tips-heading" hidden>
-            <h3 id="tips-heading">How to read this</h3>
+          <section id="tips" class="tips" aria-labelledby="tips-heading" hidden>
+            <h2 id="tips-heading">How to read this</h2>
             <ul>
               <li><strong>Colours</strong> on the lot: yellow is full sun, grey part sun and dark blue shade (in the hours view, yellow is the most sun). They're drawn over the aerial photo where there is one.</li>
               <li><strong>Hatched spots</strong> are under a roof or tree.</li>
@@ -92,7 +92,7 @@
               <li><strong>Click any spot</strong> on the lot to see its sun month by month.</li>
             </ul>
             <button type="button" id="tips-close" class="ghost">Got it</button>
-          </aside>
+          </section>
           <div class="view-stage">
             <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
             <div id="scene-host" class="scene-host" hidden>
@@ -129,7 +129,7 @@
           <button type="button" id="sheet-handle" class="sheet-handle" aria-expanded="false" aria-controls="lot-info">
             <span class="grabber" aria-hidden="true"></span><span class="sheet-label">Show details and settings</span>
           </button>
-          <h2 id="lot-heading"></h2>
+          <h2 id="lot-heading" tabindex="-1"></h2>
           <p id="result-headline" class="headline" aria-live="polite"></p>
           <p class="share-row">
             <button type="button" id="share" class="ghost">Copy link to this view</button>

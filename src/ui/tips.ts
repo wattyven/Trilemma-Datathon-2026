@@ -19,10 +19,12 @@ function remember() {
   }
 }
 
-export function initTips(card: HTMLElement, close: HTMLButtonElement) {
+/** `after` takes focus when the card closes, so keyboard and screen-reader users aren't dropped at the top. */
+export function initTips(card: HTMLElement, close: HTMLButtonElement, after: HTMLElement) {
   close.addEventListener('click', () => {
     card.hidden = true;
     remember();
+    after.focus({ preventScroll: true });
   });
   return {
     /** After a result: show the card unless this visitor has dismissed it before. */
@@ -32,7 +34,8 @@ export function initTips(card: HTMLElement, close: HTMLButtonElement) {
     show() {
       card.hidden = false;
       close.focus({ preventScroll: true });
-      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      card.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
     },
   };
 }

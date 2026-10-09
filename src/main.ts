@@ -103,7 +103,7 @@ analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
-const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'));
+const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId('lot-heading'));
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
 });
