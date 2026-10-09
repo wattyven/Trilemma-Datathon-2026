@@ -99,6 +99,12 @@ Built with [three.js](https://threejs.org/), [SunCalc](https://github.com/mourne
 
 Endpoint details, quirks and measurements are in [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md).
 
+## Licence
+
+The code is under the [MIT licence](LICENSE). The data VanShade reads stays under each provider's licence, listed in the
+table above (the app shows the attribution each requires). The Fraunces typeface is under the SIL Open Font Licence
+([`src/assets/fonts/OFL.txt`](src/assets/fonts/OFL.txt)), and the libraries keep their own licences.
+
 ## Development
 
 ```sh

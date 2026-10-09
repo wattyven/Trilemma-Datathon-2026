@@ -1,6 +1,7 @@
 {
   "name": "vanshade",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "description": "Sun and shade mapper for Metro Vancouver yards. Static site, all compute in the browser.",
