@@ -121,6 +121,13 @@ export const copy = {
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
   tipsLink: 'How to read this',
+  locate: {
+    button: 'Use my location',
+    finding: 'Finding your location…',
+    denied: "Location is turned off for this site. Allow it in your browser's settings, or type your address instead.",
+    unavailable: "We couldn't find your location. Try again in a moment, or type your address instead.",
+    noAddress: "There's no street address within 100 m of where you are. Type your address instead.",
+  },
   legend: {
     hours: 'Hours of direct sun a day',
     percent: 'Share of the time in shade',

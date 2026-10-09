@@ -1,5 +1,5 @@
 // BC Address Geocoder client.
-import { AUTOCOMPLETE, GEOCODER_URL, METRO_BBOX, MIN_CONFIDENT_SCORE } from '../config';
+import { AUTOCOMPLETE, GEOCODER_NEAREST_URL, GEOCODER_URL, LOCATE, METRO_BBOX, MIN_CONFIDENT_SCORE } from '../config';
 import type { Position } from '../geo/polygon';
 import { getJson } from './http';
 import { isInScope } from './scope';
@@ -124,4 +124,21 @@ export async function resolve(query: string, signal?: AbortSignal): Promise<Reso
   const fc = await getJson<FeatureCollection>(resolveUrl(query), { signal });
   const first = fc.features?.[0];
   return classify(first ? parseFeature(first) : null);
+}
+
+/** "Use my location": the address nearest a position, within LOCATE.maxDistanceM. */
+export function nearestUrl([lon, lat]: Position): string {
+  const q = new URLSearchParams({ point: `${lon.toFixed(6)},${lat.toFixed(6)}`, outputSRS: '4326', maxDistance: String(LOCATE.maxDistanceM) });
+  return `${GEOCODER_NEAREST_URL}?${q}`;
+}
+
+/** A hit is a single Feature; no address in range is an empty FeatureCollection. */
+export function parseNearest(r: RawFeature | FeatureCollection): string | null {
+  const f: RawFeature | undefined = 'features' in r ? r.features?.[0] : (r as RawFeature);
+  const address = f?.properties?.fullAddress;
+  return typeof address === 'string' && address.trim() ? address : null;
+}
+
+export async function nearestAddress(lonLat: Position, signal?: AbortSignal): Promise<string | null> {
+  return parseNearest(await getJson<RawFeature | FeatureCollection>(nearestUrl(lonLat), { signal }));
 }

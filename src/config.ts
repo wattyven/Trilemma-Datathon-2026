@@ -1,6 +1,9 @@
 // Endpoints and constants verified in Phase 0 (docs/DATA_SOURCES.md).
 
 export const GEOCODER_URL = 'https://geocoder.api.gov.bc.ca/addresses.json';
+/** Reverse lookup for "Use my location": the nearest address point to a position. */
+export const GEOCODER_NEAREST_URL = 'https://geocoder.api.gov.bc.ca/sites/nearest.json';
+export const LOCATE = { maxDistanceM: 100, timeoutMs: 10_000 } as const;
 
 export const WFS_URL = 'https://openmaps.gov.bc.ca/geo/pub/wfs';
 /** Public OGL-BC layer. The similarly named `…_FA_SVW` is the access-only "Fully Attributed" dataset. */

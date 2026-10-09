@@ -1,8 +1,8 @@
 import './styles.css';
 import { Analysis, errorMessage, type AnalysisElements } from './analysis';
-import { IMAGERY } from './config';
+import { IMAGERY, LOCATE } from './config';
 import { copy } from './copy';
-import { resolve, suggest, type GeocodeMatch } from './data/geocoder';
+import { nearestAddress, resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
@@ -125,6 +125,31 @@ const search = initSearch(form, input, listbox, {
   fetchSuggestions: suggest,
   onPick: (match) => void lookup({ kind: 'match', match }),
   onSubmitText: (text) => void lookup({ kind: 'text', text }),
+});
+
+// "Use my location": the nearest address to the device, then the normal search. Only offered
+// where the browser can locate (a secure page with the Geolocation API).
+const locate = byId<HTMLButtonElement>('locate');
+if ('geolocation' in navigator && window.isSecureContext) byId('locate-row').hidden = false;
+const currentPosition = () =>
+  new Promise<GeolocationPosition>((ok, fail) => navigator.geolocation.getCurrentPosition(ok, fail, { enableHighAccuracy: true, timeout: LOCATE.timeoutMs, maximumAge: 60_000 }));
+locate.addEventListener('click', async () => {
+  clearMessage();
+  locate.disabled = true;
+  locate.textContent = copy.locate.finding;
+  try {
+    const pos = await currentPosition();
+    const address = await nearestAddress([pos.coords.longitude, pos.coords.latitude]);
+    if (!address) return showMessage(copy.locate.noAddress);
+    search.setValue(address);
+    void lookup({ kind: 'text', text: address });
+  } catch (e) {
+    const code = (e as GeolocationPositionError).code;
+    showMessage(code === 1 ? copy.locate.denied : code === 2 || code === 3 ? copy.locate.unavailable : isOffline() ? copy.offline : copy.geocoderDown);
+  } finally {
+    locate.disabled = false;
+    locate.textContent = copy.locate.button;
+  }
 });
 
 for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-example]')) {

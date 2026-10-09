@@ -141,3 +141,18 @@ describe('network calls', () => {
     expect((await resolve('zzzz')).kind).toBe('not-found');
   });
 });
+
+describe('use my location', async () => {
+  const { nearestUrl, parseNearest } = await import('../src/data/geocoder');
+  const fixture = (await import('./fixtures/geocoder-nearest-cityhall.json')).default;
+  it('asks for the nearest address within 100 m, in lon/lat', () => {
+    const u = new URL(nearestUrl([-123.1139, 49.2613]));
+    expect(u.origin + u.pathname).toBe('https://geocoder.api.gov.bc.ca/sites/nearest.json');
+    expect(Object.fromEntries(u.searchParams)).toEqual({ point: '-123.113900,49.261300', outputSRS: '4326', maxDistance: '100' });
+  });
+
+  it('reads the address from a hit, and null from an empty answer', () => {
+    expect(parseNearest(fixture as never)).toBe('2699 Yukon St, Vancouver, BC');
+    expect(parseNearest({ features: [] })).toBeNull();
+  });
+});

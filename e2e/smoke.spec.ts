@@ -73,6 +73,23 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(shared.locator('#about')).toBeHidden();
 });
 
+test('"Use my location" finds the nearest address', async ({ browser }) => {
+  const here = await browser.newContext({ geolocation: { latitude: 49.26131, longitude: -123.11394 }, permissions: ['geolocation'] }); // Vancouver City Hall
+  const page = await here.newPage();
+  await page.goto('./');
+  await page.locator('#locate').click();
+  await expect(page.locator('#lot-heading')).toContainText('Vancouver, BC');
+  await expect(page.locator(RESULT)).toBeVisible();
+  await here.close();
+
+  const denied = await browser.newContext(); // no permission granted
+  const page2 = await denied.newPage();
+  await page2.goto('./');
+  await page2.locator('#locate').click();
+  await expect(page2.locator('#message')).toContainText('Location is turned off');
+  await denied.close();
+});
+
 test('out-of-area addresses get a clear message', async ({ page }) => {
   await page.goto('./');
   await page.locator('#address-input').fill('1 Centennial Sq, Victoria');
