@@ -31,6 +31,8 @@ jobs:
           VITE_LIDARBC_PROXY: ${{ vars.VITE_LIDARBC_PROXY }}
           # The site's address for link previews; unset = .env (https://vanshade.ca/).
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
+          # Public site chat. A repository variable; it is copied into the built pages. Unset: chat stays local-only.
+          VITE_GEMINI_API_KEY: ${{ vars.VITE_GEMINI_API_KEY }}
 
       - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v5

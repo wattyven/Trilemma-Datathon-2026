@@ -1,7 +1,8 @@
 // The Analysis panel: a reading of the current lot, then questions about that same reading.
 // It sits in the info column under the lot notice, so it never covers the 3D view.
 import { copy } from '../copy';
-import { formatInsightContext, type InsightFacts } from '../insight';
+import { GeminiChatError, streamGemini, type GeminiTurn } from '../geminiDirect';
+import { advisorInstructions, formatInsightContext, type InsightFacts } from '../insight';
 
 export interface AnalysisChatElements {
   open: HTMLButtonElement;
@@ -37,7 +38,9 @@ export function initAnalysisChat(
 ) {
   const { open, panel, log, status, form, input, chips } = els;
   const closeBtn = panel.querySelector<HTMLButtonElement>('#analysis-close');
+  const browserKey = import.meta.env.VITE_GEMINI_API_KEY?.trim() ?? '';
   let sessionId = newSessionId();
+  let turns: GeminiTurn[] = [];
   let shownContext = '';
   let abort: AbortController | null = null;
   let busy = false;
@@ -118,6 +121,7 @@ export function initAnalysisChat(
     abort = null;
     setBusy(false);
     sessionId = newSessionId();
+    turns = [];
     shownContext = context;
     log.replaceChildren();
     void closeSession(previous);
@@ -133,6 +137,7 @@ export function initAnalysisChat(
     abort = null;
     setBusy(false);
     sessionId = newSessionId();
+    turns = [];
     hide();
     log.replaceChildren();
     status.textContent = '';
@@ -172,6 +177,28 @@ export function initAnalysisChat(
     abort = controller;
     const reply = bubble('assistant', '');
     try {
+      if (browserKey) {
+        const text = await streamGemini({
+          key: browserKey,
+          instructions: advisorInstructions(formatInsightContext(facts)),
+          turns,
+          message,
+          signal: controller.signal,
+          onText: (extra) => {
+            reply.textContent += extra;
+            log.scrollTop = log.scrollHeight;
+            status.textContent = '';
+          },
+        });
+        if (text.trim()) {
+          turns.push({ role: 'user', text: message }, { role: 'model', text });
+          while (turns.length > 8) turns.splice(0, 2);
+        } else {
+          reply.remove();
+          bubble('error', copy.analysis.failed);
+        }
+        return;
+      }
       const res = await fetch('/api/analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -191,6 +218,11 @@ export function initAnalysisChat(
       if (code) bubble('error', code === 'failed' && detail ? detail : messageFor(code));
       else if (!reply.isConnected) bubble('error', copy.analysis.failed);
     } catch (e) {
+      if (e instanceof GeminiChatError) {
+        reply.remove();
+        bubble('error', e.code === 'failed' && e.detail ? e.detail : messageFor(e.code));
+        return;
+      }
       if ((e as { name?: string }).name === 'AbortError') {
         if (!reply.textContent) reply.remove();
         return;
@@ -276,6 +308,7 @@ export function initAnalysisChat(
   }
 
   async function closeSession(id: string) {
+    if (browserKey) return;
     try {
       await fetch('/api/analysis/close', {
         method: 'POST',
