@@ -1,6 +1,6 @@
 // Dev-server side of the Analysis chat. Keys are read from .env.local and never sent to the browser.
 // Gemini answers directly. Cursor is only used when no Gemini key is saved, as a no-repo cloud agent.
-import { loadEnv, type Connect, type Plugin } from 'vite';
+import { loadEnv, type Plugin } from 'vite';
 import { advisorInstructions, buildAdvisorPrompt, explainAdvisorFailure, geminiChunkText, mergeAssistantText, takeSseEvents } from '../insight';
 
 const API = 'https://api.cursor.com';
@@ -44,15 +44,20 @@ export function analysisChatPlugin(): Plugin {
   return {
     name: 'vanshade-analysis-chat',
     configureServer(server) {
-      attach(server.middlewares, server.config.root, server.config.mode);
+      attach(asMiddleware(server.middlewares), server.config.root, server.config.mode);
     },
     configurePreviewServer(server) {
-      attach(server.middlewares, server.config.root, server.config.mode);
+      attach(asMiddleware(server.middlewares), server.config.root, server.config.mode);
     },
   };
 }
 
-function attach(middlewares: Connect.Server, root: string, mode: string) {
+/** Vite's request type comes from Node, which this browser project does not include. The running server still has `url` and `method`. */
+function asMiddleware(middlewares: object): { use(fn: (req: IncomingRequest, res: ServerResponse, next: () => void) => void): void } {
+  return middlewares as { use(fn: (req: IncomingRequest, res: ServerResponse, next: () => void) => void): void };
+}
+
+function attach(middlewares: { use(fn: (req: IncomingRequest, res: ServerResponse, next: () => void) => void): void }, root: string, mode: string) {
   middlewares.use((req, res, next) => {
     const path = (req.url ?? '').split('?')[0];
     if (path !== '/api/analysis' && path !== '/api/analysis/close') {
@@ -82,7 +87,8 @@ function attach(middlewares: Connect.Server, root: string, mode: string) {
 
 function savedKey(root: string, mode: string, name: string): string {
   const env = loadEnv(mode, root, '');
-  return (process.env[name] ?? env[name] ?? '').trim();
+  const fromProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[name];
+  return (fromProcess ?? env[name] ?? '').trim();
 }
 
 function cursorKey(root: string, mode: string): string {
@@ -130,9 +136,9 @@ async function answerWithGemini(
   writeEvent(res, { status: 'reading' });
   await gate(body.sessionId, async () => {
     const chat = touchGemini(body.sessionId);
-    const contents = [
+    const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [
       ...chat.turns.map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
-      { role: 'user', parts: [{ text: body.message }] },
+      { role: 'user' as const, parts: [{ text: body.message }] },
     ];
     const response = await geminiStream(key, advisorInstructions(body.context), contents, stop.signal);
     if (!response.ok || !response.body) throw await geminiFailure(response);
@@ -212,7 +218,7 @@ async function geminiFailure(res: Response): Promise<AdvisorError> {
   return failureFrom(text);
 }
 
-async function handle(req: Connect.IncomingMessage, res: ServerResponse, path: string, keys: { cursor: string; gemini: string }) {
+async function handle(req: IncomingRequest, res: ServerResponse, path: string, keys: { cursor: string; gemini: string }) {
   let raw: unknown;
   try {
     raw = JSON.parse(await readBody(req)) as unknown;
@@ -519,7 +525,7 @@ function statusFor(code: Code): number {
   }
 }
 
-async function readBody(req: Connect.IncomingMessage): Promise<string> {
+async function readBody(req: IncomingRequest): Promise<string> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of req as AsyncIterable<Uint8Array | string>) {
@@ -548,6 +554,12 @@ function delay(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /** The fields the middleware uses. Typed locally so this file does not depend on Node's type package. */
+interface IncomingRequest {
+  url?: string;
+  method?: string;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array | string>;
+}
+
 interface ServerResponse {
   statusCode: number;
   headersSent: boolean;
