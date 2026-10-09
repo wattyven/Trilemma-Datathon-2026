@@ -407,13 +407,14 @@ The spike ran requests one at a time with a 350 ms gap and an in-memory cache. G
 
 Measured with `spike/12`–`19` (the `*.live.test.ts` ones run with `npx vitest run --config spike/vitest.live.config.ts`).
 
-### 7.1 The one server-side piece: a LidarBC CORS proxy
+### 7.1 Server-side piece for data: a LidarBC CORS proxy
 
-VanShade is a static site with one exception: a small Cloudflare Worker
+VanShade is a static site with two exceptions, both small Cloudflare Workers. The only one that touches data is
 ([`proxy/lidarbc/`](../proxy/lidarbc)) that adds CORS headers to the LidarBC object store, which has the newest LiDAR and no
 CORS. It forwards `GET`/`HEAD` of LidarBC DSM/DEM tiles only, passes `Range` through, and caches at the edge for a day. The
 site reads its URL from the build-time variable `VITE_LIDARBC_PROXY` (a GitHub repository variable). **Without it the site is
-fully static** and skips LidarBC; everything else in this section works from the browser directly.
+fully static** and skips LidarBC; everything else in this section works from the browser directly. (The other Worker,
+[`proxy/gemini/`](../proxy/gemini), answers the Analysis chat and reads no map data.)
 
 ### 7.2 Which surface a lot gets
 

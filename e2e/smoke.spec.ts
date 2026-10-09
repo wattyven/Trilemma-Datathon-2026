@@ -38,7 +38,8 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect(page.locator('#sun-controls')).toBeHidden(); // modes, Measure at, 3D data: Advanced only
   await expect(page.locator('#timeline')).toBeHidden();
   await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
-  await expect(page.locator('#caveats')).toContainText('Lot lines are approximate');
+  await expect(page.locator('#lot-notices')).toContainText('approximate, not a legal survey');
+  await expect(page.locator('#lot-caveats')).toContainText('Trees count as solid all year');
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
   // Pins mark the sunniest and shadiest square metre; the summary's direction highlights one.
@@ -51,6 +52,32 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   // A pin opens its spot's months.
   await max.click();
   await expect(page.locator('#inspector svg.chart g.bar')).toHaveCount(12);
+
+  // Analysis: Gemini reads the lot through the proxy (stubbed here, so the test costs nothing). A
+  // build without VITE_GEMINI_PROXY has no Analysis button; the deployed site must have one.
+  const analysisOpen = page.locator('#analysis-open');
+  if (process.env.BASE_URL || (await analysisOpen.isVisible())) {
+    const asked: { context: string; turns: { role: string; text: string }[] }[] = [];
+    await page.route(/\/chat$/, (route) => {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      asked.push(route.request().postDataJSON());
+      return route.fulfill({ headers: { ...cors, 'Content-Type': 'text/event-stream' }, body: 'data: {"text":"The south-east corner "}\n\ndata: {"text":"is sunniest."}\n\ndata: {"done":true}\n\n' });
+    });
+    await analysisOpen.click();
+    const answers = page.locator('.analysis-msg[data-role="assistant"]');
+    await expect(answers).toHaveText(['The south-east corner is sunniest.']);
+    expect(asked[0]!.context).toContain('Address: 453 W 12th Ave, Vancouver, BC');
+    expect(asked[0]!.context).toContain('with typical weather');
+    // A suggested question goes with the conversation so far.
+    await page.locator('#analysis-chips button').first().click();
+    await expect(page.locator('.analysis-msg[data-role="user"]')).toHaveText(['Where should I plant vegetables?']);
+    await expect(answers).toHaveCount(2);
+    expect(asked[1]!.turns.map((t) => t.role)).toEqual(['user', 'model', 'user']);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#analysis-dialog')).toBeHidden();
+    await page.unroute(/\/chat$/);
+  }
 
   // New dates recompute, and go into the link (no time, no Advanced settings).
   await page.locator('#basic-from').fill('2026-06-01');
@@ -85,7 +112,7 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await older.close();
 
   // About accuracy opens and closes.
-  await shared.locator('#caveats [data-open-about]').click();
+  await shared.locator('#lot-caveats [data-open-about]').click();
   await expect(shared.locator('#about')).toBeVisible();
   await shared.keyboard.press('Escape');
   await expect(shared.locator('#about')).toBeHidden();
@@ -209,6 +236,7 @@ test('embed: "Copy embed code" gives an iframe that works on another page', asyn
   expect(await frame.locator('.site-header .brand').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
   await expect(frame.locator('#search-form')).toBeHidden();
   await expect(frame.locator('#tips')).toBeHidden();
+  await expect(frame.locator('#analysis-open')).toBeHidden(); // no chat on other sites' pages
   await expect(frame.locator('#embed-bar')).toContainText('Open Government Licences');
   const open = frame.locator('#embed-open');
   await expect(open).toHaveAttribute('target', '_blank');

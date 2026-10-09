@@ -2,8 +2,8 @@
 
 The BC Government's LidarBC object store (`nrs.objectstore.gov.bc.ca/gdwuts`) serves the newest
 Metro Vancouver LiDAR (2024 and 2025 1 m surface and ground models) without CORS headers, so a
-browser app can't read it directly. This Cloudflare Worker adds them. It is the only server-side
-piece of VanShade, the one exception to its static-only design (see docs/DATA_SOURCES.md §7.1).
+browser app can't read it directly. This Cloudflare Worker adds them. It is one of VanShade's two
+server-side pieces, with the Analysis chat's Gemini proxy (`proxy/gemini/`); see docs/DATA_SOURCES.md §7.1.
 
 What it does, and nothing more:
 

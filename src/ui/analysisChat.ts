@@ -1,12 +1,14 @@
-// The Analysis panel: a reading of the current lot, then questions about that same reading.
-// It sits in the info column under the lot notice, so it never covers the 3D view.
+// The Analysis panel: Gemini's short reading of the current lot, then questions about it. Questions
+// go to the Analysis proxy (proxy/gemini, VITE_GEMINI_PROXY), which holds the API key; the
+// conversation itself lives here and goes back with each question.
+import type { ErrorCode, Turn } from '../../proxy/gemini/worker';
 import { copy } from '../copy';
-import { GeminiChatError, streamGemini, type GeminiTurn } from '../geminiDirect';
-import { advisorInstructions, formatInsightContext, type InsightFacts } from '../insight';
+import { formatInsightContext, OPENING_QUESTION, takeEvents, type InsightFacts } from '../insight';
 
 export interface AnalysisChatElements {
   open: HTMLButtonElement;
   panel: HTMLElement;
+  close: HTMLButtonElement;
   log: HTMLElement;
   status: HTMLElement;
   form: HTMLFormElement;
@@ -14,312 +16,167 @@ export interface AnalysisChatElements {
   chips: HTMLElement;
 }
 
-type ChatCode = 'failed' | 'no-server' | 'no-key' | 'no-repo' | 'busy';
+/** The last four exchanges go back with each question (the proxy takes nine turns at most). */
+const KEEP_TURNS = 8;
 
-/** Chat id. `randomUUID` is missing in an insecure frame, and that throw used to stop the map from loading. */
-function newSessionId(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-interface StreamEvent {
-  text?: string;
-  status?: 'starting' | 'reading' | 'working';
-  code?: ChatCode;
-  detail?: string;
-  done?: boolean;
-}
-
-export function initAnalysisChat(
-  els: AnalysisChatElements,
-  getFacts: () => InsightFacts | null,
-  prepare?: () => Promise<void>,
-) {
-  const { open, panel, log, status, form, input, chips } = els;
-  const closeBtn = panel.querySelector<HTMLButtonElement>('#analysis-close');
-  const browserKey = import.meta.env.VITE_GEMINI_API_KEY?.trim() ?? '';
-  let sessionId = newSessionId();
-  let turns: GeminiTurn[] = [];
-  let shownContext = '';
+/** @param proxy the proxy's base URL, without a trailing slash */
+export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFacts: () => InsightFacts | null) {
+  const { open, panel, close, log, status, form, input, chips } = els;
+  let turns: Turn[] = [];
+  /** The lot the conversation started from; a different one starts it over. */
+  let startedWith = '';
   let abort: AbortController | null = null;
-  let busy = false;
-  /** Bumped when a conversation is thrown away, so a late reply can't re-enable the form. */
-  let generation = 0;
 
   for (const label of copy.analysis.chips) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'ghost';
-    btn.textContent = label;
-    btn.addEventListener('click', () => void ask(label, true));
-    chips.append(btn);
+    const b = Object.assign(document.createElement('button'), { type: 'button', className: 'ghost', textContent: label });
+    b.addEventListener('click', () => void ask(label, true));
+    chips.append(b);
   }
-
-  open.addEventListener('click', () => {
-    if (!panel.hidden) {
-      hide();
-      return;
-    }
-    void show();
-  });
-  closeBtn?.addEventListener('click', () => hide());
-  panel.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Escape') return;
-    ev.stopPropagation();
+  open.addEventListener('click', () => (panel.hidden ? show() : hide()));
+  close.addEventListener('click', () => {
     hide();
     open.focus();
   });
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault();
+  panel.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    hide();
+    open.focus();
+  });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
     void ask(text, true);
   });
 
-  function reveal() {
+  function show() {
     panel.hidden = false;
     open.setAttribute('aria-expanded', 'true');
     panel.scrollIntoView({ block: 'nearest' });
+    const facts = getFacts();
+    if (!facts) {
+      status.textContent = copy.analysis.notReady;
+      return;
+    }
+    const context = formatInsightContext(facts);
+    if (context === startedWith && log.childElementCount) return input.focus();
+    clear();
+    startedWith = context;
+    void ask(OPENING_QUESTION, false);
   }
 
   function hide() {
     panel.hidden = true;
     open.setAttribute('aria-expanded', 'false');
-    abort?.abort();
-    abort = null;
-    setBusy(false);
-    status.textContent = '';
+    stop();
   }
 
-  async function show() {
-    const gen = generation;
-    reveal();
-    if (prepare) {
-      status.textContent = copy.analysis.playing;
-      try {
-        await prepare();
-      } catch {
-        /* the day view can fail; still read whatever result is on screen */
-      }
-      if (gen !== generation) return;
-    }
-    const facts = getFacts();
-    if (!facts) {
-      status.textContent = copy.analysis.empty;
-      return;
-    }
-    const context = formatInsightContext(facts);
-    if (context === shownContext && log.childElementCount > 0) {
-      input.focus();
-      return;
-    }
-    const previous = sessionId;
-    generation++;
+  /** Abandon the answer in progress (closing the panel, or starting over). */
+  function stop() {
     abort?.abort();
     abort = null;
     setBusy(false);
-    sessionId = newSessionId();
-    turns = [];
-    shownContext = context;
-    log.replaceChildren();
-    void closeSession(previous);
-    void ask(copy.analysis.opening, false);
   }
 
-  /** A new search: drop the conversation and the cloud agent behind it. */
-  function reset() {
-    const previous = sessionId;
-    generation++;
-    shownContext = '';
-    abort?.abort();
-    abort = null;
-    setBusy(false);
-    sessionId = newSessionId();
+  function clear() {
+    stop();
     turns = [];
-    hide();
+    startedWith = '';
     log.replaceChildren();
     status.textContent = '';
-    void closeSession(previous);
   }
 
   function setBusy(on: boolean) {
-    busy = on;
-    input.disabled = on;
-    form.querySelector('button')!.disabled = on;
-    for (const btn of chips.querySelectorAll('button')) btn.disabled = on;
+    for (const el of form.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button')) el.disabled = on;
+    for (const b of chips.querySelectorAll('button')) b.disabled = on;
+    status.textContent = on ? copy.analysis.reading : '';
   }
 
   function bubble(role: 'user' | 'assistant' | 'error', text: string): HTMLParagraphElement {
-    const p = document.createElement('p');
-    p.className = 'analysis-msg';
+    const p = Object.assign(document.createElement('p'), { className: 'analysis-msg', textContent: text });
     p.dataset.role = role;
-    p.textContent = text;
     log.append(p);
     log.scrollTop = log.scrollHeight;
     return p;
   }
 
-  async function ask(message: string, showUser: boolean) {
-    if (busy) return;
-    const gen = generation;
+  async function ask(question: string, showQuestion: boolean) {
+    if (abort) return; // one question at a time
     const facts = getFacts();
     if (!facts) {
-      status.textContent = copy.analysis.empty;
+      status.textContent = copy.analysis.notReady;
       return;
     }
-    if (showUser) bubble('user', message);
-    setBusy(true);
-    status.textContent = copy.analysis.reading;
-    abort?.abort();
+    if (showQuestion) bubble('user', question);
     const controller = new AbortController();
     abort = controller;
+    setBusy(true);
     const reply = bubble('assistant', '');
+    let error: ErrorCode | 'offline' | null = null;
     try {
-      if (browserKey) {
-        const text = await streamGemini({
-          key: browserKey,
-          instructions: advisorInstructions(formatInsightContext(facts)),
-          turns,
-          message,
-          signal: controller.signal,
-          onText: (extra) => {
-            reply.textContent += extra;
-            log.scrollTop = log.scrollHeight;
-            status.textContent = '';
-          },
-        });
-        if (text.trim()) {
-          turns.push({ role: 'user', text: message }, { role: 'model', text });
-          while (turns.length > 8) turns.splice(0, 2);
-        } else {
-          reply.remove();
-          bubble('error', copy.analysis.failed);
-        }
-        return;
-      }
-      const res = await fetch('/api/analysis', {
+      const res = await fetch(`${proxy}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, context: formatInsightContext(facts), message }),
+        // The newest numbers each time, so a follow-up after changing the dates uses them.
+        body: JSON.stringify({ context: formatInsightContext(facts), turns: [...turns, { role: 'user', text: question }] }),
         signal: controller.signal,
       });
-      const type = res.headers.get('content-type') ?? '';
-      if (!res.body || !type.includes('text/event-stream')) {
-        reply.remove();
-        bubble('error', res.status === 404 || type.includes('text/html') ? copy.analysis.noServer : await errorText(res));
-        return;
-      }
-      await readStream(res.body, reply, controller.signal);
-      const code = reply.dataset.error as ChatCode | undefined;
-      const detail = reply.dataset.detail ?? '';
-      if (!reply.textContent?.trim()) reply.remove();
-      if (code) bubble('error', code === 'failed' && detail ? detail : messageFor(code));
-      else if (!reply.isConnected) bubble('error', copy.analysis.failed);
-    } catch (e) {
-      if (e instanceof GeminiChatError) {
-        reply.remove();
-        bubble('error', e.code === 'failed' && e.detail ? e.detail : messageFor(e.code));
-        return;
-      }
-      if ((e as { name?: string }).name === 'AbortError') {
-        if (!reply.textContent) reply.remove();
-        return;
-      }
-      reply.remove();
-      bubble('error', navigator.onLine ? copy.analysis.failed : copy.offline);
+      error = res.ok && res.body ? await read(res.body, reply, controller.signal) : await errorOf(res);
+      const answer = reply.textContent ?? '';
+      if (!error && answer.trim()) turns = [...turns, { role: 'user' as const, text: question }, { role: 'model' as const, text: answer }].slice(-KEEP_TURNS);
+      else error ??= 'failed';
+    } catch {
+      if (!controller.signal.aborted) error = navigator.onLine ? 'failed' : 'offline';
     } finally {
-      if (gen !== generation) return;
-      if (abort === controller) abort = null;
-      setBusy(false);
-      status.textContent = '';
-      if (!panel.hidden) input.focus();
+      if (abort === controller) {
+        abort = null;
+        setBusy(false);
+      }
     }
+    if (!reply.textContent?.trim()) reply.remove();
+    if (error && !controller.signal.aborted) bubble('error', error === 'offline' ? copy.offline : copy.analysis.errors[error]);
+    if (!panel.hidden && !controller.signal.aborted) input.focus();
   }
 
-  async function readStream(body: ReadableStream<Uint8Array>, reply: HTMLParagraphElement, signal: AbortSignal) {
+  /** Stream the answer into `reply`; the error code if one arrives or the stream ends without `done`. */
+  async function read(body: ReadableStream<Uint8Array>, reply: HTMLElement, signal: AbortSignal): Promise<ErrorCode | null> {
     const reader = body.getReader();
     const dec = new TextDecoder();
     let buf = '';
     while (!signal.aborted) {
       const { done, value } = await reader.read();
-      if (value) buf += dec.decode(value, { stream: !done });
-      let idx = buf.indexOf('\n\n');
-      while (idx >= 0) {
-        const block = buf.slice(0, idx);
-        buf = buf.slice(idx + 2);
-        const line = block.split('\n').find((l) => l.startsWith('data:'));
-        if (line) {
-          try {
-            applyEvent(JSON.parse(line.slice(5).trim()) as StreamEvent, reply);
-          } catch {
-            /* a partial or non-JSON keepalive */
-          }
-        }
-        idx = buf.indexOf('\n\n');
+      buf += dec.decode(value, { stream: !done });
+      const taken = takeEvents(done ? `${buf}\n\n` : buf);
+      buf = taken.rest;
+      for (const e of taken.events) {
+        if ('error' in e) return e.error;
+        if ('done' in e) return null;
+        reply.textContent += e.text;
+        status.textContent = '';
+        log.scrollTop = log.scrollHeight;
       }
       if (done) break;
     }
+    return 'failed';
   }
 
-  function applyEvent(ev: StreamEvent, reply: HTMLParagraphElement) {
-    if (ev.status === 'starting') status.textContent = copy.analysis.starting;
-    else if (ev.status === 'reading') status.textContent = copy.analysis.reading;
-    else if (ev.status === 'working') status.textContent = copy.analysis.working;
-    if (ev.text) {
-      reply.textContent += ev.text;
-      log.scrollTop = log.scrollHeight;
-      status.textContent = '';
-    }
-    if (ev.code) reply.dataset.error = ev.code;
-    if (ev.detail) reply.dataset.detail = ev.detail;
-  }
-
-  async function errorText(res: Response): Promise<string> {
-    if (res.status === 404) return copy.analysis.noServer;
+  async function errorOf(res: Response): Promise<ErrorCode> {
     try {
-      const body = (await res.json()) as { code?: ChatCode; detail?: string };
-      if (body.code === 'failed' && body.detail) return body.detail;
-      if (body.code) return messageFor(body.code);
+      const e = ((await res.json()) as { error?: unknown }).error;
+      if (e === 'busy' || e === 'limit' || e === 'failed') return e;
     } catch {
-      /* not JSON */
+      /* not ours: a network page or the like */
     }
-    return copy.analysis.failed;
+    return 'failed';
   }
 
-  function messageFor(code: ChatCode): string {
-    switch (code) {
-      case 'no-server':
-        return copy.analysis.noServer;
-      case 'no-key':
-        return copy.analysis.noKey;
-      case 'no-repo':
-        return copy.analysis.noRepo;
-      case 'busy':
-        return copy.analysis.busy;
-      case 'failed':
-        return copy.analysis.failed;
-      default: {
-        const _never: never = code;
-        return _never;
-      }
-    }
-  }
-
-  async function closeSession(id: string) {
-    if (browserKey) return;
-    try {
-      await fetch('/api/analysis/close', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: id }),
-        keepalive: true,
-      });
-    } catch {
-      /* the dev server may not be the one serving this page */
-    }
-  }
-
-  return { reset };
+  /** A new lot or the start page: drop the conversation and close the panel. */
+  return {
+    reset() {
+      clear();
+      hide();
+    },
+  };
 }

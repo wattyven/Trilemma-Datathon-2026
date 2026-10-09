@@ -1,6 +1,6 @@
 import './styles.css';
 import { Analysis, errorMessage, type AnalysisElements } from './analysis';
-import { IMAGERY, LOCATE } from './config';
+import { GEMINI_PROXY, IMAGERY, LOCATE } from './config';
 import { copy } from './copy';
 import { nearestAddress, resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
@@ -123,27 +123,30 @@ const timeline = new Timeline(
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
 const analysisOpen = byId<HTMLButtonElement>('analysis-open');
-const analysisChat = initAnalysisChat(
-  {
-    open: analysisOpen,
-    panel: byId('analysis-dialog'),
-    log: byId('analysis-log'),
-    status: byId('analysis-status'),
-    form: byId('analysis-form'),
-    input: byId('analysis-input'),
-    chips: byId('analysis-chips'),
-  },
-  () => analysis.insight(),
-  async () => {
-    await analysis.playDay();
-    writeUrl(false);
-  },
-);
-analysis.bindHeatmap(byId<HTMLButtonElement>('heatmap-toggle'), byId('heatmap-note'));
+const analysisChat = GEMINI_PROXY
+  ? initAnalysisChat(
+      GEMINI_PROXY,
+      {
+        open: analysisOpen,
+        panel: byId('analysis-dialog'),
+        close: byId('analysis-close'),
+        log: byId('analysis-log'),
+        status: byId('analysis-status'),
+        form: byId('analysis-form'),
+        input: byId('analysis-input'),
+        chips: byId('analysis-chips'),
+      },
+      () => analysis.insight(),
+    )
+  : null;
 analysis.onResult = () => {
-  analysisOpen.hidden = false;
-  byId('heatmap-toggle').hidden = false;
+  analysisOpen.hidden = !analysisChat;
 };
+/** A new search, another lot or the start page: close the chat and forget its conversation. */
+function resetAnalysisChat() {
+  analysisOpen.hidden = true;
+  analysisChat?.reset();
+}
 analysis.onViewChange = () => writeUrl(false);
 analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
@@ -348,9 +351,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   lastLookup = { req, opts };
   clearMessage();
   hideLot(lotEls);
-  analysisOpen.hidden = true;
-  analysis.clearHeatmap();
-  analysisChat.reset();
+  resetAnalysisChat();
   lotCanvas.clear();
   intro.hidden = true;
   document.documentElement.classList.add('has-lot'); // the address bar tucks into the header
@@ -434,9 +435,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
 
 /** Draw the chosen lot, then run elevation and sun for it. */
 async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number, steps: Steps, signal: AbortSignal) {
-  analysisOpen.hidden = true;
-  analysis.clearHeatmap();
-  analysisChat.reset();
+  resetAnalysisChat();
   const parcel = found.candidates[selected];
   if (!parcel) return;
   shown = { match, found, selected };
@@ -617,6 +616,7 @@ function goHome(push: boolean) {
   clearMessage();
   statusList.hidden = true;
   hideLot(lotEls);
+  resetAnalysisChat();
   lotCanvas.clear();
   intro.hidden = false;
   document.documentElement.classList.remove('has-lot');

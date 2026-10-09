@@ -1,7 +1,7 @@
 // Main-thread wrapper around the shade worker: promise per request, progress callbacks, and
 // "newest load wins" (a new lot cancels the previous one's horizon precompute).
 import { abortError } from '../data/http';
-import type { AreaMessage, ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadedMessage, LoadRequest, ToWorker } from './protocol';
+import type { ComputeRequest, ComputeResult, ErrorCode, FromWorker, LoadedMessage, LoadRequest, ToWorker } from './protocol';
 
 export class EngineError extends Error {
   readonly code: ErrorCode;
@@ -89,13 +89,5 @@ export class ShadeEngine {
     const msg = await this.send({ type: 'compute', id, request }, undefined, signal);
     if (msg.type !== 'result') throw new EngineError('internal', 'Unexpected worker reply');
     return { result: msg.result, ms: msg.ms };
-  }
-
-  /** Sun across the whole loaded landscape, on a coarse grid. Horizons stay cached until the next load. */
-  async area(step: number, request: ComputeRequest, signal?: AbortSignal): Promise<AreaMessage> {
-    const id = ++this.seq;
-    const msg = await this.send({ type: 'area', id, step, request }, undefined, signal);
-    if (msg.type !== 'area') throw new EngineError('internal', 'Unexpected worker reply');
-    return msg;
   }
 }

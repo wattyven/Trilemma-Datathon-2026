@@ -1,0 +1,19 @@
+# Cloudflare Worker for the Analysis chat (Gemini). See README.md.
+name = "vanshade-gemini"
+main = "worker.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Browsers from other sites, and requests without an Origin header, get a 403.
+ALLOWED_ORIGINS = "https://vanshade.ca,https://www.vanshade.ca,http://localhost:5173,http://localhost:5180,http://localhost:4173"
+
+# At most 10 questions a minute from one IP address (counted per Cloudflare location).
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+# The API key is a secret, never in this file: npx wrangler secret put GEMINI_API_KEY

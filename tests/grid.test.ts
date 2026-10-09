@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bilinear, heatmapStep, maxValue, NoLidarError, nodataFraction, selectCells, selectWindowCells, withObserver, type Raster } from '../src/engine/grid';
+import { bilinear, maxValue, NoLidarError, nodataFraction, selectCells, withObserver, type Raster } from '../src/engine/grid';
 import type { Ring } from '../src/geo/polygon';
 import { flatRaster } from './helpers/synthetic';
 
@@ -75,34 +75,5 @@ describe('selectCells', () => {
 
   it('refuses a lot that covers no pixel centre', () => {
     expect(() => selectCells(dsm, dtm, square(10.6, 10.6, 0.2), opts)).toThrow(NoLidarError);
-  });
-});
-
-describe('heatmap grid', () => {
-  it('covers every block with a surface, including past where the ground model stops', () => {
-    const dsm = flatRaster(16, 16, 5);
-    const dtm = flatRaster(16, 16, 4);
-    for (let i = 0; i < dtm.data.length; i++) {
-      const x = i % 16, y = (i / 16) | 0;
-      if (x < 8 || y < 8) dtm.data[i] = NaN;
-    }
-    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) dsm.data[y * 16 + x] = NaN;
-    const cells = selectWindowCells(dsm, dtm, 8, { mode: 'ground', heightM: 0.3 }, 2);
-    expect(cells.step).toBe(8);
-    expect(cells.count).toBe(3);
-    const onGround = [...cells.z0].filter((_, i) => cells.px[i]! >= 8 && cells.py[i]! >= 8);
-    const onSurface = [...cells.z0].filter((_, i) => cells.px[i]! < 8 || cells.py[i]! < 8);
-    expect(onGround).toHaveLength(1);
-    expect(onGround[0]).toBeCloseTo(4.3);
-    expect(onSurface).toHaveLength(2);
-    expect(onSurface[0]).toBeCloseTo(5.3);
-    expect(onSurface[1]).toBeCloseTo(5.3);
-  });
-
-  it('keeps about 8 m cells until the window would be too many samples', () => {
-    expect(heatmapStep(400, 400, 1)).toBe(8);
-    expect(heatmapStep(2000, 2000, 1)).toBeGreaterThan(8);
-    const step = heatmapStep(2000, 2000, 1);
-    expect(Math.ceil(2000 / step) * Math.ceil(2000 / step)).toBeLessThanOrEqual(4096);
   });
 });

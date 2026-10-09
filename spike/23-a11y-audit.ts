@@ -37,6 +37,17 @@ try {
   await desk.locator(RESULT).waitFor({ timeout: 90_000 });
   await desk.waitForTimeout(2500);
   await audit(desk, 'result (Basic), desktop');
+  // The Analysis chat, open with an answer (the proxy stubbed, so nothing goes to Gemini).
+  if (await desk.locator('#analysis-open').isVisible()) {
+    await desk.route(/\/chat$/, (route) => {
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      return route.fulfill({ headers: { ...cors, 'Content-Type': 'text/event-stream' }, body: 'data: {"text":"The south-east corner is sunniest."}\n\ndata: {"done":true}\n\n' });
+    });
+    await desk.locator('#analysis-open').click();
+    await desk.locator('.analysis-msg[data-role="assistant"]').waitFor();
+    await audit(desk, 'Analysis chat, desktop');
+  } else console.log('- Analysis chat skipped: no VITE_GEMINI_PROXY in this build');
   const adv = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await adv.goto(`${base}${LOT}&adv=1&m=season`);
   await adv.locator(RESULT).waitFor({ timeout: 90_000 });

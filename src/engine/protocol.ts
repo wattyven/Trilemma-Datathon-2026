@@ -104,26 +104,13 @@ export type ComputeResult =
 
 export type ErrorCode = 'no-lidar' | 'no-cells' | 'tile-edge' | 'fetch' | 'cancelled' | 'not-loaded' | 'internal';
 
-export interface AreaMessage {
-  type: 'area';
-  id: number;
-  step: number;
-  px: Float32Array;
-  py: Float32Array;
-  covered: Uint8Array;
-  values: Float32Array | Uint8Array;
-  valueKind: 'moment' | 'day' | 'season' | 'shade';
-}
-
 export type ToWorker =
   | { type: 'prefetch'; id: number; urls: string[] }
   | { type: 'load'; id: number; request: LoadRequest }
-  | { type: 'compute'; id: number; request: ComputeRequest }
-  | { type: 'area'; id: number; step: number; request: ComputeRequest };
+  | { type: 'compute'; id: number; request: ComputeRequest };
 
 export type FromWorker =
   | { type: 'progress'; id: number; stage: 'elevation' | 'horizon'; done: number; total: number }
   | LoadedMessage
   | { type: 'result'; id: number; result: ComputeResult; ms: number }
-  | AreaMessage
   | { type: 'error'; id: number; code: ErrorCode; message: string };

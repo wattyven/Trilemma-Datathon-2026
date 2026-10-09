@@ -88,6 +88,8 @@ how VanShade follows it:
     (2025, 1 m) or *Most detailed* (2016, 0.5 m); *Show changes since 2016* hatches what changed.
 - **Click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's sun month by
   month (with a typical-weather column in the table view) and through the day.
+- **Analysis:** a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each part), then
+  your own questions, such as "Where should I plant vegetables?". It answers from the numbers VanShade shows for the lot.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
   North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), the photo sits under the results.
 - **Copy link:** the address, lot, dates and settings are in the URL (`adv=1` for Advanced mode). Shared links show a
@@ -164,6 +166,9 @@ The app's **About accuracy** panel has the details.
 | Aerial photos | Each municipality's orthophoto service (list in the app's About panel) | Each municipality's Open Government Licence |
 | Typical weather | Environment and Climate Change Canada climate normals (hours of bright sunshine, Vancouver and Abbotsford airports), adjusted with [Open-Meteo](https://open-meteo.com/) historical weather (ECMWF, Copernicus ERA5) | Open Government Licence – Canada; CC BY 4.0 |
 
+Analysis answers are written by [Google's Gemini](https://ai.google.dev/gemini-api), called through
+[a small proxy](proxy/gemini) that keeps the API key off the site; only a written summary of the lot and the questions are sent.
+
 Built with [three.js](https://threejs.org/), [SunCalc](https://github.com/mourner/suncalc),
 [geotiff.js](https://geotiffjs.github.io/), [proj4js](https://github.com/proj4js/proj4js),
 [Luxon](https://moment.github.io/luxon/), [copc.js](https://github.com/connormanning/copc.js) and
@@ -192,9 +197,13 @@ npm run smoke        # Playwright smoke test (BASE_URL=… to point at a deploye
 A monthly workflow (`.github/workflows/refresh-index.yml`) rebuilds the high-resolution LiDAR file index and opens an
 issue when new surveys appear.
 
-The app is a static Vite + TypeScript site with no backend. The one optional exception is the LidarBC proxy in
-[`proxy/lidarbc/`](proxy/lidarbc): deploy it once with `npx wrangler deploy`, then set the repository variable
-`VITE_LIDARBC_PROXY`. Without it, the site skips LidarBC. Every push to `main` runs CI:
+The app is a static Vite + TypeScript site with no backend, apart from two optional Cloudflare Workers, each deployed once
+with `npx wrangler deploy` and switched on with a repository variable:
+- [`proxy/lidarbc/`](proxy/lidarbc) (`VITE_LIDARBC_PROXY`) adds CORS headers to LidarBC. Without it, the site skips LidarBC.
+- [`proxy/gemini/`](proxy/gemini) (`VITE_GEMINI_PROXY`) holds the Gemini API key for the Analysis chat. Without it, there's
+  no Analysis button.
+
+Every push to `main` runs CI:
 1. typecheck, both time-zone test runs, and build
 2. deploy to GitHub Pages
 3. the Playwright smoke test against the live site
@@ -206,6 +215,7 @@ The app is a static Vite + TypeScript site with no backend. The one optional exc
 | `src/imagery/` | municipal aerial photos: sources, fetching, placement |
 | `src/weather/` | typical weather: airport sunshine normals and the local cloud pattern |
 | `proxy/lidarbc/` | the Cloudflare Worker that adds CORS headers to LidarBC |
+| `proxy/gemini/` | the Cloudflare Worker that answers the Analysis chat with Gemini (it holds the API key) |
 | `src/engine/` | cells, horizons, sun sampling, outputs; the worker protocol and client |
 | `src/workers/` | the shade worker and its horizon helper threads |
 | `src/scene/` | the three.js view (lazy-loaded) and its pure geometry helpers |

@@ -1,4 +1,4 @@
-// Pop-up dialogs: "About accuracy" (opened from the caveats line and the footer) and Basic's
+// Pop-up dialogs: "About accuracy" (opened from the caveats list and the footer) and Basic's
 // "About these numbers".
 export function initDialog(dialog: HTMLDialogElement, openers: Iterable<HTMLElement>) {
   for (const btn of openers) {

@@ -45,7 +45,7 @@ try {
   await desk.screenshot({ path: join(DOCS, 'desktop.png') });
   await desk.locator('#inspector').screenshot({ path: join(DOCS, 'inspector.png') });
   await desk.screenshot({ path: join(OUT_DIR, 'review-desktop-full.png'), fullPage: true });
-  await desk.locator('#caveats [data-open-about]').click();
+  await desk.locator('#lot-caveats [data-open-about]').click();
   await desk.waitForTimeout(300);
   await desk.screenshot({ path: join(OUT_DIR, 'review-about.png') });
   await desk.keyboard.press('Escape');

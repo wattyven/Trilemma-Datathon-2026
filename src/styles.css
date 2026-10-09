@@ -118,17 +118,6 @@ button.ghost:hover { border-color: var(--moss); }
 /* Lot layout */
 .lot { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 28px; margin-top: 16px; }
 .view-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; }
-.analysis { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; grid-column: 1 / -1; width: 100%; }
-.analysis:not(:has(> :not([hidden]))) { display: none; }
-.analysis-panel { flex: 1 1 100%; }
-#heatmap-note { flex: 1 1 100%; margin: 0; }
-button.analysis-open {
-  margin: 16px 0 0; padding: 6px 14px; font-weight: 600; color: var(--fog);
-  background: var(--cedar); border: 0; border-radius: var(--radius);
-}
-button.analysis-open:hover { background: color-mix(in srgb, var(--cedar) 88%, var(--sun)); }
-button.analysis-open[aria-pressed='true'] { color: var(--cedar); background: var(--sun); }
-button.analysis-open:disabled { opacity: 0.6; }
 .segmented { display: inline-flex; border: 1px solid var(--mist); border-radius: var(--radius); padding: 2px; margin: 0; background: var(--panel); }
 .segmented label { position: relative; padding: 4px 14px; border-radius: 6px; cursor: pointer; }
 .segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
@@ -240,7 +229,6 @@ button.analysis-open:disabled { opacity: 0.6; }
 .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .examples span { color: var(--muted); }
 button.link { padding: 0; border: 0; background: none; color: var(--shade); text-decoration: underline; text-underline-offset: 2px; }
-.caveats { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 10px 0 0; padding: 8px 10px; font-size: 0.875rem; color: var(--muted); border-top: 1px solid var(--mist); }
 .share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -4px 0 12px; }
 .share-row .hint { margin: 0; overflow-wrap: anywhere; }
 .about { max-width: min(680px, calc(100vw - 32px)); max-height: 85vh; padding: 20px 24px; border: 1px solid var(--mist); border-radius: 12px; color: var(--ink); background: var(--panel); }
@@ -250,23 +238,27 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .about ul { padding-left: 18px; }
 .about li { margin-bottom: 6px; }
 .about-close { float: right; margin: 0 0 8px 12px; }
-/* Full width under the lot, after the accuracy notes. The transcript scrolls once it is tall enough to read a conversation. */
+.sheet-handle { display: none; }
+
+/* Analysis chat: a button under the view, opening a panel there. The conversation scrolls once it's tall. */
+.analysis { margin-top: 12px; }
+.analysis:not(:has(> :not([hidden]))) { display: none; }
+button.analysis-open {
+  padding: 8px 16px; font-weight: 600; color: var(--fog);
+  background: var(--cedar); border: 0; border-radius: var(--radius);
+}
+button.analysis-open:hover { background: color-mix(in srgb, var(--cedar) 88%, var(--sun)); }
 .analysis-panel:not([hidden]) {
-  display: flex; flex-direction: column; gap: 8px;
-  width: 100%; margin: 10px 0 0; padding: 12px 14px;
-  border: 1px solid var(--mist); border-radius: var(--radius); color: var(--ink); background: var(--panel);
+  display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding: 12px 14px;
+  border: 1px solid var(--mist); border-radius: var(--radius); background: var(--panel);
 }
 .analysis-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.analysis-panel .analysis-head h2 { margin: 0; font-size: 1.05rem; }
+.analysis-head h2 { margin: 0; font-size: 1.05rem; }
+#analysis-status { margin: 0; }
 #analysis-status:empty { display: none; }
-.analysis-log {
-  flex: 1 1 auto; min-height: 8rem; max-height: 22rem; overflow: auto;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.analysis-msg {
-  max-width: 92%; margin: 0; padding: 8px 12px; white-space: pre-wrap;
-  border-radius: 12px; line-height: 1.45;
-}
+.analysis-log { display: flex; flex-direction: column; gap: 8px; max-height: 22rem; overflow: auto; }
+.analysis-log:empty { display: none; }
+.analysis-msg { max-width: 92%; margin: 0; padding: 8px 12px; white-space: pre-wrap; border-radius: 12px; line-height: 1.45; }
 .analysis-msg:empty { display: none; }
 .analysis-msg[data-role='assistant'] { align-self: flex-start; background: var(--fog); }
 .analysis-msg[data-role='user'] { align-self: flex-end; color: var(--fog); background: var(--cedar); }
@@ -281,9 +273,8 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
   padding: 10px 16px; font-weight: 600; color: var(--fog);
   background: var(--cedar); border: 0; border-radius: var(--radius);
 }
-.analysis-form button:disabled, .analysis-chips button:disabled { opacity: 0.55; }
+.analysis-form :disabled, .analysis-chips button:disabled { opacity: 0.55; cursor: default; }
 .analysis-footnote { margin: 0; }
-.sheet-handle { display: none; }
 
 /* Info column */
 .lot-info h2 { margin: 0 0 12px; font-size: 1.3rem; }
@@ -292,7 +283,9 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .facts dd { margin: 0; }
 .notices { margin: 0 0 12px; padding-left: 18px; font-size: 0.95rem; }
 .notices li { margin-bottom: 6px; }
-.notices li[data-notice='approximate-lines'] { color: var(--muted); }
+.notices li[data-notice='approximate-lines'], .caveats li { color: var(--muted); }
+/* The lot notices and the caveats (with the photo credit, in Basic) read as one list. */
+html:not(.basic) #lot-notices { margin-bottom: 6px; }
 .switcher { border: 1px solid var(--mist); border-radius: var(--radius); padding: 8px 12px; }
 .switcher label { display: block; padding: 4px 0; cursor: pointer; }
 
@@ -334,15 +327,14 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .basic #result-headline, .basic #result-summary, .basic #sun-controls, .basic #lot-facts, .basic #lot-more, .basic .debug,
 .basic #timeline, .basic #timeline-note, .basic #opacity-wrap, .basic #changes-wrap, .basic #shadows-wrap,
 .basic [data-ui='advanced'], html:not(.basic) [data-ui='basic'],
-html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic) #basic-head, html:not(.basic) #credit-notices,
+html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic) #basic-head, html:not(.basic) #photo-credit-item,
 .basic #photo-credit { display: none !important; }
 .basic .lot { grid-template-columns: 1fr; gap: 12px; }
 /* The panel's pieces join the page's column: address, summary and dates first, then the view, then the rest. */
 .basic .lot-info { display: contents; }
 .basic .lot-info > #lot-heading, .basic .lot-info > #basic-head, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-dates { order: -1; margin-bottom: 0; }
-.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #credit-notices, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
-.basic .lot-info > #credit-notices { margin-top: -12px; } /* one list with the lot notices */
-.credit-notices li { color: var(--muted); }
+.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #lot-caveats, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
+.basic .lot-info > #lot-caveats { margin-top: -12px; } /* one list with the lot notices */
 /* The dates line and "About these numbers" sit beside the address on wider screens. */
 .basic-head { margin: 0; color: var(--muted); }
 .basic-stats-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; }
@@ -385,7 +377,7 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic)
 .embed #lot-facts, .embed #lot-more, .embed #lot-notices, .embed #lot-switcher,
 .embed .controls .row, .embed .controls > .hint:not(.mode-hint), .embed #elevation-wrap { display: none !important; }
 .embed.embed-lot .search { display: none; }
-.embed #basic-dates, .embed #advanced-toggle { display: none !important; }
+.embed #basic-dates, .embed #advanced-toggle, .embed .analysis { display: none !important; }
 /* The name stays for screen readers (it's the page's h1); the address bar stays for embeds without an address. */
 .embed .site-header .brand { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .embed .site-header { padding: 8px 12px 0; }

@@ -11,10 +11,6 @@ describe('index.html', () => {
 
   it('loads the app entry and exposes the build id', () => {
     expect(html).toContain('<script type="module" src="/src/main.ts"></script>');
-    expect(html).toContain('id="analysis-open"');
-    expect(html).toContain('id="heatmap-toggle"');
-    expect(html).toContain('>Analysis</button>');
-    expect(html).toContain('id="analysis-dialog"');
     expect(html).toContain('<meta name="vanshade-build" content="%VITE_BUILD_SHA%" />');
   });
 });

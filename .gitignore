@@ -7,6 +7,9 @@ dist/
 *.gpkg
 playwright-report/
 test-results/
-# Local secrets for the Analysis chat. .env is the public site address, not a secret.
+# Local overrides and secrets (.env itself holds only public settings)
 .env.local
 .env.*.local
+# Cloudflare Workers: wrangler's cache and local secrets for `wrangler dev`
+.wrangler/
+.dev.vars

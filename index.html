@@ -149,13 +149,24 @@
           <div id="legend" class="legend" hidden></div>
           <p id="readout" class="readout" aria-live="polite"></p>
           <section id="inspector" class="inspector" aria-live="polite" hidden></section>
-          <p id="caveats" class="caveats">
-            <span>Lot lines are approximate.</span>
-            <span id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</span>
-            <span>Trees count as solid all year.</span>
-            <span>The main numbers are for clear days.</span>
-            <button type="button" class="link" data-open-about>About accuracy</button>
-          </p>
+          <div class="analysis">
+            <button type="button" id="analysis-open" class="analysis-open" hidden aria-expanded="false" aria-controls="analysis-dialog">Analysis</button>
+            <section id="analysis-dialog" class="analysis-panel" hidden aria-labelledby="analysis-heading">
+              <div class="analysis-head">
+                <h2 id="analysis-heading">Analysis</h2>
+                <button type="button" id="analysis-close" class="ghost">Close</button>
+              </div>
+              <p id="analysis-status" class="hint" aria-live="polite"></p>
+              <div id="analysis-log" class="analysis-log" role="log"></div>
+              <div id="analysis-chips" class="analysis-chips"></div>
+              <form id="analysis-form" class="analysis-form">
+                <label class="visually-hidden" for="analysis-input">Ask about this lot</label>
+                <input id="analysis-input" type="text" maxlength="2000" autocomplete="off" placeholder="Ask about this lot's sun and shade" />
+                <button type="submit">Ask</button>
+              </form>
+              <p class="hint analysis-footnote">Answers are written by Google's Gemini from this lot's numbers, and can be wrong.</p>
+            </section>
+          </div>
         </div>
         <div class="lot-info" id="lot-info" data-sheet="collapsed">
           <button type="button" id="sheet-handle" class="sheet-handle" aria-expanded="false" aria-controls="lot-info">
@@ -241,7 +252,12 @@
             <dl id="lot-facts-more" class="facts"></dl>
           </details>
           <ul id="lot-notices" class="notices"></ul>
-          <ul id="credit-notices" class="notices credit-notices"><li id="photo-credit-item" hidden></li></ul>
+          <ul id="lot-caveats" class="notices caveats">
+            <li id="photo-credit-item" hidden></li>
+            <li id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</li>
+            <li>Trees count as solid all year.</li>
+            <li>The main numbers are for clear days. <button type="button" class="link" data-open-about>About accuracy</button></li>
+          </ul>
           <details id="lot-switcher" class="switcher" hidden>
             <summary id="lot-switcher-summary">Not the right lot?</summary>
             <fieldset>
@@ -256,26 +272,6 @@
             <label class="check"><input type="checkbox" id="compare-toggle" /> Compare 3D shadows with the shade engine (engine shade is tinted blue)</label>
             <dl id="debug-facts" class="facts"></dl>
           </details>
-        </div>
-        <div class="analysis">
-          <button type="button" id="analysis-open" class="analysis-open" hidden aria-expanded="false" aria-controls="analysis-dialog">Analysis</button>
-          <button type="button" id="heatmap-toggle" class="analysis-open" hidden aria-pressed="false">Heat map</button>
-          <p id="heatmap-note" class="hint" hidden></p>
-          <section id="analysis-dialog" class="analysis-panel" hidden aria-labelledby="analysis-heading">
-            <div class="analysis-head">
-              <h2 id="analysis-heading">Analysis</h2>
-              <button type="button" id="analysis-close" class="ghost">Close</button>
-            </div>
-            <p id="analysis-status" class="hint" aria-live="polite"></p>
-            <div id="analysis-log" class="analysis-log" role="log"></div>
-            <div id="analysis-chips" class="analysis-chips"></div>
-            <form id="analysis-form" class="analysis-form">
-              <label class="visually-hidden" for="analysis-input">Ask about this lot</label>
-              <input id="analysis-input" type="text" maxlength="2000" autocomplete="off" placeholder="Ask about this lot's sun and shade" />
-              <button type="submit">Ask</button>
-            </form>
-            <p class="hint analysis-footnote">Answers use this lot's sun and shade numbers. The key stays on this computer.</p>
-          </section>
         </div>
       </section>
     </main>
@@ -304,8 +300,8 @@
         square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
         keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
         the newer survey wherever something did. "3D data" under More options lets you pick either survey on its own. It then follows the sun across the day or season
-        to count hours of direct sun. The sun and shade are worked out in your browser, and map data is requested from the public sources below.
-        Opening Analysis also sends a short written summary of the lot to Gemini so it can answer questions; the 3D model stays on your computer.
+        to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests and, if you
+        open Analysis, a short written summary of the lot and your questions, which go to Google's Gemini to write the answers.
       </p>
       <h3>How to use VanShade</h3>
       <ol>
@@ -348,6 +344,7 @@
         <li>Newer LiDAR surface and ground models (LidarBC, 2024 and 2025): Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
         <li id="about-imagery">Aerial photos, when switched on, come from each municipality's open data.</li>
         <li>Typical weather: sunshine normals for Vancouver and Abbotsford airports from Environment and Climate Change Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>; local cloud from <a href="https://open-meteo.com/">Open-Meteo.com</a> historical weather (ECMWF and Copernicus ERA5), <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</li>
+        <li>Analysis answers are written by <a href="https://ai.google.dev/gemini-api">Google's Gemini</a>, from the lot's numbers shown here.</li>
         <li>Libraries: <a href="https://threejs.org/">three.js</a>, <a href="https://github.com/mourner/suncalc">SunCalc</a>, <a href="https://geotiffjs.github.io/">geotiff.js</a>, <a href="https://github.com/proj4js/proj4js">proj4js</a>, <a href="https://moment.github.io/luxon/">Luxon</a>, <a href="https://github.com/connormanning/copc.js">copc.js</a>, <a href="https://github.com/hobuinc/laz-perf">laz-perf</a>. Headings use <a href="https://github.com/undercasetype/Fraunces">Fraunces</a> (SIL Open Font License).</li>
       </ul>
     </dialog>

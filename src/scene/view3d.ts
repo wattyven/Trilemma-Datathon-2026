@@ -82,8 +82,6 @@ export class LotScene {
   private terrainInput: TerrainInput | null = null;
   private changeMesh: THREE.Mesh | null = null;
   private overlay: THREE.Mesh | null = null;
-  private heatMesh: THREE.Mesh | null = null;
-  private heatOn = false;
   private layerTexture: THREE.CanvasTexture | null = null;
   private compareTexture: THREE.CanvasTexture | null = null;
   private lineMaterials: LineMaterial[] = [];
@@ -269,8 +267,8 @@ export class LotScene {
     const mat = this.overlay.material as THREE.MeshBasicMaterial;
     mat.map = this.compareTexture ?? this.layerTexture;
     mat.needsUpdate = true;
-    this.overlay.visible = !!mat.map && !this.heatOn;
-    this.canvas.dataset.state = this.hasLayer || this.heatOn ? 'result' : this.model ? 'elevation' : 'empty';
+    this.overlay.visible = !!mat.map;
+    this.canvas.dataset.state = this.hasLayer ? 'result' : this.model ? 'elevation' : 'empty';
     this.invalidate();
   }
 
@@ -339,54 +337,6 @@ export class LotScene {
       this.world.add(this.changeMesh);
     }
     this.invalidate();
-  }
-
-  /**
-   * A continuous sun colouring over the whole loaded landscape. Null hides it and brings the lot
-   * colours back. The mesh follows the terrain at about 8 m, and the texture fills every sample's block.
-   */
-  setHeatmap(rgba: Uint8ClampedArray<ArrayBuffer> | null) {
-    if (!rgba) {
-      this.heatOn = false;
-      if (this.heatMesh) this.heatMesh.visible = false;
-      this.applyOverlay();
-      return;
-    }
-    const mesh = this.ensureHeatMesh();
-    if (!mesh) {
-      this.invalidate();
-      return;
-    }
-    const tex = this.texture(rgba);
-    tex.magFilter = THREE.LinearFilter;
-    const mat = mesh.material as THREE.MeshBasicMaterial;
-    mat.map?.dispose();
-    mat.map = tex;
-    mat.needsUpdate = true;
-    mesh.visible = true;
-    this.heatOn = true;
-    this.applyOverlay();
-  }
-
-  private ensureHeatMesh(): THREE.Mesh | null {
-    if (this.heatMesh) return this.heatMesh;
-    const input = this.terrainInput;
-    const model = this.model;
-    if (!input || !model) return null;
-    const step = Math.max(2, Math.round(8 / Math.max(model.window.res, 0.1)));
-    const c1 = Math.floor((input.width - 1) / step) * step;
-    const r1 = Math.floor((input.height - 1) / step) * step;
-    if (c1 < step || r1 < step) return null;
-    const arrays = buildGrid(input, { c0: 0, r0: 0, c1, r1 }, step, { ground: [1, 1, 1], water: [1, 1, 1] });
-    for (let i = 1; i < arrays.positions.length; i += 3) arrays.positions[i]! += 0.12;
-    this.heatMesh = new THREE.Mesh(
-      toGeometry(arrays),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, toneMapped: false }),
-    );
-    this.heatMesh.renderOrder = 3;
-    this.heatMesh.visible = false;
-    this.world.add(this.heatMesh);
-    return this.heatMesh;
   }
 
   /** How opaque the results are over the terrain (lowered to see the photo underneath). */
@@ -512,8 +462,6 @@ export class LotScene {
     this.world.clear();
     this.terrain = [];
     this.overlay = null;
-    this.heatMesh = null;
-    this.heatOn = false;
     this.layerTexture?.dispose();
     this.compareTexture?.dispose();
     this.layerTexture = this.compareTexture = null;

@@ -1,11 +1,12 @@
-// Plain-language facts for the Analysis chat, and the small bits of stream parsing the dev
-// server shares with tests. No network here.
+// The Analysis chat's side of the conversation: the lot in plain lines for the advisor, and the
+// events the Analysis proxy (proxy/gemini) streams back. No network here.
+import type { ErrorCode } from '../proxy/gemini/worker';
 
 export interface InsightFacts {
   address: string;
   jurisdiction: string;
   area: string;
-  /** Mode, date and time, as the inspector already phrases them. */
+  /** Mode and dates, as the inspector already phrases them. */
   showing: string;
   measuredAt: string;
   headline: string;
@@ -16,11 +17,15 @@ export interface InsightFacts {
 }
 
 const CAVEATS = [
-  'Hours are clear-sky direct sun. Cloud and rain are not included.',
+  'The main hours are direct sun on clear days. Figures "with typical weather" allow for average cloud.',
   'Trees are treated as solid all year, so winter light through bare branches is understated.',
   'Lot lines are approximate, not a legal survey.',
-  'Only objects within about 200 metres cast shadows.',
+  'Only buildings, trees and land within about 200 metres cast shadows.',
 ];
+
+/** The first question, not shown: a short reading of the lot. */
+export const OPENING_QUESTION =
+  'Give a short practical reading of this lot: where the sun and shade fall, what that means for a garden or for sitting outside, and one thing to watch out for. Three short paragraphs at most.';
 
 /** The lot, in lines a model can read. Empty fields are left out. */
 export function formatInsightContext(facts: InsightFacts): string {
@@ -33,115 +38,30 @@ export function formatInsightContext(facts: InsightFacts): string {
     facts.lidar ? `Elevation: ${facts.lidar}` : '',
     facts.headline ? `Result: ${facts.headline}` : '',
     facts.summary ? `Comparison: ${facts.summary}` : '',
-    facts.thresholds ? `Colour scale: ${facts.thresholds}` : '',
+    facts.thresholds ? `Sun classes: ${facts.thresholds}` : '',
     ...facts.notices.filter((n) => n.trim()).map((n) => `Note: ${n.trim()}`),
     ...CAVEATS,
   ];
   return lines.filter((line) => line.length > 0).join('\n');
 }
 
-/** Instructions plus the latest lot facts. The question is sent separately so a chat API can keep a system role. */
-export function advisorInstructions(context: string): string {
-  return [
-    'You are the advisor inside VanShade, a sun and shade map for one Metro Vancouver lot. The person is deciding where to garden or spend time outside.',
-    'Reply in plain sentences for a gardener. No headings, and do not mention software, files, or tools.',
-    'Use only the lot facts below and the conversation so far. If the facts do not say, say you do not know.',
-    'There is no repository. Do not edit files, run commands, browse, or call tools. The reply is the whole answer.',
-    '',
-    'Lot facts:',
-    context.trim(),
-  ].join('\n');
-}
+export type ChatEvent = { text: string } | { done: true } | { error: ErrorCode };
 
-/** Instructions plus the latest lot facts and question. Sent as one prompt where there is no system role. */
-export function buildAdvisorPrompt(context: string, question: string): string {
-  return [advisorInstructions(context), '', 'Question:', question.trim()].join('\n');
-}
-
-/** Visible reply text from one Gemini `data` payload. Several JSON objects on separate lines all count. */
-export function geminiPayloadText(data: string): string {
-  let text = '';
-  for (const piece of data.split('\n')) {
-    const line = piece.trim();
-    if (!line || line === '[DONE]') continue;
+/** Complete events from the stream so far (`data: {…}` blocks); `rest` is the unfinished tail. */
+export function takeEvents(buffer: string): { events: ChatEvent[]; rest: string } {
+  const blocks = buffer.replaceAll('\r\n', '\n').split('\n\n');
+  const rest = blocks.pop()!;
+  const events: ChatEvent[] = [];
+  for (const block of blocks) {
+    const data = block.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5)).join('\n');
     try {
-      text += geminiChunkText(JSON.parse(line) as unknown);
+      const e = JSON.parse(data) as Partial<{ text: unknown; done: unknown; error: unknown }>;
+      if (typeof e.text === 'string') events.push({ text: e.text });
+      else if (e.done === true) events.push({ done: true });
+      else if (e.error === 'busy' || e.error === 'limit' || e.error === 'failed') events.push({ error: e.error });
     } catch {
-      /* a non-JSON line is not a reply chunk */
+      /* a comment or keep-alive */
     }
-  }
-  return text;
-}
-
-/** Visible reply text from one Gemini stream chunk. Thinking parts are left out. */
-export function geminiChunkText(payload: unknown): string {
-  if (!payload || typeof payload !== 'object') return '';
-  const candidates = (payload as { candidates?: unknown }).candidates;
-  const first = Array.isArray(candidates) ? candidates[0] : undefined;
-  if (!first || typeof first !== 'object') return '';
-  const parts = (first as { content?: { parts?: unknown } }).content?.parts;
-  if (!Array.isArray(parts)) return '';
-  return parts
-    .filter((part): part is { text: string } => {
-      if (!part || typeof part !== 'object') return false;
-      const row = part as { text?: unknown; thought?: unknown };
-      return typeof row.text === 'string' && row.thought !== true;
-    })
-    .map((part) => part.text)
-    .join('');
-}
-
-export interface SseEvent {
-  event: string;
-  data: string;
-}
-
-/** Pull complete SSE blocks out of a byte stream. `rest` is the incomplete tail. */
-export function takeSseEvents(buffer: string): { events: SseEvent[]; rest: string } {
-  const events: SseEvent[] = [];
-  let rest = buffer.replaceAll('\r\n', '\n');
-  while (true) {
-    const split = rest.indexOf('\n\n');
-    if (split < 0) break;
-    const block = rest.slice(0, split);
-    rest = rest.slice(split + 2);
-    if (!block.trim()) continue;
-    let event = 'message';
-    const data: string[] = [];
-    for (const line of block.split('\n')) {
-      if (line.startsWith('event:')) event = line.slice(6).trim();
-      else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
-    }
-    events.push({ event, data: data.join('\n') });
   }
   return { events, rest };
-}
-
-/** Same as `takeSseEvents`, and a final block that arrived without a trailing blank line. */
-export function takeSseEventsEnd(buffer: string): { events: SseEvent[]; rest: string } {
-  if (!buffer.trim()) return { events: [], rest: '' };
-  const padded = buffer.endsWith('\n') ? `${buffer}\n` : `${buffer}\n\n`;
-  return { events: takeSseEvents(padded).events, rest: '' };
-}
-
-/**
- * Assistant text from Cursor is usually a delta, and sometimes a growing snapshot of the same reply.
- * Returns the full text so far.
- */
-export function mergeAssistantText(soFar: string, next: string): string {
-  if (!next) return soFar;
-  if (next.startsWith(soFar)) return next;
-  return soFar + next;
-}
-
-export type AdvisorProblem = 'failed' | 'no-repo' | 'no-key' | 'busy';
-
-/** Turn a Cursor error body into a code the chat can show. The detail is a short sentence, never a page of HTML. */
-export function explainAdvisorFailure(message: string): { code: AdvisorProblem; detail: string } {
-  const detail = message.replace(/\s+/g, ' ').trim().slice(0, 240);
-  const lower = detail.toLowerCase();
-  if (/repository|no-repo|"repos"/.test(lower)) return { code: 'no-repo', detail: '' };
-  if (lower.includes('unauthorized') || lower.includes('invalid api key') || lower.includes('api key')) return { code: 'no-key', detail: '' };
-  if (lower.includes('too many') || lower.includes('rate limit') || lower.includes('high demand') || lower.includes('unavailable')) return { code: 'busy', detail: '' };
-  return { code: 'failed', detail: detail.startsWith('<') ? '' : detail };
 }

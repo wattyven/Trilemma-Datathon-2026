@@ -1,6 +1,5 @@
 // Elevation rasters and analysis cells. All coordinates are continuous pixel
 // coordinates in the window: pixel (c, r) is centred at (c + 0.5, r + 0.5); NaN means nodata.
-import { HEATMAP } from '../config';
 import { pointInGeometry, type AreaGeometry, type Ring } from '../geo/polygon';
 
 export interface Raster {
@@ -153,69 +152,6 @@ export function selectCells(dsm: Raster, dtm: Raster, lot: Ring[][], o: CellOpti
     cells.z0[i] = o.observer.mode === 'surface' ? s + o.observer.heightM : t + o.observer.heightM;
     cells.covered[i] = s - t > o.coveredM ? 1 : 0;
   });
-  return cells;
-}
-
-/** Pixel step that covers a window in at most HEATMAP.cap samples, and at least HEATMAP.minM on the ground. */
-export function heatmapStep(width: number, height: number, resM: number): number {
-  const minPx = Math.max(1, Math.ceil(HEATMAP.minM / Math.max(resM, 0.01)));
-  const cap = HEATMAP.cap;
-  if (Math.ceil(width / minPx) * Math.ceil(height / minPx) <= cap) return minPx;
-  return Math.max(minPx, Math.ceil(Math.sqrt((width * height) / cap)));
-}
-
-/**
- * One sample per `step`×`step` block across the whole raster, not only the lot.
- * Blocks with no elevation are left out; the rest cover the loaded landscape.
- */
-export function selectWindowCells(dsm: Raster, dtm: Raster, step: number, observer: Observer, coveredM: number): CellSet {
-  const size = Math.max(1, Math.round(step));
-  const xs: number[] = [];
-  const ys: number[] = [];
-  const dsmV: number[] = [];
-  const dtmV: number[] = [];
-  // The ground model is only stored near the lot. Farther out the 3D view is still the surface, so a
-  // block counts when any pixel has a surface; the observer stands on the ground where we have it.
-  for (let r0 = 0; r0 < dsm.height; r0 += size) {
-    const r1 = Math.min(dsm.height, r0 + size);
-    for (let c0 = 0; c0 < dsm.width; c0 += size) {
-      const c1 = Math.min(dsm.width, c0 + size);
-      let px = 0, py = 0, s = NaN, t = NaN, both = false;
-      for (let r = r0; r < r1 && !both; r++) {
-        for (let c = c0; c < c1; c++) {
-          const sv = dsm.data[r * dsm.width + c]!;
-          if (Number.isNaN(sv)) continue;
-          const tv = dtm.data[r * dtm.width + c]!;
-          if (!Number.isNaN(tv)) {
-            px = c + 0.5; py = r + 0.5; s = sv; t = tv; both = true;
-            break;
-          }
-          if (Number.isNaN(s)) { px = c + 0.5; py = r + 0.5; s = sv; t = sv; }
-        }
-      }
-      if (Number.isNaN(s)) continue;
-      xs.push(px); ys.push(py); dsmV.push(s); dtmV.push(t);
-    }
-  }
-  const n = xs.length;
-  const blocks = Math.ceil(dsm.height / size) * Math.ceil(dsm.width / size);
-  const cells: CellSet = {
-    count: n,
-    px: Float32Array.from(xs),
-    py: Float32Array.from(ys),
-    z0: new Float32Array(n),
-    dsm: Float32Array.from(dsmV),
-    dtm: Float32Array.from(dtmV),
-    covered: new Uint8Array(n),
-    step: size,
-    dropped: blocks - n,
-    candidates: blocks,
-  };
-  for (let i = 0; i < n; i++) {
-    const s = dsmV[i]!, t = dtmV[i]!;
-    cells.z0[i] = observer.mode === 'surface' ? s + observer.heightM : t + observer.heightM;
-    cells.covered[i] = s - t > coveredM ? 1 : 0;
-  }
   return cells;
 }
 
