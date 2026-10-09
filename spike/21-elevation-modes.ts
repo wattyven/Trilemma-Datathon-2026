@@ -40,6 +40,7 @@ try {
     console.log('  legend:', await page.locator('#legend').innerText());
     await page.locator('#changes-toggle').uncheck();
   } else console.log('  (no change overlay offered)');
+  if (await page.locator('#elevation-wrap').isVisible()) await page.locator('#elevation-wrap > summary').click(); // "More options"
   for (const [mode, text] of [['newest', /1 m grid from/], ['detailed', /0\.5 m grid from the/], ['best', /with 20\d\d where|nothing near the lot/]] as const) {
     if (!(await page.locator(`#elevation-choice option[value="${mode}"]`).count())) continue;
     const s0 = Date.now();

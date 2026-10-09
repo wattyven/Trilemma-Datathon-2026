@@ -17,7 +17,9 @@ afternoon.
 ## Using it
 
 - **Search** for an address (Metro Vancouver only). VanShade finds the lot, loads the LiDAR around it and colours the lot by
-  hours of direct sun.
+  hours of direct sun. A sentence at the top sums it up, e.g. "Most of the open ground here gets 4.5–7.5 hours of direct
+  sun a day (part sun) from April to September. The sunniest part is toward the east…". First-time visitors get a short
+  "How to read this" card, and the About panel explains the terms.
 - **Show:**
   - *Season* averages daily sun over a preset or custom range (the growing season by default).
   - *One day* gives the sun-hours for a single day.
@@ -107,6 +109,9 @@ npm run typecheck
 npm run build
 npm run smoke        # Playwright smoke test (BASE_URL=… to point at a deployed site)
 ```
+
+A monthly workflow (`.github/workflows/refresh-index.yml`) rebuilds the high-resolution LiDAR file index and opens an
+issue when new surveys appear.
 
 The app is a static Vite + TypeScript site with no backend. The one optional exception is the LidarBC proxy in
 [`proxy/lidarbc/`](proxy/lidarbc): deploy it once with `npx wrangler deploy`, then set the repository variable

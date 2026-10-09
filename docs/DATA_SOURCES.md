@@ -427,7 +427,8 @@ newest). HRDEM stays for lots over 40,000 m², or with `elev=hrdem` (debug).
 
 Both sharper surfaces sit on HRDEM resampled into a UTM 10N grid (EPSG:3157; a 3-point affine, within 2 cm of proj4 over
 440 m). HRDEM fills anything they don't cover. File lists come from `src/elevation/hires-index.json` (227 KiB, 30 KiB
-gzipped, lazy-loaded), built from S3 listings by `spike/12-hires-index.ts`. Tiles are BCGS 1:2 500 sheets (`elevation/bcgs.ts`)
+gzipped, lazy-loaded), built from S3 listings by `spike/12-hires-index.ts`. A monthly workflow
+(`.github/workflows/refresh-index.yml`, about 10 s) rebuilds it and opens an issue when new surveys or tiles appear. Tiles are BCGS 1:2 500 sheets (`elevation/bcgs.ts`)
 or 1 km UTM squares.
 
 ### 7.3 NRCan point clouds (COPC)

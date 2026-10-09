@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffIndex, type IndexLike } from '../spike/22-index-diff';
+import { diffIndex, type IndexLike } from '../spike/index-diff';
 
 const base = (): IndexLike => ({
   copc: { projects: ['pc/BC/Lower_Mainland_2016/'], tiles: { a: [[0, '_x.copc.laz', 2016, 10]] }, utm: {} },

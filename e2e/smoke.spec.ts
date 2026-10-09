@@ -31,6 +31,7 @@ test('search → 3D sun results → inspector → shareable link', async ({ page
   await expect(page.locator(RESULT)).toBeVisible();
   // With both surveys, the "Elevation data" choice switches surfaces without reloading the page.
   if (await page.locator('#elevation-wrap').isVisible()) {
+    await page.locator('#elevation-wrap > summary').click(); // under "More options"
     await page.locator('#elevation-choice').selectOption('newest');
     await expect(surface).toContainText('1 m grid from 2025', { timeout: 60_000 });
     await expect.poll(() => page.url()).toMatch(/elev=newest/);
