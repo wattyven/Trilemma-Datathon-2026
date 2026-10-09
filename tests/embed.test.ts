@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import readme from '../README.md?raw';
 import { embedSnippet, escapeAttr, fullSiteUrl } from '../src/embed';
 import { decodeHash } from '../src/urlState';
 
@@ -21,6 +22,12 @@ describe('embedding', () => {
     expect(back.debug).toBeUndefined();
     expect(back.address).toBe(state.address);
     expect(url).not.toMatch(/embed=|debug=/);
+  });
+
+  it('matches the example in the README', () => {
+    const { debug: _, ...shown } = state;
+    const code = embedSnippet(PAGE, shown, { mode: 'season' }, 'VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC');
+    expect(readme).toContain(code);
   });
 
   it('escapes addresses and URLs inside attributes', () => {

@@ -7,28 +7,30 @@ afternoon.
 
 **Live:** https://wattyven.github.io/VanShade/
 
-![VanShade showing Vancouver City Hall's lot in 3D, coloured by hours of direct sun, with the day's sun path](docs/screenshots/desktop.png)
+![VanShade showing Vancouver City Hall's lot in 3D over its aerial photo, coloured by full sun, part sun and shade over the growing season, with the day's sun path](docs/screenshots/desktop.png)
 
 <p>
   <img src="docs/screenshots/inspector.png" alt="The spot inspector: average sun-hours by month and the sun/shade strip for one day" width="480">
-  <img src="docs/screenshots/mobile.png" alt="VanShade on a phone, with the details in a bottom sheet" width="220">
+  <img src="docs/screenshots/mobile.png" alt="VanShade on a phone: the 3D view, with the result in a bottom sheet" width="220">
 </p>
 
 ## Using it
 
-- **Search** for an address (Metro Vancouver only), or tap **Use my location** to start from where you're standing. VanShade finds the lot, loads the LiDAR around it and colours the lot by
-  hours of direct sun. A sentence at the top sums it up, e.g. "Most of the open ground here gets 4.5–7.5 hours of direct
-  sun a day (part sun) from April to September. The sunniest part is toward the east…". First-time visitors get a short
-  "How to read this" card, and the About panel explains the terms.
+- **Search** for an address (Metro Vancouver only), or tap **Use my location** to start from where you're standing. VanShade
+  finds the lot, loads the LiDAR around it and shows where the sun is falling right now. A sentence at the top sums it up,
+  e.g. "At 3:30 pm on 21 June, 78% of the open ground is in direct sun." After dark it shows midday instead, and says so.
+  First-time visitors get a short "How to read this" card, and the About panel explains the terms.
 - **Show:**
-  - *Season* averages daily sun over a preset or custom range (the growing season by default).
+  - *One moment* (the default) shows sun or shade now, or at a time you pick.
   - *One day* gives the sun-hours for a single day.
-  - *One moment* shows sun or shade at a time you pick.
+  - *Season* averages daily sun over a preset or custom range (the growing season by default), e.g. "Most of the open
+    ground here gets 4.5–7.5 hours of direct sun a day (part sun) from April to September."
   - *Shade finder* shows how often each spot is shaded in a daily time window (say 1–6 pm through summer).
 - **Measure at** garden-bed height (0.3 m), seated (1.2 m) or on a roof or deck surface.
-- **Full / part sun / shade:** the default view, with adjustable thresholds (6 h and 3 h); untick it for exact hours. The
-  aerial photo is on by default where the municipality publishes one.
-- **Time slider and Play the day:** move the sun and its real-time shadows.
+- **Full / part sun / shade:** how One day and Season are coloured, with adjustable thresholds (6 h and 3 h); untick it
+  for exact hours. The aerial photo is on by default where the municipality publishes one, with the colours at half
+  strength over it.
+- **Time slider, Now and Play the day:** move the sun and its shadows between sunrise and sunset (both shown).
 - **Click a spot**, or focus the view, step with the arrow keys and press Enter, to see that spot's average sun month by month
   and its sun/shade through the day.
 - **Elevation data:** where both surveys exist, choose *Best of both* (2016 detail, updated wherever something changed by
@@ -36,8 +38,25 @@ afternoon.
   changed.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
   North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), drape the photo under the results, with a
-  slider for how see-through the results are.
-- **Copy link to this view:** the address, lot, mode, dates, time and photo setting are all in the URL.
+  slider for the colours' strength.
+- **Copy link:** the address, lot, mode, dates, time and photo setting are all in the URL. Shared links show a preview
+  card in chat apps and social media.
+- **Copy embed code:** an `<iframe>` for the current lot and time, for a blog or a garden club page. The embedded view is
+  compact (the 3D view, the result, the modes and the time slider) with a link to the full site.
+
+## Embed it
+
+Put a live VanShade view on your own page, such as a blog post or a garden club site. Open a lot, choose the mode, date and
+time, then press **Copy embed code**. You get an iframe like this one:
+
+```html
+<iframe src="https://wattyven.github.io/VanShade/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;m=moment&amp;d=2026-06-21&amp;t=15%3A30&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
+```
+
+[![The embedded view of Vancouver City Hall at 3:30 pm on 21 June: the result in a sentence, the mode buttons and the 3D view over the aerial photo](docs/screenshots/embed.png)](https://wattyven.github.io/VanShade/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&m=moment&d=2026-06-21&t=15%3A30&embed=1)
+
+GitHub doesn't run iframes in a README, so this is a picture of that embed; click it to open it live. The embed keeps the
+3D view, the result, the modes and the time slider, credits the data, and links to the full site.
 
 ## How it works
 

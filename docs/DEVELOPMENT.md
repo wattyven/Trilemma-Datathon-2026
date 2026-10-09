@@ -21,8 +21,12 @@ node spike/17-proxy-local.ts            # the LidarBC proxy under Node on :8787;
 node spike/18-imagery-check.ts          # every municipal aerial-photo service: CORS, size, not blank
 node spike/21-elevation-modes.ts <url> [address]   # the three surfaces, the change overlay and switch timings
 gh workflow run refresh-index.yml       # rebuild the LiDAR file index now; opens an issue if new surveys appear (also runs monthly)
-node spike/23-a11y-audit.ts <url>       # axe (WCAG 2.2 AA), keyboard order, phone tap targets, 200% zoom: run before shipping UI changes
+node spike/23-a11y-audit.ts <url>       # axe (WCAG 2.2 AA), keyboard order, phone tap targets, 200% zoom, the embed: run before shipping UI changes
+node spike/24-share-images.ts <url>     # the link-preview card (public/og-image.jpg) and home-screen icon (public/apple-touch-icon.png)
+node spike/08-capture-fixtures.ts [--strata]   # recapture tests/fixtures (--strata: only the strata case)
 ```
+
+`.env` holds local defaults: `VITE_BUILD_SHA=dev` (CI sets the commit) and `VITE_SITE_URL`, the absolute address used in link previews (`og:url`, `og:image`, canonical). CI passes the repository variables `VITE_LIDARBC_PROXY` and `VITE_SITE_URL`; an unset `VITE_SITE_URL` falls back to `.env`. Moving to a custom domain means setting `VITE_SITE_URL` and changing `base` in `vite.config.ts` (and its test).
 
 CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build on every push and PR. Pushes to `main` also deploy to Pages, then the `smoke` job waits for the new build and runs the Playwright smoke test against it. Find the live build in `<meta name="vanshade-build">`; check runs with `gh run list` / `gh run view --log-failed`.
 
@@ -42,6 +46,7 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 | `src/analysis.ts` | wires a selected lot to the engine, the 3D scene / 2D map, the timeline and the inspector |
 | `src/scene/` | the three.js view (`view3d.ts`, lazy-loaded) plus pure helpers: `frame.ts` (axes, sun direction) and `terrain.ts` (meshes) |
 | `src/ui/` | DOM modules: search, controls, timeline, inspector, the 2D map, design tokens (`tokens.ts` mirrors the CSS variables) |
+| `src/embed.ts` | the "Copy embed code" iframe snippet and the embed's link back to the full site |
 | `tests/` | Vitest specs. `tests/fixtures/` are real responses captured by `spike/08-capture-fixtures.ts`. |
 | `spike/` | Phase 0 probes, with their own `package.json`. Not part of the app build. |
 
@@ -56,6 +61,9 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 - Design tokens: six colours (`--fog`, `--cedar`, `--moss`, `--sun`, `--shade`, `--mist`). The data ramp stays cividis. The display face is self-hosted Fraunces 600 and the body is system UI. Don't add colours ad hoc; check any new chart hue for contrast and colour-blind separation.
 - The 3D view renders on demand: call `invalidate()` after any change, and there's no animation loop.
 - Shareable state lives in the URL hash (`src/urlState.ts`, every value validated). A new lot uses `pushState`; any other change uses a throttled `replaceState`. If you add a setting, add it there too.
+  - Links always carry the mode (`m=`): links from before One moment became the default left it out for Season, and a link without one still opens in Season (`LINK_DEFAULT_MODE` in `main.ts`).
+  - `debug=1` shows the debug details; `embed=1` is the compact layout for iframes (`.embed` on `<html>`, styles in `styles.css`). Both stay in the hash as the user moves around, and neither goes into copied links or embed code.
+  - Link previews are static Open Graph tags in `index.html`: crawlers don't run scripts, so every link shares one card.
 - The worker reads the DSM for lot + 200 m but the DTM only for lot + 44 m (the DTM is NaN elsewhere). Lots over 3,000 cells compute horizons on helper threads (`workers/horizon.worker.ts`).
 - **Progressive refinement:** the first result is HRDEM 1 m (EPSG:3979).
   - `Analysis.refine()` then loads the surface the "Elevation data" setting picks from `refinementOptions()`: `best` (the `merged` spec: point cloud plus LidarBC, `elevation/change.ts`), `newest` (LidarBC 1 m) or `detailed` (point cloud 0.5 m). All three are in EPSG:3157 and in the URL as `elev=` (`hrdem` is debug-only; old `copc`/`lidarbc` links map across). If one fails, the next is tried.
@@ -68,7 +76,9 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
   - Technical facts (lot type, plan, LiDAR rows) live in the "Lot and data details" disclosure (`setFact(..., more = true)`); the surface choice sits under "More options".
   - New user-facing text says "laser scans", not "LiDAR"/"DSM"/"grid", and lives in `copy.ts`.
   - `localStorage` is used only to remember that the "How to read this" card was dismissed (`ui/tips.ts`, wrapped in try/catch).
-  - Defaults favour new visitors: the full / part sun / shade view and the aerial photo are on (`cls=0` / `img=0` in links turn them off).
+  - Defaults favour new visitors: One moment at the current time (midday if it's dark, with a note in the headline: `Timeline.showingMiddayForNight`), the aerial photo on with the colours at 50%, and full / part sun / shade for One day and Season (`cls=0` / `img=0` in links turn them off).
+  - The panel leads with the result and then the "Show" controls; on phones the collapsed sheet is only the address and the result.
+  - Test locations are civic, commercial or council sites, never homes (see `spike/addresses.ts`). Check new ones in ParcelMap BC before committing them.
   - New UI must keep `spike/23-a11y-audit.ts` clean: zero axe violations, no phone tap targets under 24 px, no horizontal scroll at 200% zoom.
 - The 3D mesh near the lot is `buildTerraced` (true cell footprints, vertical walls between smooth cells more than 2 m apart, rough cells such as tree crowns blended). Overlays use its tops only (`walls: false`). It's rendering only: the engine never sees it.
 
