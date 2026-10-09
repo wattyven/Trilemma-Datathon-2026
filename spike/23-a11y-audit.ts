@@ -5,7 +5,7 @@
 //   node spike/23-a11y-audit.ts [base url]
 import { chromium, devices, type Page } from 'playwright';
 
-const base = process.argv[2] ?? 'http://localhost:5180/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5180/';
 const AXE = 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js';
 const RESULT = '.scene-canvas[data-state="result"]';
 const LOT = '#a=453+W+12th+Ave%2C+Vancouver%2C+BC';

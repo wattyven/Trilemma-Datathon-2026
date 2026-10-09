@@ -11,8 +11,8 @@ What it does, and nothing more:
   (`/gdwuts/092/092g/<year>/(dsm|dem)/bc_092g…_xli1m_utm10_….tif`); everything else is a 404.
 - Passes a single `Range: bytes=a-b` through, so the app reads only the strips it needs
   (about 10 requests and 2–3 MB per tile for a lot).
-- Adds `Access-Control-Allow-Origin` for the origins in `ALLOWED_ORIGINS` (wrangler.toml), and a 403 for
-  other browser origins. Requests without an `Origin` header (curl) are allowed.
+- Adds `Access-Control-Allow-Origin` for the origins in `ALLOWED_ORIGINS` (wrangler.toml: vanshade.ca, www, the
+  original github.io site and local dev servers), and a 403 for other browser origins. Requests without an `Origin` header (curl) are allowed.
 - Caches the upstream files at Cloudflare's edge for a day, so repeat visits don't touch the
   government server.
 

@@ -1,18 +1,18 @@
 # VanShade developer guide
 
-Static sun and shade mapper for Metro Vancouver yards. Deployed to GitHub Pages at https://wattyven.github.io/VanShade/ with no backend; all compute happens in the browser. The one exception is the optional LidarBC CORS proxy (`proxy/lidarbc/`, a Cloudflare Worker you deploy yourself). Without `VITE_LIDARBC_PROXY` the site is fully static.
+Static sun and shade mapper for Metro Vancouver yards. Served by GitHub Pages at https://vanshade.ca with no backend; all compute happens in the browser. The one exception is the optional LidarBC CORS proxy (`proxy/lidarbc/`, a Cloudflare Worker you deploy yourself). Without `VITE_LIDARBC_PROXY` the site is fully static.
 
 Verified endpoints and data quirks are in [`DATA_SOURCES.md`](DATA_SOURCES.md). Read it before touching any data source.
 
 ## Commands
 
 ```sh
-npm run dev         # http://localhost:5173/VanShade/ (note the base path)
+npm run dev         # http://localhost:5173/
 npm test            # vitest (node env, fetch stubbed)
 npm run test:tz     # the suite under TZ=UTC and TZ=Asia/Tokyo (what CI runs)
 npm run typecheck   # tsc --noEmit, strict
 npm run build       # → dist/
-npm run smoke       # Playwright smoke test (e2e/); BASE_URL=<url> for a deployed site, default http://localhost:5180/VanShade/
+npm run smoke       # Playwright smoke test (e2e/); BASE_URL=<url> for a deployed site, default http://localhost:5180/
 node spike/07-deployed-check.ts <url>   # the longer UI check with timings and screenshots (cd spike && npm i first)
 node spike/11-screenshots.ts <url>      # README screenshots (docs/screenshots/)
 npx vitest run --config spike/vitest.live.config.ts   # live checks against the real data services (spike/*.live.test.ts)
@@ -26,7 +26,7 @@ node spike/24-share-images.ts <url>     # the link-preview card (public/og-image
 node spike/08-capture-fixtures.ts [--strata]   # recapture tests/fixtures (--strata: only the strata case)
 ```
 
-`.env` holds local defaults: `VITE_BUILD_SHA=dev` (CI sets the commit) and `VITE_SITE_URL`, the absolute address used in link previews (`og:url`, `og:image`, canonical). CI passes the repository variables `VITE_LIDARBC_PROXY` and `VITE_SITE_URL`; an unset `VITE_SITE_URL` falls back to `.env`. Moving to a custom domain means setting `VITE_SITE_URL` and changing `base` in `vite.config.ts` (and its test).
+`.env` holds local defaults: `VITE_BUILD_SHA=dev` (CI sets the commit) and `VITE_SITE_URL`, the absolute address used in link previews (`og:url`, `og:image`, canonical). CI passes the repository variables `VITE_LIDARBC_PROXY` and `VITE_SITE_URL`; an unset `VITE_SITE_URL` falls back to `.env`. The site lives at the root of vanshade.ca, so `base` in `vite.config.ts` is `/`; a test keeps it in step with the path of `VITE_SITE_URL`.
 
 CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build on every push and PR. Pushes to `main` also deploy to Pages, then the `smoke` job waits for the new build and runs the Playwright smoke test against it. Find the live build in `<meta name="vanshade-build">`; check runs with `gh run list` / `gh run view --log-failed`.
 
@@ -91,7 +91,7 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 4. Geocoder: request `parcelPoint`. BLOCK matches silently fall back to `accessPoint` (in the street), which needs the buffered parcel search. `brief=true` drops `localityName`. The `localityName` parameter doesn't filter.
 5. Use America/Vancouver time via luxon. Never `new Date(y, m, d)`, and never hard-code offsets. **BC has been on permanent UTC−7 since 2026-03-09** (tzdb 2026b), so there's no fall-back from Nov 2026. Local clock times are only right if the runtime's tz data is 2026b or later; Node 25.8 ships 2026a, CI's Node 24.21 is newer. Tests compare UTC instants.
 6. DSM and DTM must come from the same HRDEM mosaic tile and grid. This is verified identical.
-7. Pages serves under `/VanShade/`. Asset and worker URLs must respect Vite's `base` (`new URL(..., import.meta.url)`).
+7. The site is served from the root of vanshade.ca (Vite `base: '/'`). Asset and worker URLs still go through Vite (`new URL(..., import.meta.url)`), so a sub-path deployment would only need a new `base`.
 8. Never commit elevation data (`*.tif` is gitignored).
 9. The DataBC WFS only sends CORS headers when the request has a `Referer`. Never use `no-referrer` (`tests/html.test.ts` guards this). A sandboxed JSONP fallback exists.
 10. The parcel layer is `PMBC_PARCEL_FABRIC_POLY_SVW`; the `…_FA_SVW` one is restricted. Strata come back as stacked identical polygons, so deduplicate them.

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { OUT_DIR, SPIKE_DIR } from './lib.ts';
 
-const base = process.argv[2] ?? 'http://localhost:5180/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5180/';
 const DOCS = join(SPIKE_DIR, '..', 'docs', 'screenshots');
 mkdirSync(DOCS, { recursive: true });
 mkdirSync(OUT_DIR, { recursive: true });

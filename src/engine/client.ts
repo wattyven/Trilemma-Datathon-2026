@@ -27,7 +27,7 @@ export class ShadeEngine {
   private currentLoad = 0;
 
   constructor() {
-    // Vite rewrites this to a hashed asset under the Pages base path (docs/DEVELOPMENT.md, gotcha 7).
+    // Vite rewrites this to a hashed asset under the site's base path (docs/DEVELOPMENT.md, gotcha 7).
     this.worker = new Worker(new URL('../workers/shade.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (ev: MessageEvent<FromWorker>) => this.dispatch(ev.data);
     this.worker.onerror = (ev) => {

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { OUT_DIR } from './lib.ts';
 
-const base = process.argv[2] ?? 'http://localhost:5181/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5181/';
 const address = process.argv[3] ?? '410 W Georgia St, Vancouver';
 const key = address.split(',')[0]!.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 mkdirSync(OUT_DIR, { recursive: true });

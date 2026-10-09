@@ -8,8 +8,8 @@ export const SPIKE_DIR = dirname(fileURLToPath(import.meta.url));
 export const OUT_DIR = join(SPIKE_DIR, 'out');
 export const SAMPLES_DIR = join(SPIKE_DIR, '..', 'docs', 'samples');
 
-export const ORIGIN = 'https://wattyven.github.io';
-export const UA = 'VanShade-spike/0.1 (+https://github.com/wattyven/VanShade)';
+export const ORIGIN = 'https://vanshade.ca';
+export const UA = 'VanShade-spike/0.1 (+https://github.com/wattyven/Trilemma-Datathon-2026)';
 
 export interface FetchResult {
   url: string;

@@ -37,7 +37,8 @@ describe('link previews', () => {
 });
 
 describe('vite config', () => {
-  it('serves under the GitHub Pages repo path', () => {
-    expect(viteConfig.base).toBe('/VanShade/');
+  it('serves from the root of vanshade.ca', () => {
+    expect(viteConfig.base).toBe('/');
+    expect(new URL(/^VITE_SITE_URL=(.+)$/m.exec(env)![1]!).pathname).toBe(viteConfig.base); // links and assets agree
   });
 });

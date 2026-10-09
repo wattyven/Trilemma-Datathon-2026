@@ -1,5 +1,5 @@
 // One smoke test of the deployed flow, plus a mobile layout check.
-//   BASE_URL=https://wattyven.github.io/VanShade/ npx playwright test   (CI does this after deploy)
+//   BASE_URL=https://vanshade.ca/ npx playwright test   (CI does this after deploy)
 //   npx playwright test                                                  (against `vite --port 5180`)
 import { defineConfig, devices } from '@playwright/test';
 
@@ -12,7 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0, // live government APIs: allow one retry for a network blip
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: process.env.BASE_URL ?? 'http://localhost:5180/VanShade/',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:5180/',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

@@ -5,7 +5,7 @@ neighbours, trees and buildings, and works out how many hours of direct sun each
 averaged over a season. Gardeners use it to find full-sun spots for vegetables; anyone can use it to find shade for a summer
 afternoon.
 
-**Live:** https://wattyven.github.io/VanShade/
+**Live:** https://vanshade.ca
 
 VanShade is our entry for the **Trilemma Datathon 2026**. The original proposal is below, under [Why we built it](#why-we-built-it).
 
@@ -106,7 +106,7 @@ Put a live VanShade view on your own page, such as a blog post or a garden club 
 time, then press **Copy embed code**. You get an iframe like this one:
 
 ```html
-<iframe src="https://wattyven.github.io/VanShade/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;m=moment&amp;d=2026-06-21&amp;t=15%3A30&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
+<iframe src="https://vanshade.ca/#a=453+W+12th+Ave%2C+Vancouver%2C+BC&amp;m=moment&amp;d=2026-06-21&amp;t=15%3A30&amp;embed=1" width="100%" height="600" style="border:0" loading="lazy" title="VanShade: sun and shade at 453 W 12th Ave, Vancouver, BC"></iframe>
 ```
 
 The embed keeps the 3D view, the result, the modes and the time slider, credits the data, and links to the full site.
@@ -181,7 +181,7 @@ table above (the app shows the attribution each requires). The Fraunces typeface
 
 ```sh
 npm ci
-npm run dev          # http://localhost:5173/VanShade/
+npm run dev          # http://localhost:5173/
 npm test             # Vitest
 npm run test:tz      # the suite under TZ=UTC and TZ=Asia/Tokyo (as CI runs it)
 npm run typecheck

@@ -5,4 +5,4 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # Browsers from other sites get a 403. Requests without an Origin header (curl) are allowed.
-ALLOWED_ORIGINS = "https://wattyven.github.io,http://localhost:5180,http://localhost:4173"
+ALLOWED_ORIGINS = "https://vanshade.ca,https://www.vanshade.ca,https://wattyven.github.io,http://localhost:5180,http://localhost:4173"

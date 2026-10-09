@@ -4,9 +4,9 @@ import { defineConfig } from 'vitest/config';
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env;
 if (env && !env.VITE_SITE_URL) delete env.VITE_SITE_URL;
 
-// GitHub Pages serves the site under /<repo>/.
+// Served from the root of https://vanshade.ca (GitHub Pages with a custom domain).
 export default defineConfig({
-  base: '/VanShade/',
+  base: '/',
   build: { target: 'es2022', sourcemap: true },
   // copc.js imports laz-perf's browser build; we hand it the web-worker build instead (it runs in
   // a module worker, and its .wasm is fetched from our own assets), so bundle only that one.

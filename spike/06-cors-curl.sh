@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CORS headers for every endpoint as a *.github.io origin would see them (GET + preflight).
 set -u
-ORIGIN="${ORIGIN:-https://wattyven.github.io}"
+ORIGIN="${ORIGIN:-https://vanshade.ca}"
 COG=https://canelevation-dem.s3.ca-central-1.amazonaws.com/hrdem-mosaic-1m/2_3-mosaic-1m-dsm.tif
 PT='-123.1139388%2049.261317'
 declare -a NAMES URLS

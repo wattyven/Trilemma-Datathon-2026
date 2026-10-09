@@ -1,13 +1,13 @@
 // Drives the real UI in headless Chromium against a local or deployed build.
-//   node spike/07-deployed-check.ts http://localhost:5173/VanShade/
-//   node spike/07-deployed-check.ts https://wattyven.github.io/VanShade/
+//   node spike/07-deployed-check.ts http://localhost:5173/
+//   node spike/07-deployed-check.ts https://vanshade.ca/
 // Closes the Phase 0 question: do geocoder and WFS CORS work from the github.io origin?
 import { chromium, type Page } from 'playwright';
 import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { OUT_DIR, writeOut } from './lib.ts';
 
-const base = process.argv[2] ?? 'http://localhost:5173/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5173/';
 const tag = new URL(base).hostname.replace(/\W+/g, '-');
 mkdirSync(OUT_DIR, { recursive: true });
 

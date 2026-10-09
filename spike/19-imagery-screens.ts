@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { OUT_DIR } from './lib.ts';
 
-const base = process.argv[2] ?? 'http://localhost:5180/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5180/';
 mkdirSync(OUT_DIR, { recursive: true });
 const RESULT = '.scene-canvas[data-state="result"]';
 const ALL = [

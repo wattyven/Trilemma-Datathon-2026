@@ -29,7 +29,7 @@ jobs:
           VITE_BUILD_SHA: ${{ github.sha }}
           # LidarBC CORS proxy (proxy/lidarbc). A repository variable; unset = the app skips LidarBC.
           VITE_LIDARBC_PROXY: ${{ vars.VITE_LIDARBC_PROXY }}
-          # The site's address for link previews; unset = .env (the GitHub Pages address).
+          # The site's address for link previews; unset = .env (https://vanshade.ca/).
           VITE_SITE_URL: ${{ vars.VITE_SITE_URL }}
 
       - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

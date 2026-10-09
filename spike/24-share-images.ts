@@ -7,7 +7,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { SPIKE_DIR } from './lib.ts';
 
-const base = process.argv[2] ?? 'http://localhost:5180/VanShade/';
+const base = process.argv[2] ?? 'http://localhost:5180/';
 const ROOT = join(SPIKE_DIR, '..');
 const PUBLIC = join(ROOT, 'public');
 const font = readFileSync(join(ROOT, 'src/assets/fonts/fraunces-600-latin.woff2')).toString('base64');

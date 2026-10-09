@@ -369,6 +369,11 @@ Curl used `Origin: https://wattyven.github.io`. Chromium ran at `http://localhos
 - WFS point query
 - WFS buffer query
 
+**Checked again for `https://vanshade.ca` (2026-10-08), before the move to the custom domain.** With that `Origin`,
+the geocoder, the WFS (with a Referer), the WCS and all 11 municipal photo services answer with
+`access-control-allow-origin: https://vanshade.ca`; STAC and the S3 elevation files send `*`. Only the LidarBC proxy
+needed its allow-list updated (`proxy/lidarbc/wrangler.toml`).
+
 So the geocoder and a plain WFS `fetch` work from `https://wattyven.github.io`, and the JSONP fallback wasn't needed. COG and STAC reads from that origin get their check in Phase 2, when the app first makes them; both send `Access-Control-Allow-Origin: *`.
 
 | Endpoint | curl ACAO | Chromium | Notes |
