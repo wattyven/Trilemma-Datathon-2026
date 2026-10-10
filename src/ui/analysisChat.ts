@@ -1,14 +1,14 @@
-// The Analysis panel: Gemini's short reading of the current lot, then questions about it. Questions
-// go to the Analysis proxy (proxy/gemini, VITE_GEMINI_PROXY), which holds the API key; the
-// conversation itself lives here and goes back with each question.
+// The Analysis panel, under the view whenever a lot has a result: Gemini's short reading of the lot,
+// then questions about it. Questions go to the Analysis proxy (proxy/gemini, VITE_GEMINI_PROXY),
+// which holds the API key; the conversation itself lives here and goes back with each question.
 import type { ErrorCode, Turn } from '../../proxy/gemini/worker';
 import { copy } from '../copy';
-import { formatInsightContext, OPENING_QUESTION, takeEvents, type InsightFacts } from '../insight';
+import { formatInsightContext, takeEvents, type InsightFacts } from '../insight';
 
 export interface AnalysisChatElements {
-  open: HTMLButtonElement;
   panel: HTMLElement;
-  close: HTMLButtonElement;
+  /** Takes focus when the guide brings the panel into view (tabindex="-1"). */
+  heading: HTMLElement;
   log: HTMLElement;
   status: HTMLElement;
   form: HTMLFormElement;
@@ -21,10 +21,10 @@ const KEEP_TURNS = 8;
 
 /** @param proxy the proxy's base URL, without a trailing slash */
 export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFacts: () => InsightFacts | null) {
-  const { open, panel, close, log, status, form, input, chips } = els;
+  const { panel, heading, log, status, form, input, chips } = els;
   let turns: Turn[] = [];
-  /** The lot the conversation started from; a different one starts it over. */
-  let startedWith = '';
+  /** This lot's reading has been asked for (once per lot). */
+  let readAsked = false;
   let abort: AbortController | null = null;
 
   for (const label of copy.analysis.chips) {
@@ -32,17 +32,6 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
     b.addEventListener('click', () => void ask(label, true));
     chips.append(b);
   }
-  open.addEventListener('click', () => (panel.hidden ? show() : hide()));
-  close.addEventListener('click', () => {
-    hide();
-    open.focus();
-  });
-  panel.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    hide();
-    open.focus();
-  });
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -51,29 +40,7 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
     void ask(text, true);
   });
 
-  function show() {
-    panel.hidden = false;
-    open.setAttribute('aria-expanded', 'true');
-    panel.scrollIntoView({ block: 'nearest' });
-    const facts = getFacts();
-    if (!facts) {
-      status.textContent = copy.analysis.notReady;
-      return;
-    }
-    const context = formatInsightContext(facts);
-    if (context === startedWith && log.childElementCount) return input.focus();
-    clear();
-    startedWith = context;
-    void ask(OPENING_QUESTION, false);
-  }
-
-  function hide() {
-    panel.hidden = true;
-    open.setAttribute('aria-expanded', 'false');
-    stop();
-  }
-
-  /** Abandon the answer in progress (closing the panel, or starting over). */
+  /** Abandon the answer in progress (a new lot, or the start page). */
   function stop() {
     abort?.abort();
     abort = null;
@@ -83,7 +50,7 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
   function clear() {
     stop();
     turns = [];
-    startedWith = '';
+    readAsked = false;
     log.replaceChildren();
     status.textContent = '';
   }
@@ -102,7 +69,7 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
     return p;
   }
 
-  async function ask(question: string, showQuestion: boolean) {
+  async function ask(question: string, showQuestion: boolean, focusAfter = true) {
     if (abort) return; // one question at a time
     const facts = getFacts();
     if (!facts) {
@@ -123,7 +90,7 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
         body: JSON.stringify({ context: formatInsightContext(facts), turns: [...turns, { role: 'user', text: question }] }),
         signal: controller.signal,
       });
-      error = res.ok && res.body ? await read(res.body, reply, controller.signal) : await errorOf(res);
+      error = res.ok && res.body ? await stream(res.body, reply, controller.signal) : await errorOf(res);
       const answer = reply.textContent ?? '';
       if (!error && answer.trim()) turns = [...turns, { role: 'user' as const, text: question }, { role: 'model' as const, text: answer }].slice(-KEEP_TURNS);
       else error ??= 'failed';
@@ -137,11 +104,11 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
     }
     if (!reply.textContent?.trim()) reply.remove();
     if (error && !controller.signal.aborted) bubble('error', error === 'offline' ? copy.offline : copy.analysis.errors[error]);
-    if (!panel.hidden && !controller.signal.aborted) input.focus();
+    if (focusAfter && !panel.hidden && !controller.signal.aborted) input.focus();
   }
 
   /** Stream the answer into `reply`; the error code if one arrives or the stream ends without `done`. */
-  async function read(body: ReadableStream<Uint8Array>, reply: HTMLElement, signal: AbortSignal): Promise<ErrorCode | null> {
+  async function stream(body: ReadableStream<Uint8Array>, reply: HTMLElement, signal: AbortSignal): Promise<ErrorCode | null> {
     const reader = body.getReader();
     const dec = new TextDecoder();
     let buf = '';
@@ -172,11 +139,30 @@ export function initAnalysisChat(proxy: string, els: AnalysisChatElements, getFa
     return 'failed';
   }
 
-  /** A new lot or the start page: drop the conversation and close the panel. */
   return {
+    /** A new lot or the start page: drop the conversation and hide the panel. */
     reset() {
       clear();
-      hide();
+      panel.hidden = true;
+    },
+    /** A result is on screen: the panel shows, "Reading this lot…" until the reading starts. */
+    show() {
+      if (!panel.hidden) return;
+      panel.hidden = false;
+      if (!readAsked) setBusy(true);
+    },
+    /** Read the lot with this (unshown) first question, once per lot; focus stays where it is. */
+    read(opening: string) {
+      if (readAsked || panel.hidden) return;
+      readAsked = true;
+      setBusy(false);
+      void ask(opening, false, false);
+    },
+    /** Bring the panel into view and move focus to it. */
+    reveal() {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      panel.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+      heading.focus({ preventScroll: true });
     },
   };
 }

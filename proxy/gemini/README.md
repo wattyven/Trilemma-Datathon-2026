@@ -1,6 +1,7 @@
 # Analysis proxy (Gemini)
 
-The Analysis panel answers questions about a lot with Google's Gemini. A Gemini API key must stay
+The Analysis panel reads each lot the site shows, and answers questions about it, with Google's
+Gemini: one request per lot viewed, plus one per question. A Gemini API key must stay
 secret: one shipped in the site's JavaScript can be copied by anyone and used on your account, and
 Google blocks keys it finds exposed. This Cloudflare Worker holds the key and makes the calls. It
 is the second server-side piece of VanShade, after the LidarBC proxy; the sun and shade are still
@@ -34,7 +35,7 @@ npx wrangler secret put GEMINI_API_KEY    # paste the key from Google AI Studio 
 
 Then point the site at it: GitHub → repository Settings → Secrets and variables → Actions →
 Variables → `VITE_GEMINI_PROXY` = that URL (no trailing slash), and re-run the deploy workflow.
-Until the variable is set, the Analysis button stays hidden.
+Until the variable is set, the site has no Analysis panel.
 
 In Google AI Studio, keep the key limited to the Gemini API and set a spending limit or budget
 alert on its project. Replacing the key later is only `wrangler secret put` again: no rebuild.

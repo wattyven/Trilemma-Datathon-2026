@@ -20,6 +20,7 @@ try {
   // 1. The lot, as the app draws it.
   const app = await browser.newPage({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 2 });
   await app.addInitScript(() => localStorage.setItem('vanshade:tips-seen-v1', '1'));
+  await app.route(/\/chat$/, (route) => route.abort()); // the card shows the view, not Analysis's reading
   const hash = new URLSearchParams({ a: '453 W 12th Ave, Vancouver, BC', m: 'season', d: '2026-06-21', t: '15:30', spots: '0' }); // a cleaner card without pins
   await app.goto(`${base}#${hash}`);
   await app.locator('dd[data-key="surface"]').filter({ hasText: /0\.5 m/ }).waitFor({ state: 'attached', timeout: 120_000 });

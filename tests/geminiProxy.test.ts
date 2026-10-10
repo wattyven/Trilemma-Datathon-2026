@@ -1,6 +1,7 @@
 // The Analysis proxy (proxy/gemini/worker.ts) with Gemini stubbed.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker, { chunkText, LIMITS, MODEL, parseChat, type Env } from '../proxy/gemini/worker';
+import { GOAL_QUESTIONS, OPENING_QUESTION } from '../src/insight';
 
 const SITE = 'https://vanshade.ca';
 const env: Env = { GEMINI_API_KEY: 'test-key', ALLOWED_ORIGINS: `${SITE},http://localhost:5180` };
@@ -74,6 +75,13 @@ describe('the Analysis proxy', () => {
     expect(parseChat({ context: 'c', turns: [a('1')] })).toBeNull();
     expect(parseChat({ context: 'c', turns: [q('1'), q('2'), q('3')] })).toBeNull();
     expect(parseChat({ context: 'c', turns: Array.from({ length: LIMITS.turns + 2 }, (_, i) => (i % 2 ? a('x') : q('x'))) })).toBeNull();
+  });
+
+  it('takes the site\'s opening questions, the guide\'s included', () => {
+    for (const text of [OPENING_QUESTION, ...Object.values(GOAL_QUESTIONS)]) {
+      expect(text.length).toBeLessThanOrEqual(LIMITS.question);
+      expect(parseChat({ context: 'c', turns: [{ role: 'user', text }] })).not.toBeNull();
+    }
   });
 
   it('retries a busy Gemini, then says busy; other failures say failed, without Gemini\'s message', async () => {

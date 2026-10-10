@@ -1,6 +1,7 @@
 // Every user-facing string. Written for a gardener, not a GIS analyst.
 import type { ParcelNotice } from './data/parcels';
 import type { Side } from './engine/lotSummary';
+import type { Goal } from './insight';
 
 const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
 const fmtH = (h: number) => (Number.isInteger(h) ? String(h) : h.toFixed(1));
@@ -132,6 +133,7 @@ export const copy = {
   },
   legend: {
     hours: 'Hours of direct sun a day',
+    hoursDay: 'Hours of direct sun that day',
     percent: 'Share of the time in shade',
     sun: 'In direct sun',
     shade: 'In shade',
@@ -208,19 +210,58 @@ export const copy = {
       };
     },
   },
+  /** The guided start: each goal's steps (the welcome that offers them is in index.html). */
+  guide: {
+    done: 'Done: ',
+    read: 'Read it',
+    goals: {
+      garden: {
+        title: 'Find the best spot for your garden',
+        steps: [
+          { title: 'Type your address', text: 'Anywhere in Metro Vancouver, or use your location.' },
+          { title: 'See where the sun falls', text: 'Hours of direct sun a day from April to September. Lighter spots get more; the Max pin marks the sunniest.' },
+          { title: 'Find out what to plant where', text: "VanShade's advisor reads your lot and suggests where vegetables will do best." },
+        ],
+      },
+      patio: {
+        title: 'Find shade for a patio',
+        steps: [
+          { title: 'Type your address', text: 'Anywhere in Metro Vancouver, or use your location.' },
+          { title: 'See where the shade falls', text: 'How often each spot is shaded on summer afternoons, 1 to 6 pm. Darker spots are shadier; the pin marks the shadiest.' },
+          { title: 'Find out where to sit', text: "VanShade's advisor suggests the best place for a patio or seating." },
+        ],
+      },
+      home: {
+        title: "See the sun at a home you're considering",
+        steps: [
+          { title: 'Type the address', text: 'Anywhere in Metro Vancouver.' },
+          { title: 'Watch the sun through the day', text: 'Lighter spots get more sun today. Press Play the day under the map to watch the shadows move, or pick another date.' },
+          { title: 'Find out what it means', text: "VanShade's advisor sums up the lot's sun and shade." },
+        ],
+      },
+    } satisfies Record<Goal, { title: string; steps: { title: string; text: string }[] }>,
+  },
   /** Basic mode's summary: the lot's maximum and minimum average daily hours, and where they are. */
   basic: {
     period: (start: string, end: string) => `Average hours of direct sun a day, ${fmtDate(start)} to ${fmtDate(end)}`,
+    periodDay: (date: string) => `Hours of direct sun on ${fmtDate(date)}`,
+    periodShade: (from: string, to: string, start: string, end: string) =>
+      `How often each spot is shaded between ${fmtTime(from)} and ${fmtTime(to)}, ${fmtDate(start)} to ${fmtDate(end)}`,
     max: 'Maximum',
     min: 'Minimum',
+    mostShade: 'Most shade',
+    leastShade: 'Least shade',
     hours: (h: number) => `${tenth(h)} hours`,
+    percent: (p: number) => `${Math.round(p)}% of the time`,
     /** "in the [north-east]" / "near the [middle]": the bracketed word is the button. */
     where: (side: Side) => (side === 'middle' ? ['near the', 'middle'] : ['in the', side]) as [string, string],
-    show: (kind: 'sunniest' | 'shadiest') => `: show the ${kind === 'sunniest' ? 'sunniest' : 'shadiest'} spot on the view`,
+    show: ': show this spot on the view',
     even: (low: number, high: number) => `Sun is fairly even: ${tenth(low)} to ${tenth(high)} hours a day across the lot.`,
+    evenShade: (low: number, high: number) => `Shade is fairly even: ${Math.round(low)}% to ${Math.round(high)}% of the time across the lot.`,
     mostlyCovered: "Almost all of this lot is under a roof or trees, so there's little open ground to measure. Advanced options can measure on roofs and decks.",
     legend: 'Hours of direct sun a day',
-    spotSize: 'The maximum and minimum are for patches of open ground about 2 m × 2 m, the size of a small garden bed.',
+    spotSize: 'These figures are for patches of open ground about 2 m × 2 m, the size of a small garden bed.',
+    clearSky: 'They assume clear skies: clouds would mean less sun.',
   },
   /** Typical weather: the clear-day hours scaled by how often the sun actually shines (an extra line, never the main number). */
   weather: {

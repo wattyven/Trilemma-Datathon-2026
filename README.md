@@ -70,14 +70,23 @@ how VanShade follows it:
 
 ## Using it
 
+- **Guided start:** a first visit asks what you're here for: the best spot for a garden, shade for a patio, or the sun at a
+  home you're thinking of buying. VanShade then sets up the right view and takes you through three steps: your address, the
+  sun map, and Analysis's advice for that goal. "I'm just browsing" leaves the regular page. To see the welcome again, use
+  the start page's "Not sure where to start?" or open [vanshade.ca/#welcome](https://vanshade.ca/#welcome).
 - **Search** for an address (Metro Vancouver only), or tap **Use my location** to start from where you're standing. VanShade
   finds the lot and loads the LiDAR around it; the address bar then moves up beside the name, and the VanShade title takes
   you back to the start. First-time visitors get a short "How to read this" card, and the About panel explains the terms.
-- **Basic mode** (the default) has one setting, the dates (1 April to 30 September unless you change them), and a summary:
-  - **Maximum** and **minimum** average hours of direct sun a day, for patches of open ground about 2 m × 2 m, and where they
-    are: "Maximum: 11.6 hours, in the east". Click the direction to find its pin.
-  - Under each, the hours to expect **with typical weather** (see [How it works](#how-it-works)).
-  - The view spans the page, coloured from the lot's own fewest to most hours. **Max** and **Min** pins mark the two spots.
+- **Basic mode** (the default) has three views, each with only the settings it needs, and a summary of the lot's two extremes:
+  - **Growing season** (the default): the dates (1 April to 30 September unless you change them), and the **maximum** and
+    **minimum** average hours of direct sun a day, for patches of open ground about 2 m × 2 m, and where they are: "Maximum:
+    11.6 hours, in the east". Click the direction to find its pin. Under each, the hours to expect **with typical weather**
+    (see [How it works](#how-it-works)).
+  - **Afternoon shade**: how often each spot is shaded between two times of day over a range of dates (1 to 6 pm, June to
+    August), with the most and least shaded spots. Handy for a patio.
+  - **One day**: hours of direct sun on a date, with **Play the day** under the map to watch real shadows move.
+  - The view spans the page, with hours coloured from the lot's own fewest to most (shade from 0 to 100% of the time), and
+    pins mark the two spots.
 - **Advanced mode** (the switch at the top right) is the full toolkit:
   - *One moment* (now, or a time you pick), *One day*, *Season* and *Shade finder* (how often each spot is shaded in a daily
     time window, say 1–6 pm through summer).
@@ -88,8 +97,9 @@ how VanShade follows it:
     (2025, 1 m) or *Most detailed* (2016, 0.5 m); *Show changes since 2016* hatches what changed.
 - In Advanced mode, **click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that
   spot's sun month by month (with a typical-weather column in the table view) and through the day.
-- **Analysis:** a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each part), then
-  your own questions, such as "Where should I plant vegetables?". It answers from the numbers VanShade shows for the lot.
+- **Analysis:** under the view, a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each
+  part) appears by itself once the result is in; then ask your own questions, such as "Where should I plant vegetables?". It
+  answers from the numbers VanShade shows for the lot.
 - **Aerial photo:** where the municipality publishes open orthophotos (Vancouver, Burnaby, Surrey, Coquitlam, the District of
   North Vancouver, Delta, Maple Ridge, both Langleys, Port Coquitlam, White Rock), the photo always sits under the results.
 - **Copy link:** the address, lot, dates and settings are in the URL (`adv=1` for Advanced mode). Shared links show a
@@ -201,7 +211,7 @@ The app is a static Vite + TypeScript site with no backend, apart from two optio
 with `npx wrangler deploy` and switched on with a repository variable:
 - [`proxy/lidarbc/`](proxy/lidarbc) (`VITE_LIDARBC_PROXY`) adds CORS headers to LidarBC. Without it, the site skips LidarBC.
 - [`proxy/gemini/`](proxy/gemini) (`VITE_GEMINI_PROXY`) holds the Gemini API key for the Analysis chat. Without it, there's
-  no Analysis button.
+  no Analysis.
 
 Every push to `main` runs CI:
 1. typecheck, both time-zone test runs, and build

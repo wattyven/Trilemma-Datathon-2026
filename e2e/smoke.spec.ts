@@ -1,9 +1,32 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 const RESULT = '.scene-canvas[data-state="result"]';
+/** A returning visitor: the start page's welcome has been seen. */
+const welcomeSeen = () => localStorage.setItem('vanshade:welcome-seen-v1', '1');
+const CHAT_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
+type Asked = { context: string; turns: { role: string; text: string }[] };
+
+/** Every lot's Analysis reads itself: answer /chat in this browser, so no test calls Gemini. Returns what was asked. */
+async function stubChat(context: BrowserContext, answer = ['The south-east corner ', 'is sunniest.']): Promise<Asked[]> {
+  const asked: Asked[] = [];
+  await context.route(/\/chat$/, (route) => {
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CHAT_CORS });
+    asked.push(route.request().postDataJSON());
+    const body = [...answer.map((text) => JSON.stringify({ text })), '{"done":true}'].map((d) => `data: ${d}\n\n`).join('');
+    return route.fulfill({ headers: { ...CHAT_CORS, 'Content-Type': 'text/event-stream' }, body });
+  });
+  return asked;
+}
 
 test('Basic: search → maximum and minimum hours → pins → dates → shareable link', async ({ page, context }) => {
+  const asked = await stubChat(context);
   await page.goto('./');
+  // A first visit asks what the visitor is here for; "just browsing" is the regular page.
+  const welcome = page.locator('#welcome');
+  await expect(welcome).toBeVisible();
+  await welcome.getByRole('button', { name: "I'm just browsing" }).click();
+  await expect(welcome).toBeHidden();
+  await expect(page.locator('#guide')).toBeHidden();
   await expect(page.locator('#intro')).toBeVisible();
 
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
@@ -58,30 +81,22 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await page.waitForTimeout(1500);
   await expect(page.locator('#inspector')).toBeHidden();
 
-  // Analysis: Gemini reads the lot through the proxy (stubbed here, so the test costs nothing). A
-  // build without VITE_GEMINI_PROXY has no Analysis button; the deployed site must have one.
-  const analysisOpen = page.locator('#analysis-open');
-  if (process.env.BASE_URL || (await analysisOpen.isVisible())) {
-    const asked: { context: string; turns: { role: string; text: string }[] }[] = [];
-    await page.route(/\/chat$/, (route) => {
-      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
-      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
-      asked.push(route.request().postDataJSON());
-      return route.fulfill({ headers: { ...cors, 'Content-Type': 'text/event-stream' }, body: 'data: {"text":"The south-east corner "}\n\ndata: {"text":"is sunniest."}\n\ndata: {"done":true}\n\n' });
-    });
-    await analysisOpen.click();
+  // Analysis sits under the view, with no button or Close, and reads the lot by itself through the
+  // proxy. A build without VITE_GEMINI_PROXY has no Analysis; the deployed site must have it.
+  const panel = page.locator('#analysis-dialog');
+  if (process.env.BASE_URL || (await panel.isVisible())) {
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Close' })).toHaveCount(0);
     const answers = page.locator('.analysis-msg[data-role="assistant"]');
     await expect(answers).toHaveText(['The south-east corner is sunniest.']);
     expect(asked[0]!.context).toContain('Address: 453 W 12th Ave, Vancouver, BC');
     expect(asked[0]!.context).toContain('with typical weather');
+    expect(asked[0]!.turns[0]!.text).toContain('practical reading');
     // A suggested question goes with the conversation so far.
     await page.locator('#analysis-chips button').first().click();
     await expect(page.locator('.analysis-msg[data-role="user"]')).toHaveText(['Where should I plant vegetables?']);
     await expect(answers).toHaveCount(2);
     expect(asked[1]!.turns.map((t) => t.role)).toEqual(['user', 'model', 'user']);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('#analysis-dialog')).toBeHidden();
-    await page.unroute(/\/chat$/);
   }
 
   // New dates recompute, and go into the link (no time, no Advanced settings).
@@ -96,6 +111,7 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await page.locator('input[name="view"][value="map"]').check({ force: true });
   await expect(page.locator('.spot-pin:not([hidden])')).toHaveCount(2);
   await page.locator('input[name="view"][value="3d"]').check({ force: true });
+  await expect.poll(() => page.url()).not.toMatch(/[#&]v=map/); // the link catches up (it's throttled)
   await expect(page.locator('#photo-toggle')).toHaveCount(0);
   await expect(page.locator('#photo-credit-item')).toContainText('City of Vancouver');
   expect(page.url()).not.toMatch(/[#&]img=/);
@@ -135,7 +151,97 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect(page.locator(RESULT)).toBeVisible();
 });
 
+test('guide: a goal from the welcome walks through the address, the sun map and the advice', async ({ page, context }) => {
+  const asked = await stubChat(context, ['The east side is sunniest.']);
+  await page.goto('./');
+  await page.locator('#welcome button[value="garden"]').click();
+  // Step 1: the address, with the steps for the goal below it.
+  const guide = page.locator('#guide');
+  const current = page.locator('#guide-steps li[aria-current="step"]');
+  await expect(page.locator('#guide-title')).toHaveText('Find the best spot for your garden');
+  await expect(current).toContainText('Type your address');
+  await expect(page.locator('.intro-preview')).toBeHidden();
+  await expect(page.locator('#address-input')).toBeFocused();
+  await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
+  await page.locator('#address-input').press('Enter');
+  // Step 2: the sun map, in Basic; the steps explain it, so no tips card.
+  await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
+  await expect(page.locator('#tips')).toBeHidden();
+  if ((await page.locator('#guide-steps li').count()) === 3) {
+    // Step 3: Analysis reads the lot with the goal's question once the sharper scans are in.
+    await expect(current).toContainText('Find out what to plant where', { timeout: 60_000 });
+    await expect(page.locator('.analysis-msg[data-role="assistant"]')).toHaveText(['The east side is sunniest.']);
+    expect(asked[0]!.turns[0]!.text).toContain('vegetables');
+    await current.getByRole('button', { name: 'Read it' }).click();
+    await expect(page.locator('#analysis-heading')).toBeFocused();
+  } else await expect(current).toContainText('See where the sun falls'); // a build without the Analysis proxy
+  // Home is step 1 again. Leaving the guide brings the overview back, and the welcome reopens from it.
+  await page.locator('#home-link').click();
+  await expect(current).toContainText('Type your address');
+  await page.locator('#guide-exit').click();
+  await expect(guide).toBeHidden();
+  await expect(page.locator('.intro-preview')).toBeVisible();
+  await page.locator('#welcome-open').click();
+  // A patio goal opens Basic's afternoon shade; a home buyer's, Basic's one day.
+  await page.locator('#welcome button[value="patio"]').click();
+  await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
+  await expect(page.locator('input[name="basic-view"][value="shade"]')).toBeChecked();
+  await page.locator('#guide-exit').click();
+  await page.locator('#welcome-open').click();
+  await page.locator('#welcome button[value="home"]').click();
+  await expect(page.locator('html')).toHaveClass(/\bbasic\b/);
+  await expect(page.locator('input[name="basic-view"][value="day"]')).toBeChecked();
+  await expect(page.locator('#guide-title')).toContainText('a home');
+  // vanshade.ca/#welcome opens it again for a returning visitor, and leaves a clean address.
+  const again = await context.newPage();
+  await again.goto('./#welcome');
+  await expect(again.locator('#welcome')).toBeVisible();
+  expect(new URL(again.url()).hash).toBe('');
+  await again.close();
+});
+
+test('Basic views: afternoon shade and one day, each with its own settings and link', async ({ page, context }) => {
+  await stubChat(context);
+  await page.addInitScript(welcomeSeen);
+  await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC');
+  await expect(page.locator(RESULT)).toBeVisible();
+  const view = (name: string) => page.locator('#basic-views label', { hasText: name });
+  // Afternoon shade: the dates and the hours of the day, the shadiest spot first.
+  await view('Afternoon shade').click();
+  await expect(page.locator('#basic-period')).toContainText('How often each spot is shaded between 1:00 pm and 6:00 pm, 1 June to 31 August');
+  await expect(page.locator('#basic-summary dt').first()).toContainText('Most shade');
+  await expect(page.locator('#basic-summary')).toContainText(/\d+% of the time/);
+  await expect(page.locator('#basic-from-time')).toHaveValue('13:00');
+  await expect(page.locator('#legend')).toContainText('Share of the time in shade');
+  await expect.poll(() => page.url()).toMatch(/m=shade.*adv=0|adv=0.*m=shade/);
+  await page.locator('#basic-to-time').fill('16:00');
+  await page.locator('#basic-to-time').dispatchEvent('change');
+  await expect(page.locator('#basic-period')).toContainText('between 1:00 pm and 4:00 pm');
+  await expect.poll(() => page.url()).toMatch(/wt=16%3A00/);
+  // One day: the date and Play the day under the map, with moving shadows; no dates above.
+  await view('One day').click();
+  await expect(page.locator('#basic-period')).toContainText('Hours of direct sun on');
+  await expect(page.locator('#basic-dates')).toBeHidden();
+  await expect(page.locator('#tl-play')).toBeVisible();
+  await expect(page.locator('#legend')).toContainText('Hours of direct sun that day');
+  await expect.poll(() => page.url()).toMatch(/m=day/);
+  // The link opens the same view in Basic, on a fresh page.
+  const shared = await context.newPage();
+  await shared.goto(page.url());
+  await expect(shared.locator(RESULT)).toBeVisible();
+  await expect(shared.locator('html')).toHaveClass(/\bbasic\b/);
+  await expect(shared.locator('input[name="basic-view"][value="day"]')).toBeChecked();
+  await shared.close();
+  // Back to the growing season: a plain Basic link again.
+  await view('Growing season').click();
+  await expect(page.locator('#basic-period')).toContainText('Average hours of direct sun a day');
+  await expect(page.locator('#tl-play')).toBeHidden();
+  await expect.poll(() => page.url()).not.toMatch(/[#&](adv|m)=/);
+});
+
 test('Advanced: modes, time, 3D data, inspector and links', async ({ page, context }) => {
+  await stubChat(context);
   await page.goto('./#adv=1');
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');
@@ -217,6 +323,7 @@ test('Advanced: modes, time, 3D data, inspector and links', async ({ page, conte
 });
 
 test('embed: "Copy embed code" gives an iframe that works on another page', async ({ page, context }) => {
+  await stubChat(context);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC&p=custom&cs=2026-06-01&ce=2026-06-30');
   await expect(page.locator(RESULT)).toBeVisible();
@@ -240,7 +347,7 @@ test('embed: "Copy embed code" gives an iframe that works on another page', asyn
   expect(await frame.locator('.site-header .brand').evaluate((el) => el.getBoundingClientRect().height)).toBeLessThanOrEqual(1);
   await expect(frame.locator('#search-form')).toBeHidden();
   await expect(frame.locator('#tips')).toBeHidden();
-  await expect(frame.locator('#analysis-open')).toBeHidden(); // no chat on other sites' pages
+  await expect(frame.locator('#analysis-dialog')).toBeHidden(); // no chat on other sites' pages
   await expect(frame.locator('#embed-bar')).toContainText('Open Government Licences');
   const open = frame.locator('#embed-open');
   await expect(open).toHaveAttribute('target', '_blank');
@@ -251,6 +358,8 @@ test('embed: "Copy embed code" gives an iframe that works on another page', asyn
 
 test('"Use my location" finds the nearest address', async ({ browser }) => {
   const here = await browser.newContext({ geolocation: { latitude: 49.26131, longitude: -123.11394 }, permissions: ['geolocation'] }); // Vancouver City Hall
+  await here.addInitScript(welcomeSeen);
+  await stubChat(here);
   const page = await here.newPage();
   await page.goto('./');
   await page.locator('#locate').click();
@@ -259,6 +368,7 @@ test('"Use my location" finds the nearest address', async ({ browser }) => {
   await here.close();
 
   const denied = await browser.newContext(); // no permission granted
+  await denied.addInitScript(welcomeSeen);
   const page2 = await denied.newPage();
   await page2.goto('./');
   await page2.locator('#locate').click();
@@ -267,13 +377,16 @@ test('"Use my location" finds the nearest address', async ({ browser }) => {
 });
 
 test('out-of-area addresses get a clear message', async ({ page }) => {
+  await page.addInitScript(welcomeSeen);
   await page.goto('./');
   await page.locator('#address-input').fill('1 Centennial Sq, Victoria');
   await page.locator('#address-input').press('Enter');
   await expect(page.locator('#message')).toContainText('Metro Vancouver only');
 });
 
-test('mobile: Basic stacks the summary over the view; Advanced uses a bottom sheet @mobile', async ({ page }) => {
+test('mobile: Basic stacks the summary over the view; Advanced uses a bottom sheet @mobile', async ({ page, context }) => {
+  await stubChat(context);
+  await page.addInitScript(welcomeSeen);
   await page.goto('./');
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');

@@ -67,6 +67,14 @@
         <p class="hint">Contains information licensed under the Open Government Licences of British Columbia and Canada. <button type="button" class="link" data-open-about>About</button></p>
       </div>
 
+      <section id="guide" class="guide" aria-labelledby="guide-title" hidden>
+        <div class="guide-head">
+          <h2 id="guide-title"></h2>
+          <button type="button" id="guide-exit" class="link">Leave the guide</button>
+        </div>
+        <ol id="guide-steps" class="guide-steps"></ol>
+      </section>
+
       <ol id="status" class="status" aria-live="polite" hidden></ol>
       <div id="message" class="message" role="alert" hidden></div>
 
@@ -84,6 +92,7 @@
           <button type="button" class="ghost" data-example="4949 Canada Way, Burnaby">Burnaby City Hall</button>
           <button type="button" class="ghost" data-example="355 W Queens Rd, North Vancouver">District of North Vancouver Hall</button>
           </p>
+          <p class="welcome-again"><button type="button" id="welcome-open" class="link">Not sure where to start? Choose what you're here for.</button></p>
           <p class="hint">Covers the 21 municipalities, Electoral Area A and Tsawwassen First Nation in Metro Vancouver. Free, with no account. Addresses are looked up with BC's public address service; VanShade keeps nothing.</p>
         </div>
         <figure class="intro-preview">
@@ -149,12 +158,8 @@
           <p id="readout" class="readout" aria-live="polite"></p>
           <section id="inspector" class="inspector" aria-live="polite" hidden></section>
           <div class="analysis">
-            <button type="button" id="analysis-open" class="analysis-open" hidden aria-expanded="false" aria-controls="analysis-dialog">Analysis</button>
             <section id="analysis-dialog" class="analysis-panel" hidden aria-labelledby="analysis-heading">
-              <div class="analysis-head">
-                <h2 id="analysis-heading">Analysis</h2>
-                <button type="button" id="analysis-close" class="ghost">Close</button>
-              </div>
+              <h2 id="analysis-heading" tabindex="-1">Analysis</h2>
               <p id="analysis-status" class="hint" aria-live="polite"></p>
               <div id="analysis-log" class="analysis-log" role="log"></div>
               <div id="analysis-chips" class="analysis-chips"></div>
@@ -174,10 +179,20 @@
           <h2 id="lot-heading" tabindex="-1"></h2>
           <p id="basic-head" class="basic-head"><span id="basic-period"></span><button type="button" class="info-button" id="numbers-open" aria-label="About these numbers" title="About these numbers" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5" /><circle cx="10" cy="6.2" r="1.1" fill="currentColor" /><path d="M10 9v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg></button></p>
           <div id="basic-summary" class="basic-summary" aria-live="polite"></div>
-          <form id="basic-dates" class="basic-dates" aria-label="Dates to average over" novalidate>
-            <label>From <input type="date" id="basic-from" /></label>
-            <label>To <input type="date" id="basic-to" /></label>
-          </form>
+          <div id="basic-controls" class="basic-controls">
+            <fieldset id="basic-views" class="segmented basic-views">
+              <legend class="visually-hidden">What to show</legend>
+              <label><input type="radio" name="basic-view" value="season" checked /> Growing season</label>
+              <label><input type="radio" name="basic-view" value="shade" /> Afternoon shade</label>
+              <label><input type="radio" name="basic-view" value="day" /> One day</label>
+            </fieldset>
+            <form id="basic-dates" class="basic-dates" aria-label="Dates" novalidate>
+              <label>From <input type="date" id="basic-from" /></label>
+              <label>To <input type="date" id="basic-to" /></label>
+              <label id="basic-from-time-wrap" hidden>Between <input type="time" id="basic-from-time" step="900" /></label>
+              <label id="basic-to-time-wrap" hidden>and <input type="time" id="basic-to-time" step="900" /></label>
+            </form>
+          </div>
           <p id="result-headline" class="headline" aria-live="polite"></p>
           <p id="result-summary" class="summary"></p>
           <form id="sun-controls" class="controls" hidden>
@@ -299,8 +314,8 @@
         square metre of the lot works out which parts of the sky are blocked. It then looks for sharper and newer LiDAR: by default it
         keeps the 0.5 m detail of NRCan's point clouds wherever the Province's 2024–2025 surveys show nothing changed, and uses
         the newer survey wherever something did. "3D data" under More options lets you pick either survey on its own. It then follows the sun across the day or season
-        to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests and, if you
-        open Analysis, a short written summary of the lot and your questions, which go to Google's Gemini to write the answers.
+        to count hours of direct sun. Everything runs in your browser; nothing is sent anywhere except the map data requests and,
+        for Analysis, a short written summary of the lot's results and any questions you ask, which go to Google's Gemini to write the answers.
       </p>
       <h3>How to use VanShade</h3>
       <ol>
@@ -346,6 +361,24 @@
         <li>Analysis answers are written by <a href="https://ai.google.dev/gemini-api">Google's Gemini</a>, from the lot's numbers shown here.</li>
         <li>Libraries: <a href="https://threejs.org/">three.js</a>, <a href="https://github.com/mourner/suncalc">SunCalc</a>, <a href="https://geotiffjs.github.io/">geotiff.js</a>, <a href="https://github.com/proj4js/proj4js">proj4js</a>, <a href="https://moment.github.io/luxon/">Luxon</a>, <a href="https://github.com/connormanning/copc.js">copc.js</a>, <a href="https://github.com/hobuinc/laz-perf">laz-perf</a>. Headings use <a href="https://github.com/undercasetype/Fraunces">Fraunces</a> (SIL Open Font License).</li>
       </ul>
+    </dialog>
+
+    <dialog id="welcome" class="about welcome" aria-labelledby="welcome-heading">
+      <form method="dialog">
+        <h2 id="welcome-heading"><span class="welcome-dot" aria-hidden="true"></span>Welcome to VanShade</h2>
+        <p>
+          VanShade shows where the sun falls on any property in Metro Vancouver, square metre by square metre, from laser scans of
+          the city. It can help you find the best spots to plant vegetables, a shady place for the patio, or how much sun a home
+          gets before you buy it.
+        </p>
+        <p class="welcome-ask">To start, what are you most interested in?</p>
+        <div class="welcome-choices">
+          <button value="garden" class="welcome-choice"><strong>Find the best spot for my garden</strong><span>Where vegetables and flowers will get enough sun</span></button>
+          <button value="patio" class="welcome-choice"><strong>Find shade for a patio</strong><span>Which spots stay shaded on summer afternoons</span></button>
+          <button value="home" class="welcome-choice"><strong>See the sun at a home I'm thinking of buying</strong><span>How the sun and shadows move across it through the day</span></button>
+        </div>
+        <button value="browse" class="link welcome-browse">I'm just browsing</button>
+      </form>
     </dialog>
 
     <dialog id="numbers-info" class="about" aria-labelledby="numbers-heading">

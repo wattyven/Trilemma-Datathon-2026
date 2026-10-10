@@ -109,6 +109,8 @@ export const LIDARBC_PROXY = (import.meta.env.VITE_LIDARBC_PROXY ?? '').replace(
 
 /** The Analysis chat asks Gemini through our proxy (proxy/gemini), which holds the key. Unset: no Analysis button. */
 export const GEMINI_PROXY = (import.meta.env.VITE_GEMINI_PROXY ?? '').replace(/\/+$/, '');
+/** Analysis reads a lot once the sharper laser scans are in, or after this long. */
+export const ANALYSIS_WAIT_MS = 15_000;
 
 /** Ray-march steps of max(minStepM, stepFrac · d): 0.25 m near the cell keeps roof edges and fences within a cell (tests/shadow). */
 export const HORIZON = {

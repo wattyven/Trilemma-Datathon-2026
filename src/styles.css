@@ -244,17 +244,11 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 /* Analysis chat: a button under the view, opening a panel there. The conversation scrolls once it's tall. */
 .analysis { margin-top: 12px; }
 .analysis:not(:has(> :not([hidden]))) { display: none; }
-button.analysis-open {
-  padding: 8px 16px; font-weight: 600; color: var(--fog);
-  background: var(--cedar); border: 0; border-radius: var(--radius);
-}
-button.analysis-open:hover { background: color-mix(in srgb, var(--cedar) 88%, var(--sun)); }
 .analysis-panel:not([hidden]) {
-  display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
   border: 1px solid var(--mist); border-radius: var(--radius); background: var(--panel);
 }
-.analysis-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.analysis-head h2 { margin: 0; font-size: 1.05rem; }
+.analysis-panel h2 { margin: 0; font-size: 1.05rem; }
 #analysis-status { margin: 0; }
 #analysis-status:empty { display: none; }
 .analysis-log { display: flex; flex-direction: column; gap: 8px; max-height: 22rem; overflow: auto; }
@@ -326,14 +320,15 @@ html:not(.basic) #lot-notices { margin-bottom: 6px; }
 /* Basic (html.basic, the default): the summary and dates on top, then a full-width view. "Advanced
    options" shows everything else. */
 .basic #result-headline, .basic #result-summary, .basic #sun-controls, .basic #lot-facts, .basic #lot-more, .basic .debug,
-.basic #timeline, .basic #timeline-note, .basic #opacity-wrap, .basic #changes-wrap, .basic #shadows-wrap,
+.basic:not([data-basic-view='day']) #timeline, .basic:not([data-basic-view='day']) #timeline-note, /* One day keeps Play the day */
+.basic #opacity-wrap, .basic #changes-wrap, .basic #shadows-wrap,
 .basic [data-ui='advanced'], html:not(.basic) [data-ui='basic'],
-html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic) #basic-head, html:not(.basic) #photo-credit-item,
+html:not(.basic) #basic-summary, html:not(.basic) #basic-controls, html:not(.basic) #basic-head, html:not(.basic) #photo-credit-item,
 .basic #photo-credit { display: none !important; }
 .basic .lot { grid-template-columns: 1fr; gap: 12px; }
 /* The panel's pieces join the page's column: address, summary and dates first, then the view, then the rest. */
 .basic .lot-info { display: contents; }
-.basic .lot-info > #lot-heading, .basic .lot-info > #basic-head, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-dates { order: -1; margin-bottom: 0; }
+.basic .lot-info > #lot-heading, .basic .lot-info > #basic-head, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-controls { order: -1; margin-bottom: 0; }
 .basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #lot-caveats, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
 .basic .lot-info > #lot-caveats { margin-top: -12px; } /* one list with the lot notices */
 /* The dates line and "About these numbers" sit beside the address on wider screens. */
@@ -369,7 +364,9 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic)
 .basic-stats dt .spot-dot { align-self: center; }
 .basic-stats dd { margin: 0; }
 .basic-summary .note { margin: 6px 0 0; font-size: 0.875rem; color: var(--muted); }
-.basic-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0; }
+.basic-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; margin: 12px 0; }
+.basic-views { flex-wrap: wrap; }
+.basic-dates { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
 .basic-dates label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
 .basic-dates input { font: inherit; padding: 4px 6px; border: 1px solid var(--mist); border-radius: 6px; background: var(--panel); color: inherit; }
 
@@ -378,7 +375,7 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic)
 .embed #lot-facts, .embed #lot-more, .embed #lot-notices, .embed #lot-switcher,
 .embed .controls .row, .embed .controls > .hint:not(.mode-hint), .embed #elevation-wrap { display: none !important; }
 .embed.embed-lot .search { display: none; }
-.embed #basic-dates, .embed #advanced-toggle, .embed .analysis { display: none !important; }
+.embed #basic-controls, .embed #advanced-toggle, .embed .analysis, .embed #guide { display: none !important; }
 /* The name stays for screen readers (it's the page's h1); the address bar stays for embeds without an address. */
 .embed .site-header .brand { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .embed .site-header { padding: 8px 12px 0; }
@@ -389,12 +386,55 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-dates, html:not(.basic)
 .embed .controls { margin-top: 8px; padding: 10px 12px; }
 .embed-bar { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; font-size: 0.8rem; }
 .embed-bar .hint { margin: 0; }
+/* The guided start: the welcome pop-up and the steps for the visitor's goal. */
+.welcome { max-width: min(560px, calc(100vw - 32px)); }
+.welcome h2 { font-size: 1.5rem; }
+.welcome-dot { display: inline-block; width: 0.5em; height: 0.5em; margin-right: 0.35em; border-radius: 50%; background: var(--sun); vertical-align: 0.1em; }
+.welcome-ask { margin: 16px 0 8px; font-weight: 600; }
+.welcome-choices { display: grid; gap: 8px; }
+.welcome-choice {
+  display: block; width: 100%; padding: 10px 14px; text-align: left; line-height: 1.35;
+  color: var(--ink); background: var(--panel); border: 1px solid var(--mist); border-radius: var(--radius);
+}
+.welcome-choice:hover { border-color: var(--moss); background: var(--fog); }
+.welcome-choice strong { display: block; }
+.welcome-choice span { display: block; margin-top: 2px; font-size: 0.9rem; color: var(--muted); }
+.welcome-browse { margin-top: 14px; }
+.welcome-again { margin-top: 4px; }
+.guide { margin: 8px 0 16px; padding: 12px 16px 14px; background: var(--panel); border: 1px solid var(--mist); border-radius: var(--radius); }
+.guide-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; margin-bottom: 10px; }
+.guide-head h2 { margin: 0; font-size: 1.2rem; }
+.guide-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 12px; margin: 0; padding: 0; list-style: none; }
+.guide-steps li { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--radius); color: var(--muted); }
+.guide-steps li[data-state='done'] { color: var(--ink); }
+.guide-steps li[data-state='current'] { color: var(--ink); background: color-mix(in srgb, var(--sun) 14%, var(--panel)); box-shadow: inset 0 0 0 2px var(--sun); }
+.guide-n {
+  flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--mist); font-size: 0.85rem; font-weight: 700;
+}
+.guide-steps li[data-state='current'] .guide-n { color: var(--cedar); background: var(--sun); border-color: var(--sun); }
+.guide-steps li[data-state='done'] .guide-n { color: #ffffff; background: var(--moss); border-color: var(--moss); }
+.guide-body strong { display: block; }
+.guide-text { display: block; font-size: 0.9rem; line-height: 1.4; }
+.guide-body button.link { margin-top: 4px; font-weight: 600; }
+/* With a goal chosen, the start page is the address and the steps; the overview and preview step aside. */
+.guided #intro-heading, .guided .how, .guided .intro-preview, .guided .welcome-again { display: none; }
+.guided .intro { grid-template-columns: minmax(0, 1fr); }
 .embed-open { font-family: var(--font-display); font-weight: 600; font-size: 1rem; color: var(--ink); }
 .embed-open::before { content: ''; display: inline-block; width: 0.55em; height: 0.55em; margin-right: 0.35em; border-radius: 50%; background: var(--sun); }
 .embed-open::after { content: ' ↗'; }
 
 @media (max-width: 720px) {
   .intro { grid-template-columns: 1fr; }
+  .guide-steps { gap: 4px; }
+  .guide-steps li { padding: 6px 8px; }
+  .guide-steps li:not([data-state='current']) .guide-text { display: none; } /* the current step's words only */
+  /* Basic's settings: the three views side by side, and the dates (and hours) two to a row, labels above. */
+  .basic-views { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+  .basic-views label { display: flex; align-items: center; justify-content: center; padding: 6px 8px; text-align: center; line-height: 1.2; }
+  .basic-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .basic-dates label { display: grid; gap: 2px; }
+  .basic-dates input { width: 100%; min-width: 0; }
   .lot { grid-template-columns: 1fr; gap: 12px; }
   .view-stage { height: 55vh; min-height: 300px; }
   .search-row { flex-direction: column; }

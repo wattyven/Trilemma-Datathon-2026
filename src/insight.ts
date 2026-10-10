@@ -27,6 +27,18 @@ const CAVEATS = [
 export const OPENING_QUESTION =
   'Give a short practical reading of this lot: where the sun and shade fall, what that means for a garden or for sitting outside, and one thing to watch out for. Three short paragraphs at most.';
 
+/** What a visitor is here to do, picked in the welcome (ui/guide.ts). */
+export type Goal = 'garden' | 'patio' | 'home';
+
+/** The first question, not shown, when the guide opens Analysis by itself: the goal's angle on the reading. */
+export const GOAL_QUESTIONS: Record<Goal, string> = {
+  garden:
+    'I want to grow vegetables and flowers here. Using these numbers, where are the best spots for sun-loving crops such as tomatoes, which parts suit leafy greens or shade-tolerant plants, and one thing to watch out for. Three short paragraphs at most.',
+  patio:
+    'I want a patio or outdoor seating that stays shaded on hot summer afternoons. Using these numbers, where is the best spot, which parts are too sunny, and one thing to watch out for. Three short paragraphs at most.',
+  home: "I'm thinking of buying this home. Using these numbers, describe how sun and shade fall across the lot, which parts are brightest and darkest, what that means for a garden or for sitting outside, and one thing to check when visiting. Three short paragraphs at most.",
+};
+
 /** The lot, in lines a model can read. Empty fields are left out. */
 export function formatInsightContext(facts: InsightFacts): string {
   const lines = [

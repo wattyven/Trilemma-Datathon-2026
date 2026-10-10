@@ -110,6 +110,8 @@ export class Analysis {
   private inspectedCell: number | null = null;
   private threads = 1;
   private pickSeq = 0;
+  /** The shadows and sun marker last applied to the 3D view (changing shadows recompiles its shaders). */
+  private sunStyle = '';
   /** Each cell's position in local metres, for the headline (refreshed with the grid). */
   private cellPositions: Position[] = [];
   /** The current result's sunniest and shadiest patches (found in render(), for the headline and pins). */
@@ -121,6 +123,9 @@ export class Analysis {
   private lot: { parcel: Parcel; signal: AbortSignal } | null = null;
   /** The sharper surface loading (or loaded) after the first result. */
   private refinement: { spec: ElevationSpec; state: 'running' | 'interrupted' | 'done' | 'failed'; note?: string } | null = null;
+  /** Settles once this lot's sharper surface is in, or there's none left to try (`whenRefined`). */
+  private refined: Promise<void> = Promise.resolve();
+  private settleRefined: () => void = () => {};
   private refineSeq = 0;
   /** The lot's HRDEM tile, its sharper surfaces (looked up once per lot) and any that failed to load. */
   private hrdemSpec: HrdemSpec | null = null;
@@ -159,7 +164,7 @@ export class Analysis {
         this.setView(r.value as View);
         this.onViewChange(this.view);
       });
-    els.shadowsToggle.addEventListener('change', () => this.scene?.setShadows(!this.basic && els.shadowsToggle.checked));
+    els.shadowsToggle.addEventListener('change', () => this.applySunStyle());
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
     els.resetView.addEventListener('click', () => this.scene?.resetView());
     els.opacityWrap.hidden = true; // until a photo is on screen
@@ -347,6 +352,7 @@ export class Analysis {
   async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
     this.refineSeq++; // abandon the previous lot's refinement
     this.refinement = null;
+    this.refined = new Promise((resolve) => (this.settleRefined = resolve));
     this.options = null;
     this.failedSpecs.clear();
     this.lot = { parcel, signal };
@@ -413,6 +419,11 @@ export class Analysis {
     void this.refine();
   }
 
+  /** After start(): resolves when the sharper surface's result is on screen, or there's none to load. */
+  whenRefined(): Promise<void> {
+    return this.refined;
+  }
+
   /**
    * Progressive refinement: with the first (HRDEM 1 m) result on screen, load a sharper surface in
    * the background and swap it in. Any failure just keeps the first result.
@@ -427,7 +438,7 @@ export class Analysis {
     // Resume an interrupted load, or take the preferred surface that hasn't failed for this lot.
     const resume = this.refinement?.state === 'interrupted' ? this.refinement.spec : null;
     const spec = resume ?? refinementOrder(this.options, this.sourcePreference).find((s) => !this.failedSpecs.has(s));
-    if (!spec || spec === req.elevation) return;
+    if (!spec || spec === req.elevation) return this.settleRefined();
     this.refinement = { spec, state: 'running' };
     this.renderSurfaceFact();
     try {
@@ -437,6 +448,7 @@ export class Analysis {
       this.lotRequest = refinedReq; // observer changes now reuse the sharper rasters
       this.refinement.state = 'done';
       await this.swapIn(loaded, lot.parcel, lot.signal);
+      this.settleRefined();
     } catch (e) {
       if (seq !== this.refineSeq || !this.refinement) return;
       // Superseded by an observer reload (onControls restarts it), or a real failure: those are
@@ -558,8 +570,7 @@ export class Analysis {
       { lowPower: isLowPower() },
     );
     this.setPickable();
-    this.scene.setShadows(!this.basic && this.els.shadowsToggle.checked);
-    this.scene.setSunVisible(!this.basic);
+    this.applySunStyle();
     this.scene.onRender = () => this.placePins();
   }
 
@@ -713,15 +724,32 @@ export class Analysis {
     }
   }
 
+  /** Real shadows and the sun at the slider's time: Advanced, and Basic's One day. Basic's averages have no single moment. */
+  private get sunMoves(): boolean {
+    return !this.basic || this.controls.get().mode === 'day';
+  }
+
+  /** Cast shadows and the sun marker, as `sunMoves` says (in Advanced, shadows follow its Shadows setting). */
+  private applySunStyle() {
+    const shadows = this.sunMoves && (this.basic || this.els.shadowsToggle.checked);
+    const style = `${shadows} ${this.sunMoves}`;
+    if (!this.scene || style === this.sunStyle) return;
+    this.sunStyle = style;
+    this.scene.setShadows(shadows);
+    this.scene.setSunVisible(this.sunMoves);
+  }
+
   private updateSun() {
     const req = this.lotRequest;
     if (!req) return;
     const [lon, lat] = req.lonLat;
-    if (this.basic) {
-      // An average has no single moment: light the 3D view from midday in the middle of the dates.
-      const { start, end } = seasonRange(this.controls.get());
+    if (!this.sunMoves) {
+      // An average has no single moment: light the 3D view from the middle of the dates (and of the shade finder's hours).
+      const r = requestFor(this.controls.get());
+      const { start, end } = r.kind === 'shade' ? r : seasonRange(this.controls.get());
       const mid = middleDate(start, end);
-      const sun = momentSample(mid, middayMinute(dayMinuteRange(mid, lat, lon)), lat, lon);
+      const minute = r.kind === 'shade' ? (r.window.fromMin + r.window.toMin) / 2 : middayMinute(dayMinuteRange(mid, lat, lon));
+      const sun = momentSample(mid, minute, lat, lon);
       this.scene?.setSun({ azTrueDeg: sun.azTrueDeg, altDeg: sun.altDeg, path: [] });
       this.els.sunNote.hidden = true;
       return;
@@ -766,6 +794,7 @@ export class Analysis {
     this.renderLegend(layer);
     this.renderSummary();
     this.renderBasicSummary();
+    this.applySunStyle(); // Basic's views differ: One day has moving shadows
     if (this.basic) this.updateSun(); // its light follows the dates
     // The time slider always moves the 3D sun, but only changes the colours in "One moment".
     const mode = this.controls.get().mode;
@@ -827,7 +856,7 @@ export class Analysis {
       bar.className = 'legend-bar';
       const label = document.createElement('span');
       label.className = 'legend-title';
-      label.textContent = layer.kind === 'percent' ? copy.legend.percent : copy.legend.hours;
+      label.textContent = layer.kind === 'percent' ? copy.legend.percent : this.result?.kind === 'day' ? copy.legend.hoursDay : copy.legend.hours;
       const ramp = document.createElement('span');
       ramp.className = 'ramp';
       ramp.style.background = cividisGradient();
@@ -923,42 +952,49 @@ export class Analysis {
     return spot.cells.reduce((s, i) => s + r.typical![i]!, 0) / spot.cells.length;
   }
 
-  /** Basic mode: "Maximum: 11.5 hours, in the north-east", the same for the minimum, and the dates. */
+  /**
+   * Basic: "Maximum: 11.5 hours, in the north-east" and the minimum, for its view (a season, one day,
+   * or the shade finder's "Most shade: 100% of the time"), and what the figures cover.
+   */
   private renderBasicSummary() {
     const el = this.els.basicSummary;
     el.replaceChildren();
     this.els.basicPeriod.textContent = '';
     this.els.numbersOpen.hidden = true;
     const r = this.result;
-    if (!this.basic || !r || r.kind !== 'season') return;
-    const b = copy.basic;
-    const { start, end } = seasonRange(this.controls.get());
+    if (!this.basic || !r || r.kind === 'inspect' || r.kind === 'moment') return;
+    const b = copy.basic, c = this.controls.get(), q = requestFor(c);
     const p = (className: string, textContent: string) => Object.assign(document.createElement('p'), { className, textContent });
-    this.els.basicPeriod.textContent = b.period(isoDate(start), isoDate(end));
+    let period = '';
+    if (r.kind === 'season') period = b.period(isoDate(seasonRange(c).start), isoDate(seasonRange(c).end));
+    else if (r.kind === 'day') period = b.periodDay(this.timeline.get().date);
+    else if (q.kind === 'shade') period = b.periodShade(minuteLabel(q.window.fromMin), minuteLabel(q.window.toMin), isoDate(q.start), isoDate(q.end));
+    this.els.basicPeriod.textContent = period;
     const range = this.openRange();
-    if (range.coveredShare >= MOSTLY_COVERED || !range.open.length) {
-      el.append(p('note', b.mostlyCovered));
-      return;
-    }
+    if (range.coveredShare >= MOSTLY_COVERED) return el.append(p('note', b.mostlyCovered));
+    if (!range.open.length) return el.append(p('note', r.kind === 'shade' ? copy.headline.shadeNoSun : b.mostlyCovered));
     const { sunniest, shadiest } = this.spots;
+    const shade = r.kind === 'shade';
     // The figures, with "About these numbers" at the end of the same row.
     const row = Object.assign(document.createElement('div'), { className: 'basic-stats-row' });
     el.append(row);
-    if (!sunniest || !shadiest) row.append(p('even', b.even(range.low, range.high)));
+    if (!sunniest || !shadiest) row.append(p('even', shade ? b.evenShade(range.low, range.high) : b.even(range.low, range.high)));
     else {
       const dl = Object.assign(document.createElement('dl'), { className: 'basic-stats' });
-      for (const [kind, spot] of [['sunniest', sunniest], ['shadiest', shadiest]] as const) {
+      // The shade finder leads with the shadiest spot: that's what it's for.
+      const order = shade ? ([['shadiest', shadiest], ['sunniest', sunniest]] as const) : ([['sunniest', sunniest], ['shadiest', shadiest]] as const);
+      for (const [kind, spot] of order) {
         const dt = document.createElement('dt');
         const dot = Object.assign(document.createElement('span'), { className: 'spot-dot' });
         dot.dataset.kind = kind;
         dot.setAttribute('aria-hidden', 'true');
-        dt.append(dot, `${kind === 'sunniest' ? b.max : b.min}:`);
+        dt.append(dot, `${shade ? (kind === 'shadiest' ? b.mostShade : b.leastShade) : kind === 'sunniest' ? b.max : b.min}:`);
         const [before, word] = b.where(sideOf([this.cellPositions[spot.cell]!], range.open, 'middle'));
         const show = Object.assign(document.createElement('button'), { type: 'button', className: 'link', textContent: word });
-        show.append(Object.assign(document.createElement('span'), { className: 'visually-hidden', textContent: b.show(kind) }));
+        show.append(Object.assign(document.createElement('span'), { className: 'visually-hidden', textContent: b.show }));
         show.addEventListener('click', () => this.highlightSpot(kind));
         const dd = document.createElement('dd');
-        dd.append(Object.assign(document.createElement('strong'), { textContent: b.hours(spot.value) }), `, ${before} `, show);
+        dd.append(Object.assign(document.createElement('strong'), { textContent: shade ? b.percent(spot.value) : b.hours(spot.value) }), `, ${before} `, show);
         const typical = this.typicalAt(spot);
         if (typical !== null && typical >= 0.05) dd.append(Object.assign(document.createElement('span'), { className: 'typical', textContent: copy.weather.hours(typical) }));
         const item = document.createElement('div');
@@ -971,7 +1007,8 @@ export class Analysis {
     const notes: string[] = [];
     if (sunniest && shadiest) notes.push(b.spotSize);
     const w = this.weather();
-    if (w && r.typical) notes.push(copy.weather.source(w.station.short, w.station.period));
+    if (r.kind !== 'season') notes.push(b.clearSky); // typical weather is for seasons only
+    else if (w && r.typical) notes.push(copy.weather.source(w.station.short, w.station.period));
     if (range.coveredShare >= 0.05) notes.push(copy.headline.covered(range.coveredShare));
     this.els.numbersBody.replaceChildren(...notes.map((t) => p('', t)));
     this.els.numbersOpen.hidden = !notes.length;
@@ -994,8 +1031,7 @@ export class Analysis {
   /** Basic or Advanced: what the 3D view shows (no cast shadows or sun arc in Basic), the colours and the summary. */
   setBasic(on: boolean) {
     this.basic = on;
-    this.scene?.setShadows(!on && this.els.shadowsToggle.checked);
-    this.scene?.setSunVisible(!on);
+    this.applySunStyle();
     this.setPickable();
     if (on) this.closeInspector();
     this.updateSun();

@@ -1,6 +1,6 @@
 import './styles.css';
 import { Analysis, errorMessage, type AnalysisElements } from './analysis';
-import { GEMINI_PROXY, IMAGERY, LOCATE } from './config';
+import { ANALYSIS_WAIT_MS, GEMINI_PROXY, IMAGERY, LOCATE } from './config';
 import { copy } from './copy';
 import { nearestAddress, resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
@@ -11,7 +11,8 @@ import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver 
 import { IMAGERY_SOURCES } from './imagery/sources';
 import { initAbout, initDialog } from './ui/about';
 import { initAnalysisChat } from './ui/analysisChat';
-import { defaultState, initControls, seasonRange, type ControlState } from './ui/controls';
+import { initGuide } from './ui/guide';
+import { defaultState, initControls, seasonRange, type ControlState, type Mode } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
 import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
@@ -20,6 +21,7 @@ import { initTips } from './ui/tips';
 import { showSteps, type StepId, type Steps } from './ui/status';
 import { Timeline, initialTimeline, minuteLabel } from './ui/timeline';
 import { decodeHash, encodeHash, wantsAdvanced, type UrlState } from './urlState';
+import { GOAL_QUESTIONS, OPENING_QUESTION, type Goal } from './insight';
 
 const byId = <T extends HTMLElement>(id: string) => {
   const el = document.getElementById(id);
@@ -121,14 +123,12 @@ const timeline = new Timeline(
   () => initialTimeline(todayInVancouver(), nowMinuteInVancouver()),
 );
 const analysis = new Analysis(lotCanvas, controls, timeline, lotEls, analysisEls);
-const analysisOpen = byId<HTMLButtonElement>('analysis-open');
-const analysisChat = GEMINI_PROXY
+const analysisChat = GEMINI_PROXY && !embedOn // never on other sites' pages
   ? initAnalysisChat(
       GEMINI_PROXY,
       {
-        open: analysisOpen,
         panel: byId('analysis-dialog'),
-        close: byId('analysis-close'),
+        heading: byId('analysis-heading'),
         log: byId('analysis-log'),
         status: byId('analysis-status'),
         form: byId('analysis-form'),
@@ -138,12 +138,9 @@ const analysisChat = GEMINI_PROXY
       () => analysis.insight(),
     )
   : null;
-analysis.onResult = () => {
-  analysisOpen.hidden = !analysisChat;
-};
-/** A new search, another lot or the start page: close the chat and forget its conversation. */
+analysis.onResult = () => analysisChat?.show(); // under the view from the first result
+/** A new search, another lot or the start page: hide the chat and forget its conversation. */
 function resetAnalysisChat() {
-  analysisOpen.hidden = true;
   analysisChat?.reset();
 }
 analysis.onViewChange = () => writeUrl(false);
@@ -163,6 +160,32 @@ const tips = initTips(byId('tips'), byId<HTMLButtonElement>('tips-close'), byId(
 document.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('[data-show-tips]')) tips.show();
 });
+// The guided start (never in embeds): a first visit's welcome, then the steps for the chosen goal.
+const guide = embedOn
+  ? null
+  : initGuide(
+      { dialog: byId<HTMLDialogElement>('welcome'), section: byId('guide'), title: byId('guide-title'), steps: byId<HTMLOListElement>('guide-steps'), exit: byId<HTMLButtonElement>('guide-exit') },
+      { advice: analysisChat !== null, onChoose: applyGoal, onExit: () => input.focus(), onReadAdvice: () => analysisChat?.reveal() },
+    );
+byId('welcome-open').addEventListener('click', () => guide?.openWelcome());
+
+/** A choice in the welcome opens the Basic view its goal needs; just browsing is the regular page. */
+function applyGoal(goal: Goal | null) {
+  setAdvanced(false, false);
+  setBasicView(goal === 'patio' ? 'shade' : goal === 'home' ? 'day' : 'season');
+  input.focus();
+}
+
+/** Once the sharper laser scans are in (or after a wait), Analysis reads the lot: for the guide's goal, if there is one. */
+async function readWhenReady(signal: AbortSignal) {
+  if (!analysisChat) return;
+  await Promise.race([analysis.whenRefined(), new Promise((r) => setTimeout(r, ANALYSIS_WAIT_MS))]);
+  if (signal.aborted) return;
+  const goal = guide?.goal;
+  if (goal) guide.setStep(3);
+  analysisChat.read(goal ? GOAL_QUESTIONS[goal] : OPENING_QUESTION);
+}
+
 const lotInfo = byId('lot-info');
 const sheet = embedOn ? null : initSheet(lotInfo, byId<HTMLButtonElement>('sheet-handle'));
 
@@ -198,28 +221,53 @@ function fitView() {
     return;
   }
   const top = stage.getBoundingClientRect().top + window.scrollY;
-  stage.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12))}px`;
+  // One day keeps Play the day (and its note) under the map: leave room for them.
+  const below = [byId('timeline'), byId('timeline-note')].reduce((h, el) => h + (el.offsetParent ? el.offsetHeight + 10 : 0), 0);
+  stage.style.height = `${Math.max(360, Math.round(window.innerHeight - top - 12 - below))}px`;
 }
 window.addEventListener('resize', fitView);
 const refit = new ResizeObserver(fitView);
-for (const id of ['basic-summary', 'basic-head', 'basic-dates', 'lot-heading']) refit.observe(byId(id));
+for (const id of ['basic-summary', 'basic-head', 'basic-controls', 'lot-heading', 'guide', 'timeline', 'timeline-note']) refit.observe(byId(id));
 refit.observe(document.querySelector('.site-header')!);
 
 const advancedToggle = byId<HTMLButtonElement>('advanced-toggle');
+const basicViews = Array.from(document.querySelectorAll<HTMLInputElement>('input[name="basic-view"]'));
+const basicDates = byId<HTMLFormElement>('basic-dates');
 const basicFrom = byId<HTMLInputElement>('basic-from');
 const basicTo = byId<HTMLInputElement>('basic-to');
+const basicFromTime = byId<HTMLInputElement>('basic-from-time');
+const basicToTime = byId<HTMLInputElement>('basic-to-time');
 let advanced = false;
 
-/** Basic's dates show the season range the controls hold. */
-function syncBasicDates() {
-  const { start, end } = seasonRange(controls.get());
-  basicFrom.value = isoDate(start);
-  basicTo.value = isoDate(end);
+/** Basic's three views: a growing season (the default), afternoon shade (the shade finder) and one day. */
+const BASIC_VIEWS: ReadonlySet<Mode> = new Set(['season', 'shade', 'day']);
+
+/** Basic's controls show what the settings hold: the view, and its dates (and the shade finder's hours). */
+function syncBasic() {
+  const c = controls.get();
+  document.documentElement.dataset.basicView = c.mode;
+  for (const r of basicViews) r.checked = r.value === c.mode;
+  basicDates.hidden = c.mode === 'day'; // its date is under the map, with Play the day
+  byId('basic-from-time-wrap').hidden = byId('basic-to-time-wrap').hidden = c.mode !== 'shade';
+  if (c.mode === 'shade') {
+    [basicFrom.value, basicTo.value, basicFromTime.value, basicToTime.value] = [c.shadeStart, c.shadeEnd, c.fromTime, c.toTime];
+  } else {
+    const { start, end } = seasonRange(c);
+    [basicFrom.value, basicTo.value] = [isoDate(start), isoDate(end)];
+  }
+  queueMicrotask(fitView);
+}
+
+/** One of Basic's views. */
+function setBasicView(mode: Mode) {
+  controls.set({ mode });
+  syncBasic();
+  void analysis.onControls('request');
 }
 
 /**
- * Basic (the default) or Advanced options. Basic always measures a date range at garden-bed height
- * on the best surface, so switching to it sets those; switching back shows them as chosen.
+ * Basic (the default) or Advanced options. Basic measures at garden-bed height on the best surface,
+ * in one of its three views, so switching to it sets those; switching back shows them as chosen.
  */
 function setAdvanced(on: boolean, recompute = true) {
   advanced = on;
@@ -231,14 +279,15 @@ function setAdvanced(on: boolean, recompute = true) {
   else lotInfo.dataset.sheet = 'expanded'; // no bottom sheet in Basic
   if (on) return analysis.setBasic(false);
   const before = controls.get();
-  controls.set({ mode: 'season', observer: 'bed', spots: true });
+  const mode = BASIC_VIEWS.has(before.mode) ? before.mode : 'season';
+  controls.set({ mode, observer: 'bed', spots: true });
   analysis.chooseSource('best');
   analysis.setChangesEnabled(false);
-  syncBasicDates();
+  syncBasic();
   analysis.setBasic(true);
   if (!recompute) return;
   if (before.observer !== 'bed') void analysis.onControls('observer');
-  else if (before.mode !== 'season') void analysis.onControls('request');
+  else if (before.mode !== mode) void analysis.onControls('request');
 }
 
 advancedToggle.addEventListener('click', () => {
@@ -246,14 +295,25 @@ advancedToggle.addEventListener('click', () => {
   writeUrl(false);
 });
 
-byId<HTMLFormElement>('basic-dates').addEventListener('change', () => {
+byId('basic-views').addEventListener('change', (e) => {
+  setBasicView((e.target as HTMLInputElement).value as Mode);
+  writeUrl(false);
+});
+
+basicDates.addEventListener('change', () => {
   const a = parseIsoDate(basicFrom.value), b = parseIsoDate(basicTo.value);
   if (!a || !b) return;
   const [start, end] = isoDate(a) <= isoDate(b) ? [a, b] : [b, a];
-  const growing = PRESETS.growing(start.year);
-  const isGrowing = isoDate(growing.start) === isoDate(start) && isoDate(growing.end) === isoDate(end);
-  controls.set(isGrowing ? { preset: 'growing', year: start.year } : { preset: 'custom', start: isoDate(start), end: isoDate(end) });
-  syncBasicDates();
+  if (controls.get().mode === 'shade') {
+    const times = [basicFromTime.value.slice(0, 5), basicToTime.value.slice(0, 5)].sort();
+    const hours = times[0] && times[1] && times[0] !== times[1] ? { fromTime: times[0], toTime: times[1] } : {};
+    controls.set({ shadeStart: isoDate(start), shadeEnd: isoDate(end), ...hours });
+  } else {
+    const growing = PRESETS.growing(start.year);
+    const isGrowing = isoDate(growing.start) === isoDate(start) && isoDate(growing.end) === isoDate(end);
+    controls.set(isGrowing ? { preset: 'growing', year: start.year } : { preset: 'custom', start: isoDate(start), end: isoDate(end) });
+  }
+  syncBasic();
   void analysis.onControls('request');
   writeUrl(false);
 });
@@ -351,6 +411,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
   clearMessage();
   hideLot(lotEls);
   resetAnalysisChat();
+  guide?.setStep(1);
   lotCanvas.clear();
   intro.hidden = true;
   document.documentElement.classList.add('has-lot'); // the address bar tucks into the header
@@ -435,6 +496,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
 /** Draw the chosen lot, then run elevation and sun for it. */
 async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: number, steps: Steps, signal: AbortSignal) {
   resetAnalysisChat();
+  guide?.setStep(2);
   const parcel = found.candidates[selected];
   if (!parcel) return;
   shown = { match, found, selected };
@@ -455,7 +517,9 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   try {
     await analysis.start(parcel, match, steps, signal);
     steps.hide();
-    if (!signal.aborted && !embedOn) tips.showFirstTime();
+    if (signal.aborted || embedOn) return;
+    void readWhenReady(signal);
+    if (!guide?.goal) tips.showFirstTime(); // with a goal, its steps explain the view
   } catch (e) {
     if (isAbortError(e)) return;
     console.error(e);
@@ -471,8 +535,7 @@ const LINK_DEFAULT_MODE = 'season';
 
 function urlDefaults(): UrlState {
   return {
-    advanced: false,
-    mode: LINK_DEFAULT_MODE,
+    mode: LINK_DEFAULT_MODE, // `advanced` has no default: Basic's shade and day links say adv=0
     preset: defaults.preset,
     year: defaults.year,
     observer: defaults.observer,
@@ -498,20 +561,14 @@ function urlStateNow(): UrlState | null {
   const c = controls.get();
   const t = timeline.get();
   const lot = shown.found.candidates[shown.selected];
-  // Basic links carry the lot, the dates and the view; everything else is Basic's fixed choice.
-  if (!advanced)
-    return {
-      address: shown.match.fullAddress,
-      lot: shown.selected > 0 ? lot?.id : undefined,
-      preset: c.preset,
-      year: c.year,
-      start: c.preset === 'custom' ? c.start : undefined,
-      end: c.preset === 'custom' ? c.end : undefined,
-      view: analysis.currentView,
-      opacity: analysis.resultsOpacity,
-      debug: debugOn,
-      embed: embedOn,
-    };
+  // Basic links carry the lot, Basic's view and its dates; everything else is Basic's fixed choice.
+  // Afternoon shade and One day also say adv=0: links from before Basic used those modes for Advanced.
+  if (!advanced) {
+    const basic = { address: shown.match.fullAddress, lot: shown.selected > 0 ? lot?.id : undefined, view: analysis.currentView, opacity: analysis.resultsOpacity, debug: debugOn, embed: embedOn };
+    if (c.mode === 'shade') return { ...basic, advanced: false, mode: c.mode, shadeStart: c.shadeStart, shadeEnd: c.shadeEnd, fromTime: c.fromTime, toTime: c.toTime };
+    if (c.mode === 'day') return { ...basic, advanced: false, mode: c.mode, date: t.date, time: minuteLabel(t.minute) };
+    return { ...basic, preset: c.preset, year: c.year, start: c.preset === 'custom' ? c.start : undefined, end: c.preset === 'custom' ? c.end : undefined };
+  }
   return {
     advanced: true,
     address: shown.match.fullAddress,
@@ -612,6 +669,7 @@ function goHome(push: boolean) {
   statusList.hidden = true;
   hideLot(lotEls);
   resetAnalysisChat();
+  guide?.setStep(1);
   lotCanvas.clear();
   intro.hidden = false;
   document.documentElement.classList.remove('has-lot');
@@ -628,8 +686,18 @@ byId<HTMLAnchorElement>('home-link').addEventListener('click', (e) => {
 });
 
 window.addEventListener('popstate', async () => {
+  if (openWelcomeFromLink()) return;
   if (!(await applyUrl(location.hash))) goHome(false);
 });
+
+/** vanshade.ca/#welcome opens the welcome even for a returning visitor (handy for demos); the hash then goes. */
+function openWelcomeFromLink(): boolean {
+  if (location.hash !== '#welcome' || !guide) return false;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (shown) goHome(false);
+  guide.openWelcome();
+  return true;
+}
 
 // ── Copy link ────────────────────────────────────────────────────────────────────
 
@@ -658,4 +726,9 @@ byId<HTMLButtonElement>('share-embed').addEventListener('click', async () => {
   }
 });
 
-void applyUrl(location.hash);
+if (!openWelcomeFromLink()) {
+  const plainVisit = location.hash.length <= 1; // a link to a lot, or with settings, goes straight to it
+  void applyUrl(location.hash).then(() => {
+    if (plainVisit) guide?.showFirstTime();
+  });
+}
