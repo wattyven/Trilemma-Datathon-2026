@@ -70,12 +70,14 @@
       <section id="guide" class="guide" aria-labelledby="guide-title" hidden>
         <div class="guide-head">
           <h2 id="guide-title"></h2>
-          <button type="button" id="guide-exit" class="link">Leave the guide</button>
+          <p class="guide-links">
+            <button type="button" id="guide-change" class="link">Choose another option</button>
+            <button type="button" id="guide-exit" class="link">Leave the guide</button>
+          </p>
         </div>
         <ol id="guide-steps" class="guide-steps"></ol>
       </section>
 
-      <ol id="status" class="status" aria-live="polite" hidden></ol>
       <div id="message" class="message" role="alert" hidden></div>
 
       <section id="intro" class="intro" aria-labelledby="intro-heading">
@@ -142,6 +144,7 @@
             </div>
             <div id="spot-layer" class="spot-layer"></div>
             <p id="sun-note" class="sun-note" hidden></p>
+            <ol id="status" class="status" aria-live="polite" hidden></ol>
           </div>
           <p id="photo-credit" class="photo-credit" hidden></p>
           <p id="view-note" class="readout" hidden></p>

@@ -1,6 +1,19 @@
 import { expect, test, type BrowserContext } from '@playwright/test';
 
 const RESULT = '.scene-canvas[data-state="result"]';
+/** Records each state of the loading card while it's on screen, in `window.cards`. */
+const watchCard = () => {
+  const cards: string[] = [];
+  Object.assign(window, { cards });
+  new MutationObserver(() => {
+    const list = document.getElementById('status');
+    if (!list || list.hidden || !list.children.length) return;
+    const text = list.textContent ?? '';
+    if (cards.at(-1) !== text) cards.push(text);
+  }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+};
+const cardStates = (page: import('@playwright/test').Page) => page.evaluate(() => (window as unknown as { cards: string[] }).cards);
+
 /** A returning visitor: the start page's welcome has been seen. */
 const welcomeSeen = () => localStorage.setItem('vanshade:welcome-seen-v1', '1');
 const CHAT_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -20,6 +33,7 @@ async function stubChat(context: BrowserContext, answer = ['The south-east corne
 
 test('Basic: search → maximum and minimum hours → pins → dates → shareable link', async ({ page, context }) => {
   const asked = await stubChat(context);
+  await page.addInitScript(watchCard);
   await page.goto('./');
   // A first visit asks what the visitor is here for; "just browsing" is the regular page.
   const welcome = page.locator('#welcome');
@@ -31,7 +45,13 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
 
   await page.locator('#address-input').fill('453 W 12th Ave, Vancouver');
   await page.locator('#address-input').press('Enter');
+  await expect(page.locator('.view-stage #status')).toBeVisible(); // the steps sit on the map while it loads
   await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('.view-stage #status')).toBeHidden();
+  // Vancouver publishes aerial photos, so the card lists them from its first moment (and stays until they're in).
+  const cards = await cardStates(page);
+  expect(cards.length).toBeGreaterThan(1);
+  expect(cards.every((c) => c.includes('Adding aerial photos'))).toBe(true);
   await expect(page.locator('#lot-heading')).toHaveText('453 W 12th Ave, Vancouver, BC');
   // A first visit explains how to read the view, once.
   await expect(page.locator('#tips')).toBeVisible();
@@ -175,6 +195,18 @@ test('guide: a goal from the welcome walks through the address, the sun map and 
     expect(asked[0]!.turns[0]!.text).toContain('vegetables');
     await current.getByRole('button', { name: 'Read it' }).click();
     await expect(page.locator('#analysis-heading')).toBeFocused();
+    // "Choose another option" with the lot open: Escape keeps the goal; a patio switches the view and reads again.
+    await page.locator('#guide-change').click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#guide-title')).toHaveText('Find the best spot for your garden');
+    await page.locator('#guide-change').click();
+    await page.locator('#welcome button[value="patio"]').click();
+    await expect(page.locator('input[name="basic-view"][value="shade"]')).toBeChecked();
+    await expect(page.locator('#basic-period')).toContainText('How often each spot is shaded');
+    await expect(current).toContainText('Find out where to sit', { timeout: 60_000 });
+    await expect.poll(() => asked.length).toBe(2);
+    expect(asked[1]!.turns[0]!.text).toContain('patio');
+    expect(asked[1]!.context).toContain('Shade finder');
   } else await expect(current).toContainText('See where the sun falls'); // a build without the Analysis proxy
   // Home is step 1 again. Leaving the guide brings the overview back, and the welcome reopens from it.
   await page.locator('#home-link').click();
@@ -376,12 +408,28 @@ test('"Use my location" finds the nearest address', async ({ browser }) => {
   await denied.close();
 });
 
+test('loading card: no aerial photos where the municipality publishes none', async ({ page, context }) => {
+  await stubChat(context);
+  await page.addInitScript(welcomeSeen);
+  await page.addInitScript(watchCard);
+  await page.goto('./');
+  await page.locator('#address-input').fill('141 W 14th St, North Vancouver'); // City of North Vancouver city hall
+  await page.locator('#address-input').press('Enter');
+  await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('#status')).toBeHidden();
+  const cards = await cardStates(page);
+  expect(cards.length).toBeGreaterThan(1);
+  expect(cards.some((c) => c.includes('aerial photos'))).toBe(false);
+  await expect(page.locator('#photo-credit')).toContainText('No aerial photo is published for City of North Vancouver');
+});
+
 test('out-of-area addresses get a clear message', async ({ page }) => {
   await page.addInitScript(welcomeSeen);
   await page.goto('./');
   await page.locator('#address-input').fill('1 Centennial Sq, Victoria');
   await page.locator('#address-input').press('Enter');
   await expect(page.locator('#message')).toContainText('Metro Vancouver only');
+  await expect(page.locator('#lot')).toBeHidden(); // the map that held the steps goes again
 });
 
 test('mobile: Basic stacks the summary over the view; Advanced uses a bottom sheet @mobile', async ({ page, context }) => {

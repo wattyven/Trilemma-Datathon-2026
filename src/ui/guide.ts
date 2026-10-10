@@ -15,13 +15,15 @@ export interface GuideElements {
   section: HTMLElement;
   title: HTMLElement;
   steps: HTMLOListElement;
+  /** "Choose another option": the welcome again. */
+  change: HTMLButtonElement;
   exit: HTMLButtonElement;
 }
 
 export interface GuideOptions {
   /** Whether there's an advice step (the Analysis chat is set up). */
   advice: boolean;
-  /** A choice in the welcome: a goal, or null for "just browsing" (and Escape). */
+  /** A choice in the welcome: a goal, or null for "just browsing" (and Escape, unless a goal is already on). */
   onChoose(goal: Goal | null): void;
   /** "Leave the guide": the steps go, the settings stay. */
   onExit(): void;
@@ -46,12 +48,13 @@ function remember() {
 }
 
 export function initGuide(els: GuideElements, options: GuideOptions) {
-  const { dialog, section, title, steps, exit } = els;
+  const { dialog, section, title, steps, change, exit } = els;
   let goal: Goal | null = null;
   let step: Step = 1;
 
   dialog.addEventListener('close', () => {
     const v = dialog.returnValue;
+    if (!v && goal) return; // Escape or the backdrop after "Choose another option": keep the goal
     goal = GOALS.includes(v) ? (v as Goal) : null;
     step = 1;
     render();
@@ -61,6 +64,7 @@ export function initGuide(els: GuideElements, options: GuideOptions) {
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog.close();
   });
+  change.addEventListener('click', () => openWelcome());
   exit.addEventListener('click', () => {
     goal = null;
     render();

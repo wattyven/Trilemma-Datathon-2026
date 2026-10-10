@@ -93,6 +93,17 @@ export function hideLot(els: LotViewElements) {
   els.section.hidden = true;
 }
 
+/** A search started: the lot's panel shows straight away, with what was asked for, so the steps can sit on its map. */
+export function showLoadingLot(els: LotViewElements, title: string) {
+  els.section.hidden = false;
+  els.heading.textContent = title;
+  els.facts.replaceChildren();
+  els.factsMore.replaceChildren();
+  els.notices.replaceChildren();
+  els.switcher.hidden = true;
+  els.options.replaceChildren();
+}
+
 function renderSwitcher(els: LotViewElements, model: LotViewModel) {
   if (model.candidates.length < 2) {
     els.switcher.hidden = true;

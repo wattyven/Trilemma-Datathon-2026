@@ -35,6 +35,7 @@ export const copy = {
     lot: 'Finding your lot',
     elevation: 'Building the 3D landscape',
     sunlight: 'Working out the sun',
+    photo: 'Adding aerial photos', // only where the municipality publishes them
   },
   stepsNote: 'This usually takes 5–10 seconds.',
   emptyQuery: 'Type a street address to get started, for example "453 W 12th Ave, Vancouver".',

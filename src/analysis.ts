@@ -126,6 +126,8 @@ export class Analysis {
   /** Settles once this lot's sharper surface is in, or there's none left to try (`whenRefined`). */
   private refined: Promise<void> = Promise.resolve();
   private settleRefined: () => void = () => {};
+  /** Settles once this lot's aerial photo is in, failed or isn't published (`whenPhoto`). */
+  private photoSettled: Promise<void> = Promise.resolve();
   private refineSeq = 0;
   /** The lot's HRDEM tile, its sharper surfaces (looked up once per lot) and any that failed to load. */
   private hrdemSpec: HrdemSpec | null = null;
@@ -302,7 +304,8 @@ export class Analysis {
     this.applyOpacity();
   }
 
-  private async updatePhoto() {
+  /** The lot's aerial photo, where its municipality publishes one, marking its line on the loading card. Never rejects. */
+  private async updatePhoto(steps?: Steps) {
     const seq = ++this.photoSeq;
     const credit = this.els.photoCredit;
     const lot = this.lot;
@@ -319,9 +322,11 @@ export class Analysis {
       return;
     }
     credit.textContent = copy.imagery.loading;
+    steps?.set('photo', 'active');
     try {
       const photo = await fetchPhoto(source, photoBox(polygonsOf(lot.parcel.geometry), IMAGERY.marginM));
       if (seq !== this.photoSeq) return;
+      steps?.set('photo', 'done');
       if (!photo) {
         this.clearPhoto();
         credit.textContent = copy.imagery.noCoverage(source.owner);
@@ -331,6 +336,7 @@ export class Analysis {
       credit.textContent = source.credit;
     } catch {
       if (seq !== this.photoSeq) return;
+      steps?.set('photo', 'error');
       this.clearPhoto();
       credit.textContent = copy.imagery.failed;
     }
@@ -348,18 +354,9 @@ export class Analysis {
     this.applyOpacity();
   }
 
-  /** Run the whole pipeline for a lot already drawn on the map. */
-  async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
-    this.refineSeq++; // abandon the previous lot's refinement
-    this.refinement = null;
-    this.refined = new Promise((resolve) => (this.settleRefined = resolve));
-    this.options = null;
-    this.failedSpecs.clear();
-    this.lot = { parcel, signal };
-    this.baseVintage = null;
-    this.renderSourceChoice();
-    this.map.setChangeMask(null);
-    this.jurisdiction = displayJurisdiction(parcel, match);
+  /** Forget the lot on screen (its results, pins, photo and summaries), back to the plain map: a new search, or another lot. */
+  clear() {
+    this.photoSettled = Promise.resolve();
     this.photoSeq++;
     this.clearPhoto();
     this.els.photoCredit.hidden = true;
@@ -377,8 +374,23 @@ export class Analysis {
     this.els.readout.textContent = '';
     this.els.legend.hidden = true;
     this.els.hud.hidden = true;
-    this.showView('map'); // the outline, until the 3D terrain is ready
+    this.showView('map');
     setAnalysisNotices(this.lotEls, []);
+  }
+
+  /** Run the whole pipeline for a lot already drawn on the map. */
+  async start(parcel: Parcel, match: GeocodeMatch, steps: Steps, signal: AbortSignal) {
+    this.refineSeq++; // abandon the previous lot's refinement
+    this.refinement = null;
+    this.refined = new Promise((resolve) => (this.settleRefined = resolve));
+    this.options = null;
+    this.failedSpecs.clear();
+    this.lot = { parcel, signal };
+    this.baseVintage = null;
+    this.renderSourceChoice();
+    this.map.setChangeMask(null);
+    this.jurisdiction = displayJurisdiction(parcel, match);
+    this.clear(); // the map shows the outline until the 3D terrain is ready
 
     const centre = this.map.frame.origin;
     steps.set('elevation', 'active');
@@ -409,7 +421,7 @@ export class Analysis {
     await scenePromise;
     if (signal.aborted) return;
     this.buildScene(parcel);
-    void this.updatePhoto();
+    this.photoSettled = this.updatePhoto(steps); // alongside the sun
     steps.set('sunlight', 'active');
     this.timeline.setLocation(centre); // positions the sun; emits a change
     await this.compute(signal);
@@ -417,6 +429,11 @@ export class Analysis {
     this.controls.show();
     this.showView(this.view);
     void this.refine();
+  }
+
+  /** After start(): resolves when the aerial photo is on screen, failed or isn't published. */
+  whenPhoto(): Promise<void> {
+    return this.photoSettled;
   }
 
   /** After start(): resolves when the sharper surface's result is on screen, or there's none to load. */

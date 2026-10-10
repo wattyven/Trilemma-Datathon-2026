@@ -8,13 +8,13 @@ import { embedSnippet, fullSiteUrl } from './embed';
 import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver } from './engine/sun';
-import { IMAGERY_SOURCES } from './imagery/sources';
+import { IMAGERY_SOURCES, imageryFor } from './imagery/sources';
 import { initAbout, initDialog } from './ui/about';
 import { initAnalysisChat } from './ui/analysisChat';
 import { initGuide } from './ui/guide';
 import { defaultState, initControls, seasonRange, type ControlState, type Mode } from './ui/controls';
 import { LotCanvas } from './ui/lotCanvas';
-import { hideLot, renderLot, type LotViewElements } from './ui/lotView';
+import { hideLot, renderLot, showLoadingLot, type LotViewElements } from './ui/lotView';
 import { initSearch } from './ui/search';
 import { initSheet } from './ui/sheet';
 import { initTips } from './ui/tips';
@@ -164,16 +164,31 @@ document.addEventListener('click', (e) => {
 const guide = embedOn
   ? null
   : initGuide(
-      { dialog: byId<HTMLDialogElement>('welcome'), section: byId('guide'), title: byId('guide-title'), steps: byId<HTMLOListElement>('guide-steps'), exit: byId<HTMLButtonElement>('guide-exit') },
-      { advice: analysisChat !== null, onChoose: applyGoal, onExit: () => input.focus(), onReadAdvice: () => analysisChat?.reveal() },
+      {
+        dialog: byId<HTMLDialogElement>('welcome'),
+        section: byId('guide'),
+        title: byId('guide-title'),
+        steps: byId<HTMLOListElement>('guide-steps'),
+        change: byId<HTMLButtonElement>('guide-change'),
+        exit: byId<HTMLButtonElement>('guide-exit'),
+      },
+      { advice: analysisChat !== null, onChoose: (goal) => void applyGoal(goal), onExit: () => input.focus(), onReadAdvice: () => analysisChat?.reveal() },
     );
 byId('welcome-open').addEventListener('click', () => guide?.openWelcome());
 
-/** A choice in the welcome opens the Basic view its goal needs; just browsing is the regular page. */
-function applyGoal(goal: Goal | null) {
-  setAdvanced(false, false);
-  setBasicView(goal === 'patio' ? 'shade' : goal === 'home' ? 'day' : 'season');
-  input.focus();
+/**
+ * A choice in the welcome opens the Basic view its goal needs; just browsing is the regular page.
+ * With a lot open ("Choose another option"), the lot switches view and Analysis reads it again.
+ */
+async function applyGoal(goal: Goal | null) {
+  setAdvanced(false, shown !== null);
+  const switched = setBasicView(goal === 'patio' ? 'shade' : goal === 'home' ? 'day' : 'season');
+  if (!shown || !current) return input.focus();
+  const signal = current.signal;
+  if (goal) guide?.setStep(2);
+  resetAnalysisChat();
+  await switched;
+  if (!signal.aborted) void readWhenReady(signal);
 }
 
 /** Once the sharper laser scans are in (or after a wait), Analysis reads the lot: for the guide's goal, if there is one. */
@@ -258,11 +273,11 @@ function syncBasic() {
   queueMicrotask(fitView);
 }
 
-/** One of Basic's views. */
-function setBasicView(mode: Mode) {
+/** One of Basic's views; resolves once its result is on screen. */
+function setBasicView(mode: Mode): Promise<void> {
   controls.set({ mode });
   syncBasic();
-  void analysis.onControls('request');
+  return analysis.onControls('request');
 }
 
 /**
@@ -296,7 +311,7 @@ advancedToggle.addEventListener('click', () => {
 });
 
 byId('basic-views').addEventListener('change', (e) => {
-  setBasicView((e.target as HTMLInputElement).value as Mode);
+  void setBasicView((e.target as HTMLInputElement).value as Mode);
   writeUrl(false);
 });
 
@@ -426,7 +441,20 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
     return;
   }
 
-  const steps = showSteps(statusList, ['address', 'lot', 'elevation', 'sunlight']);
+  // The lot's panel and map show straight away, with the steps on the map; a failure before the lot is found hides them again.
+  analysis.clear();
+  showLoadingLot(lotEls, req.kind === 'match' ? req.match.fullAddress : req.text);
+  const lookupFailed = (text: string, action?: { label: string; run: () => void }) => {
+    hideLot(lotEls);
+    showMessage(text, action);
+  };
+  // The card shows every step it will have from the start: "Adding aerial photos" only where the
+  // municipality publishes them. A typed address is looked up before the card appears (or after a
+  // second, so there's always something to see); a picked suggestion or a link already says where.
+  const known = req.kind === 'match' ? req.match : null;
+  const ids: StepId[] = ['address', 'lot', 'elevation', 'sunlight'];
+  const steps = showSteps(statusList, known && photosAt(known) ? [...ids, 'photo'] : ids, { visible: !!known });
+  const showSoon = setTimeout(() => !signal.aborted && steps.show(), 1000);
   let stage: StepId = 'address';
   try {
     steps.set('address', 'active');
@@ -439,10 +467,10 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
         steps.hide();
         switch (outcome.kind) {
           case 'not-found':
-            return showMessage(copy.notFound);
+            return lookupFailed(copy.notFound);
           case 'low-confidence': {
             const suggested = outcome.match.fullAddress;
-            return showMessage(copy.didYouMean(suggested), {
+            return lookupFailed(copy.didYouMean(suggested), {
               label: copy.didYouMeanButton,
               run: () => {
                 search.setValue(suggested);
@@ -451,18 +479,21 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
             });
           }
           case 'coarse':
-            return showMessage(copy.coarse(outcome.match.fullAddress, outcome.match.matchPrecision));
+            return lookupFailed(copy.coarse(outcome.match.fullAddress, outcome.match.matchPrecision));
           case 'out-of-area':
-            return showMessage(copy.outOfArea(outcome.match.fullAddress));
+            return lookupFailed(copy.outOfArea(outcome.match.fullAddress));
         }
       }
       match = outcome.match;
     }
     if (!isInScope(match)) {
       steps.hide();
-      return showMessage(copy.outOfArea(match.fullAddress));
+      return lookupFailed(copy.outOfArea(match.fullAddress));
     }
+    if (photosAt(match)) steps.add('photo');
     steps.set('address', 'done');
+    clearTimeout(showSoon);
+    steps.show();
 
     stage = 'lot';
     steps.set('lot', 'active');
@@ -472,11 +503,11 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
     const best = found.candidates[0];
     if (!best) {
       steps.set('lot', 'error');
-      return showMessage(copy.noLot);
+      return lookupFailed(copy.noLot);
     }
     if (!isMetroParcel(best)) {
       steps.hide();
-      return showMessage(copy.outOfArea(match.fullAddress));
+      return lookupFailed(copy.outOfArea(match.fullAddress));
     }
     steps.set('lot', 'done');
     const preferred = opts.preferLot !== undefined ? found.candidates.findIndex((c) => c.id === opts.preferLot) : -1;
@@ -488,9 +519,16 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
     if (isAbortError(e)) return;
     console.error(e);
     steps.set(stage, 'error');
+    clearTimeout(showSoon);
+    hideLot(lotEls);
     if (e instanceof ParcelAxisError) showRetry(copy.lotGlitch);
     else showRetry(isOffline() ? copy.offline : stage === 'address' ? copy.geocoderDown : copy.parcelDown);
   }
+}
+
+/** Whether the address's municipality publishes aerial photos (its lot settles it, in the rare case they differ). */
+function photosAt(match: GeocodeMatch): boolean {
+  return imageryFor(displayJurisdiction(null, match)) !== null;
 }
 
 /** Draw the chosen lot, then run elevation and sun for it. */
@@ -500,9 +538,13 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   const parcel = found.candidates[selected];
   if (!parcel) return;
   shown = { match, found, selected };
+  const jurisdiction = displayJurisdiction(parcel, match);
+  // The lot settles the municipality (rarely not the one the address suggested), and so the photos' line.
+  if (imageryFor(jurisdiction)) steps.add('photo');
+  else steps.remove('photo');
   renderLot(lotEls, {
     address: match.fullAddress,
-    jurisdiction: displayJurisdiction(parcel, match),
+    jurisdiction,
     candidates: found.candidates,
     selected,
     notices: parcelNotices(parcel, found, { approximateGeocode: match.approximate }),
@@ -516,7 +558,7 @@ async function showLot(match: GeocodeMatch, found: ParcelLookup, selected: numbe
   lotCanvas.setOutline({ candidates: found.candidates.map((c) => c.geometry), selected, point: match.lonLat });
   try {
     await analysis.start(parcel, match, steps, signal);
-    steps.hide();
+    void analysis.whenPhoto().then(() => !signal.aborted && steps.hide()); // the card stays for the aerial photo too
     if (signal.aborted || embedOn) return;
     void readWhenReady(signal);
     if (!guide?.goal) tips.showFirstTime(); // with a goal, its steps explain the view
