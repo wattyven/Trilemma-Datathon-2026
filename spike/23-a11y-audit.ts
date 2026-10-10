@@ -120,6 +120,12 @@ try {
   await mob.waitForTimeout(2500);
   await audit(mob, 'result (Basic), phone');
   await auditBasicViews(mob, 'phone');
+  // The map, with its zoom buttons and shadows (still in One day).
+  await mob.locator('input[name="view"][value="map"]').check({ force: true });
+  await mob.locator('#map-zoom-in').waitFor();
+  await audit(mob, 'Map view, phone');
+  await smallTargets(mob, 'Map view');
+  await mob.locator('input[name="view"][value="3d"]').check({ force: true });
   await mob.locator('#advanced-toggle').click();
   await mob.waitForTimeout(800);
   await audit(mob, 'result (Advanced), phone');

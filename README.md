@@ -92,11 +92,13 @@ how VanShade follows it:
     time window, say 1–6 pm through summer).
   - **Measure at** garden-bed height (0.3 m), seated (1.2 m) or on a roof or deck surface.
   - **Full / part sun / shade** colours with adjustable thresholds (6 h and 3 h), or exact hours.
-  - **Time slider, Now and Play the day**, with sunrise and sunset; real-time 3D shadows.
+  - **Time slider, Now and Play the day**, with sunrise and sunset; real-time 3D shadows, and the same shadows on the 2D map.
   - **3D data:** *Best of both* (2016 detail, updated wherever something changed by 2025; the default), *Newest survey*
     (2025, 1 m) or *Most detailed* (2016, 0.5 m); *Show changes since 2016* hatches what changed.
 - In Advanced mode, **click a pin or any spot**, or focus the view, step with the arrow keys and press Enter, to see that
   spot's sun month by month (with a typical-weather column in the table view) and through the day.
+- **Map view:** the lot from above, true north up. Zoom with the wheel, a trackpad pinch, two fingers on a phone or the + and
+  − buttons, drag to move around once closer in, and Reset view for the whole lot.
 - **Analysis:** under the view, a short reading of the lot from Google's Gemini (where the sun and shade fall, what suits each
   part) appears by itself once the result is in; then ask your own questions, such as "Where should I plant vegetables?". It
   answers from the numbers VanShade shows for the lot.

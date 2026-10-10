@@ -134,13 +134,16 @@
           </section>
           <div class="view-stage">
             <canvas id="lot-canvas" role="img" aria-label="Map of the lot and its sun, north at the top"></canvas>
-            <div id="scene-host" class="scene-host" hidden>
-              <div id="hud" class="hud" hidden>
-                <div id="compass" class="compass" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="30" height="30"><text x="12" y="7" text-anchor="middle">N</text><path d="M12 8.5 L16 21 L12 18.5 L8 21 Z" /></svg>
-                </div>
-                <button type="button" id="reset-view" class="ghost">Reset view</button>
+            <div id="scene-host" class="scene-host" hidden></div>
+            <div id="hud" class="hud" hidden>
+              <div id="compass" class="compass" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="30" height="30"><text x="12" y="7" text-anchor="middle">N</text><path d="M12 8.5 L16 21 L12 18.5 L8 21 Z" /></svg>
               </div>
+              <div id="map-zoom" class="map-zoom" hidden>
+                <button type="button" id="map-zoom-in" class="ghost" aria-label="Zoom in" title="Zoom in">+</button>
+                <button type="button" id="map-zoom-out" class="ghost" aria-label="Zoom out" title="Zoom out">−</button>
+              </div>
+              <button type="button" id="reset-view" class="ghost">Reset view</button>
             </div>
             <div id="spot-layer" class="spot-layer"></div>
             <p id="sun-note" class="sun-note" hidden></p>
@@ -268,13 +271,16 @@
             <summary>Lot and data details</summary>
             <dl id="lot-facts-more" class="facts"></dl>
           </details>
-          <ul id="lot-notices" class="notices"></ul>
-          <ul id="lot-caveats" class="notices caveats">
-            <li id="photo-credit-item" hidden></li>
-            <li id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</li>
-            <li>Trees count as solid all year.</li>
-            <li>The main numbers are for clear days. <button type="button" class="link" data-open-about>About accuracy</button></li>
-          </ul>
+          <section id="lot-notes" class="lot-notes" aria-labelledby="lot-notes-heading">
+            <h3 id="lot-notes-heading" class="lot-notes-heading">Good to know</h3>
+            <ul id="lot-notices" class="notices"></ul>
+            <ul id="lot-caveats" class="notices caveats">
+              <li id="photo-credit-item" hidden></li>
+              <li id="caveat-lidar">The LiDAR may predate new buildings or tree growth.</li>
+              <li>Trees count as solid all year.</li>
+              <li>The main numbers are for clear days. <button type="button" class="link" data-open-about>About accuracy</button></li>
+            </ul>
+          </section>
           <details id="lot-switcher" class="switcher" hidden>
             <summary id="lot-switcher-summary">Not the right lot?</summary>
             <fieldset>

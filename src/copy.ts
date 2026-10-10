@@ -76,8 +76,8 @@ export const copy = {
   parcelClass: { Subdivision: 'Lot', 'Building Strata': 'Strata building', 'Bare Land Strata': 'Bare-land strata lot', 'Common Property': 'Strata common area', Interest: 'Easement or other interest', 'Air Space': 'Air space' } as Record<string, string>,
   switcherSummary: (others: number) => `Not the right lot? Choose another (${others} nearby)`,
   timelineNote: {
-    average: 'Move the time to preview shadows in 3D. The colours show the average, not this moment.',
-    day: 'The colours show the whole day; move the time to preview shadows in 3D.',
+    average: 'Move the time to preview shadows. The colours show the average, not this moment.',
+    day: 'The colours show the whole day; move the time to preview shadows.',
   },
   noLidar: "There's no LiDAR elevation data for this lot, so we can't work out its sun. This happens over water and in a few gaps in coverage.",
   noLidarArea: "There's no LiDAR elevation data around this address yet, so we can't work out its sun.",

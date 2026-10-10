@@ -6,7 +6,8 @@ import { applyAffine, invertAffine, type GridAffine } from '../geo/gridAffine';
 import { frameForGeometry, type LocalFrame } from '../geo/local';
 import { bounds, mapGeometry, polygonsOf, type AreaGeometry, type Position } from '../geo/polygon';
 import { WATER_RGB } from './colors';
-import { buildCellIndex, cellAtPixel, layerRgba, type Layer } from './cellPaint';
+import { buildCellIndex, cellAtPixel, layerRgba, paintCellsRgba, type Layer } from './cellPaint';
+import { FITTED, MAP_ZOOM, panBy, zoomAbout, type FitView, type ZoomState } from './mapZoom';
 
 export { HOURS_SCALE_MAX, type Layer, type LayerKind } from './cellPaint';
 
@@ -82,13 +83,24 @@ export class LotCanvas {
   private cellIndex: Int32Array | null = null;
   private photo: MapPhoto | null = null;
   private changeMask: HTMLCanvasElement | null = null;
+  /** The lot's cells in shade at the slider's time (the 3D view casts real shadows). */
+  private shadowLayer: HTMLCanvasElement | null = null;
   private layerOpacity = 1;
   private view = { cx: 0, cy: 0, s: 1, w: 0, h: 0 };
+  /** The visitor's zoom and pan, over the view that fits the lot (`fit`). */
+  private zoom: ZoomState = FITTED;
+  private fit: FitView = { cx: 0, cy: 0, s: 1 };
+  private pointers = new Map<number, Position>();
+  private pinch: { dist: number; zoom: ZoomState } | null = null;
+  private dragged = false;
+  private drawQueued = false;
   private ro: ResizeObserver;
   /** Called after every redraw, so the pins on the view can follow. */
   onDraw: () => void = () => {};
   /** Whether a click on a spot picks it (off in Basic). */
   pickable = true;
+  /** The map's own north arrow; off while the view's compass is showing. */
+  northArrow = true;
 
   constructor(private canvas: HTMLCanvasElement, private handlers: CanvasHandlers) {
     this.ro = new ResizeObserver(() => this.draw());
@@ -96,9 +108,95 @@ export class LotCanvas {
     canvas.addEventListener('mousemove', (ev) => this.handlers.onHover(this.cellAt(ev)));
     canvas.addEventListener('mouseleave', () => this.handlers.onHover(null));
     canvas.addEventListener('click', (ev) => {
+      if (this.dragged) return void (this.dragged = false); // the end of a drag, not a click
       if (!this.pickable) return;
       const c = this.cellAt(ev);
       if (c !== null) this.handlers.onPick(c);
+    });
+    // Zoom: the wheel (and a trackpad pinch) towards the pointer, two fingers on a touch screen; drag to move once closer in.
+    canvas.addEventListener(
+      'wheel',
+      (ev) => {
+        const [X, Y] = this.at(ev);
+        if (this.zoomBy(Math.exp(-ev.deltaY * (ev.deltaMode ? 0.05 : 0.002)), X, Y)) ev.preventDefault(); // at a limit, the page scrolls
+      },
+      { passive: false },
+    );
+    canvas.addEventListener('pointerdown', (ev) => {
+      if (!this.outline || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+      this.pointers.set(ev.pointerId, this.at(ev));
+      this.dragged = false;
+      if (this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()] as [Position, Position];
+        this.pinch = { dist: Math.hypot(a[0] - b[0], a[1] - b[1]), zoom: this.zoom };
+      }
+      if (this.pointers.size === 2 || this.zoom.zoom > 1) canvas.setPointerCapture(ev.pointerId);
+    });
+    canvas.addEventListener('pointermove', (ev) => {
+      const last = this.pointers.get(ev.pointerId);
+      if (!last) return;
+      const now = this.at(ev);
+      this.pointers.set(ev.pointerId, now);
+      if (this.pinch && this.pointers.size === 2) {
+        const [a, b] = [...this.pointers.values()] as [Position, Position];
+        const mid: Position = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const factor = Math.hypot(a[0] - b[0], a[1] - b[1]) / Math.max(this.pinch.dist, 1);
+        this.zoom = this.pinch.zoom;
+        this.zoomBy(factor, mid[0], mid[1]);
+        this.dragged = true;
+      } else if (this.pointers.size === 1 && this.zoom.zoom > 1) {
+        const dX = now[0] - last[0], dY = now[1] - last[1];
+        if (!this.dragged && Math.hypot(dX, dY) < 1) return;
+        this.zoom = panBy(this.zoom, dX, dY, this.fit, this.view.w, this.view.h);
+        this.dragged = true;
+        this.requestDraw();
+      }
+    });
+    const lift = (ev: PointerEvent) => {
+      this.pointers.delete(ev.pointerId);
+      if (this.pointers.size < 2) this.pinch = null;
+    };
+    canvas.addEventListener('pointerup', lift);
+    canvas.addEventListener('pointercancel', lift);
+  }
+
+  /** A pointer's position on the canvas, in CSS pixels. */
+  private at(ev: MouseEvent): Position {
+    const r = this.canvas.getBoundingClientRect();
+    return [ev.clientX - r.left, ev.clientY - r.top];
+  }
+
+  /** Zoom by `factor` about a canvas point (the middle when left out); false if already at the limit. */
+  zoomBy(factor: number, X = this.view.w / 2, Y = this.view.h / 2): boolean {
+    if (!this.outline || !this.view.w) return false;
+    const next = zoomAbout(this.zoom, factor, X, Y, this.fit, this.view.w, this.view.h);
+    if (next.zoom === this.zoom.zoom && next.pan[0] === this.zoom.pan[0] && next.pan[1] === this.zoom.pan[1]) return false;
+    this.zoom = next;
+    this.requestDraw();
+    return true;
+  }
+
+  zoomIn() {
+    this.zoomBy(MAP_ZOOM.step);
+  }
+
+  zoomOut() {
+    this.zoomBy(1 / MAP_ZOOM.step);
+  }
+
+  /** Back to the whole lot. */
+  resetView() {
+    this.zoom = FITTED;
+    this.requestDraw();
+  }
+
+  /** One redraw per frame while zooming or dragging. */
+  private requestDraw() {
+    if (this.drawQueued) return;
+    this.drawQueued = true;
+    requestAnimationFrame(() => {
+      this.drawQueued = false;
+      this.draw();
     });
   }
 
@@ -120,6 +218,7 @@ export class LotCanvas {
     const sel = model.candidates[model.selected];
     if (!sel) return;
     this.outline = model;
+    this.zoom = FITTED; // a new lot starts whole
     this.frameCache = frameForGeometry(sel);
     this.setAnalysis(null);
   }
@@ -128,6 +227,7 @@ export class LotCanvas {
     this.analysis = model;
     this.layer = null;
     this.cellsLayer = null;
+    this.shadowLayer = null;
     this.background = null;
     this.cellIndex = null;
     if (model) {
@@ -162,6 +262,25 @@ export class LotCanvas {
     this.layer = layer;
     this.cellsLayer = layer && this.analysis ? this.paintCells(this.analysis, layer) : null;
     this.draw();
+  }
+
+  /**
+   * Shadows at one moment: `sun` is 1 for each cell in direct sun, 0 in shade (a moment result).
+   * The shaded cells are darkened over the colours; null takes them away.
+   */
+  setShadows(sun: Uint8Array | null, label = '') {
+    const m = this.analysis;
+    this.shadowLayer = null;
+    if (sun && m && sun.length === m.px.length) {
+      const img = new ImageData(paintCellsRgba(this.grid(m), (i) => (sun[i] ? null : { rgb: [10, 16, 24], alpha: 150 }), false), m.window.width, m.window.height);
+      const c = document.createElement('canvas');
+      c.width = m.window.width;
+      c.height = m.window.height;
+      c.getContext('2d')!.putImageData(img, 0, 0);
+      this.shadowLayer = c;
+    }
+    this.canvas.dataset.shadows = this.shadowLayer ? label : '';
+    this.requestDraw();
   }
 
   private grid(m: AnalysisModel) {
@@ -209,8 +328,9 @@ export class LotCanvas {
     const frame = this.frameCache;
     const cssW = canvas.clientWidth || 480, cssH = canvas.clientHeight || 360;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(cssW * dpr);
-    canvas.height = Math.round(cssH * dpr);
+    const W = Math.round(cssW * dpr), H = Math.round(cssH * dpr);
+    if (canvas.width !== W) canvas.width = W; // resizing clears and reallocates: only when it changes
+    if (canvas.height !== H) canvas.height = H;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -228,9 +348,13 @@ export class LotCanvas {
     const minX = Math.min(b.minX, point[0]) - margin, maxX = Math.max(b.maxX, point[0]) + margin;
     const minY = Math.min(b.minY, point[1]) - margin, maxY = Math.max(b.maxY, point[1]) + margin;
     const pad = 36;
-    const s = Math.min((cssW - 2 * pad) / Math.max(maxX - minX, 1), (cssH - 2 * pad) / Math.max(maxY - minY, 1));
-    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    this.fit = { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, s: Math.min((cssW - 2 * pad) / Math.max(maxX - minX, 1), (cssH - 2 * pad) / Math.max(maxY - minY, 1)) };
+    this.zoom = zoomAbout(this.zoom, 1, cssW / 2, cssH / 2, this.fit, cssW, cssH); // re-clamped to this size
+    const s = this.fit.s * this.zoom.zoom, cx = this.fit.cx + this.zoom.pan[0], cy = this.fit.cy + this.zoom.pan[1];
     this.view = { cx, cy, s, w: cssW, h: cssH };
+    canvas.dataset.zoom = this.zoom.zoom.toFixed(2);
+    canvas.toggleAttribute('data-zoomed', this.zoom.zoom > 1);
+    canvas.style.touchAction = this.zoom.zoom > 1 ? 'none' : 'pan-y'; // closer in, one finger moves the map; otherwise the page
     const toPx = ([x, y]: Position): Position => [cssW / 2 + (x - cx) * s, cssH / 2 - (y - cy) * s];
 
     // Rasters: their pixel space → canvas, via an affine into local metres.
@@ -262,6 +386,11 @@ export class LotCanvas {
           ctx.imageSmoothingEnabled = false;
           ctx.globalAlpha = this.layerOpacity;
           ctx.drawImage(this.cellsLayer!, 0, 0);
+        });
+      if (this.shadowLayer)
+        withAffine(m.affine, () => {
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(this.shadowLayer!, 0, 0);
         });
     }
 
@@ -315,7 +444,7 @@ export class LotCanvas {
       ctx.stroke();
     }
 
-    drawNorthArrow(ctx, cssW - 22, 18, ink);
+    if (this.northArrow) drawNorthArrow(ctx, cssW - 22, 18, ink);
     drawScaleBar(ctx, cssH, s, cssW, ink);
     canvas.dataset.state = this.layer ? 'result' : this.analysis ? 'elevation' : 'lot';
     this.onDraw();

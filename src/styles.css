@@ -151,6 +151,8 @@ button.ghost:hover { border-color: var(--moss); }
 .view-stage { position: relative; height: 520px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--mist); background: var(--panel); }
 #lot-canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
 #lot-canvas[data-state='lot'] { cursor: default; }
+#lot-canvas[data-zoomed] { cursor: grab; }
+#lot-canvas[data-zoomed]:active { cursor: grabbing; }
 .scene-host { position: absolute; inset: 0; }
 .scene-canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 .scene-canvas:active { cursor: grabbing; }
@@ -159,6 +161,8 @@ button.ghost:hover { border-color: var(--moss); }
 .hud > * { pointer-events: auto; }
 .compass { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--mist); }
 .compass path { fill: var(--cedar); }
+.map-zoom { display: flex; gap: 6px; }
+.map-zoom button { width: 36px; height: 36px; padding: 0; font-size: 1.25rem; font-weight: 600; line-height: 1; }
 .compass text { font: 600 6px var(--font-body); fill: var(--cedar); }
 /* Pins on the sunniest and shadiest spots (ui/spotPins.ts), over the 3D view or the map; the HUD stays on top. */
 .spot-layer { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
@@ -298,6 +302,11 @@ button.link { padding: 0; border: 0; background: none; color: var(--shade); text
 .notices li[data-notice='approximate-lines'], .caveats li { color: var(--muted); }
 /* The lot notices and the caveats (with the photo credit, in Basic) read as one list. */
 html:not(.basic) #lot-notices { margin-bottom: 6px; }
+/* Advanced: the lot notes and accuracy caveats in a box of their own. Basic keeps them as bullets under the view. */
+html:not(.basic) .lot-notes { margin: 12px 0; padding: 10px 14px 4px; border: 1px solid var(--mist); border-radius: var(--radius); background: var(--panel); }
+.lot-notes-heading { margin: 0 0 6px; font-size: 0.95rem; }
+.basic .lot-notes { display: contents; }
+.basic .lot-notes-heading { display: none; }
 .switcher { border: 1px solid var(--mist); border-radius: var(--radius); padding: 8px 12px; }
 .switcher label { display: block; padding: 4px 0; cursor: pointer; }
 
@@ -346,8 +355,8 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-controls, html:not(.bas
 /* The panel's pieces join the page's column: address, summary and dates first, then the view, then the rest. */
 .basic .lot-info { display: contents; }
 .basic .lot-info > #lot-heading, .basic .lot-info > #basic-head, .basic .lot-info > #basic-summary, .basic .lot-info > #basic-controls { order: -1; margin-bottom: 0; }
-.basic .lot-info > .share-row, .basic .lot-info > #lot-notices, .basic .lot-info > #lot-caveats, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
-.basic .lot-info > #lot-caveats { margin-top: -12px; } /* one list with the lot notices */
+.basic .lot-info > .share-row, .basic .lot-notes > #lot-notices, .basic .lot-notes > #lot-caveats, .basic .lot-info > #lot-switcher { order: 1; margin: 0; }
+.basic .lot-notes > #lot-caveats { margin-top: -12px; } /* one list with the lot notices */
 /* The dates line and "About these numbers" sit beside the address on wider screens. */
 .basic-head { margin: 0; color: var(--muted); }
 .basic-stats-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; }
@@ -357,7 +366,7 @@ html:not(.basic) #basic-summary, html:not(.basic) #basic-controls, html:not(.bas
 .info-button svg { width: 18px; height: 18px; }
 @media (min-width: 721px) {
   .basic .lot { grid-template-columns: auto minmax(0, 1fr); column-gap: 20px; }
-  .basic .lot > *, .basic .lot-info > * { grid-column: 1 / -1; }
+  .basic .lot > *, .basic .lot-info > *, .basic .lot-notes > * { grid-column: 1 / -1; }
   .basic .lot-info > #lot-heading { grid-column: 1; align-self: baseline; }
   .basic .lot-info > #basic-head { grid-column: 2; align-self: baseline; }
 }

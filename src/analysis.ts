@@ -45,6 +45,10 @@ export interface AnalysisElements {
   mapCanvas: HTMLCanvasElement;
   hud: HTMLElement;
   compass: HTMLElement;
+  /** The map's + and − (Map view only; Reset view serves both views). */
+  mapZoom: HTMLElement;
+  mapZoomIn: HTMLButtonElement;
+  mapZoomOut: HTMLButtonElement;
   sunNote: HTMLElement;
   viewNote: HTMLElement;
   viewRadios: HTMLInputElement[];
@@ -112,6 +116,9 @@ export class Analysis {
   private pickSeq = 0;
   /** The shadows and sun marker last applied to the 3D view (changing shadows recompiles its shaders). */
   private sunStyle = '';
+  /** The 3D camera's heading, for the compass when switching back from the map. */
+  private compassDeg = 0;
+  private mapShadowSeq = 0;
   /** Each cell's position in local metres, for the headline (refreshed with the grid). */
   private cellPositions: Position[] = [];
   /** The current result's sunniest and shadiest patches (found in render(), for the headline and pins). */
@@ -166,9 +173,14 @@ export class Analysis {
         this.setView(r.value as View);
         this.onViewChange(this.view);
       });
-    els.shadowsToggle.addEventListener('change', () => this.applySunStyle());
+    els.shadowsToggle.addEventListener('change', () => {
+      this.applySunStyle();
+      void this.updateMapShadows();
+    });
     els.compareToggle.addEventListener('change', () => void this.updateCompare());
-    els.resetView.addEventListener('click', () => this.scene?.resetView());
+    els.resetView.addEventListener('click', () => (this.els.mapCanvas.hidden ? this.scene?.resetView() : this.map.resetView()));
+    els.mapZoomIn.addEventListener('click', () => this.map.zoomIn());
+    els.mapZoomOut.addEventListener('click', () => this.map.zoomOut());
     els.opacityWrap.hidden = true; // until a photo is on screen
     els.opacityInput.addEventListener('input', () => {
       this.setResultsOpacity(Number(els.opacityInput.value));
@@ -582,7 +594,10 @@ export class Analysis {
       {
         onPick: (cell) => void this.pick(cell),
         onHover: (cell) => this.hover(cell),
-        onCamera: (deg) => (this.els.compass.style.transform = `rotate(${deg}deg)`),
+        onCamera: (deg) => {
+          this.compassDeg = deg;
+          if (this.els.mapCanvas.hidden) this.els.compass.style.transform = `rotate(${deg}deg)`;
+        },
       },
       { lowPower: isLowPower() },
     );
@@ -632,7 +647,12 @@ export class Analysis {
     const use3d = v === '3d' && !!this.scene && !!this.loaded;
     this.els.sceneHost.hidden = !use3d;
     this.els.mapCanvas.hidden = use3d;
-    this.els.hud.hidden = !use3d;
+    // Compass and Reset view in both views once a lot is in; the map adds + and −, and its compass points north.
+    this.els.hud.hidden = !this.loaded;
+    this.els.mapZoom.hidden = use3d;
+    this.els.compass.style.transform = `rotate(${use3d ? this.compassDeg : 0}deg)`;
+    this.map.northArrow = !this.loaded;
+    void this.updateMapShadows();
     for (const r of this.els.viewRadios) r.checked = r.value === (use3d ? '3d' : this.loaded ? 'map' : this.view);
     if (!use3d) this.map.draw();
     else this.scene!.invalidate();
@@ -731,6 +751,7 @@ export class Analysis {
   async onTimeline(_t: TimelineState, dateChanged: boolean) {
     if (!this.loaded || !this.lotRequest) return;
     this.updateSun();
+    void this.updateMapShadows();
     const mode = this.controls.get().mode;
     try {
       if (mode === 'moment' || (mode === 'day' && dateChanged)) await this.compute();
@@ -746,9 +767,14 @@ export class Analysis {
     return !this.basic || this.controls.get().mode === 'day';
   }
 
+  /** Shadows at the slider's time: where the sun moves, and in Advanced when its Shadows setting is on. */
+  private get castsShadows(): boolean {
+    return this.sunMoves && (this.basic || this.els.shadowsToggle.checked);
+  }
+
   /** Cast shadows and the sun marker, as `sunMoves` says (in Advanced, shadows follow its Shadows setting). */
   private applySunStyle() {
-    const shadows = this.sunMoves && (this.basic || this.els.shadowsToggle.checked);
+    const shadows = this.castsShadows;
     const style = `${shadows} ${this.sunMoves}`;
     if (!this.scene || style === this.sunStyle) return;
     this.sunStyle = style;
@@ -778,6 +804,22 @@ export class Analysis {
     this.scene?.setSun({ azTrueDeg: sun.azTrueDeg, altDeg: sun.altDeg, path: this.pathCache.samples });
     this.els.sunNote.hidden = sun.altDeg > 0;
     this.els.sunNote.textContent = copy.view.sunDown;
+  }
+
+  /**
+   * The 2D map's shadows: the lot's cells in shade at the slider's time, darkened over the colours,
+   * whenever the 3D view would cast shadows. Not in One moment, whose colours are that moment.
+   */
+  private async updateMapShadows() {
+    const seq = ++this.mapShadowSeq;
+    if (!this.loaded || this.els.mapCanvas.hidden || !this.castsShadows || this.controls.get().mode === 'moment') return this.map.setShadows(null);
+    const t = this.timeline.get();
+    try {
+      const { result } = await engine().compute({ kind: 'moment', date: this.timeline.localDate(), minuteOfDay: t.minute });
+      if (seq === this.mapShadowSeq && result.kind === 'moment') this.map.setShadows(result.values as Uint8Array, minuteLabel(t.minute));
+    } catch {
+      // The colours are still right without them.
+    }
   }
 
   /** Debug: the engine's sun/shade at the slider time, laid over the 3D shadows. */
@@ -812,6 +854,7 @@ export class Analysis {
     this.renderSummary();
     this.renderBasicSummary();
     this.applySunStyle(); // Basic's views differ: One day has moving shadows
+    void this.updateMapShadows();
     if (this.basic) this.updateSun(); // its light follows the dates
     // The time slider always moves the 3D sun, but only changes the colours in "One moment".
     const mode = this.controls.get().mode;

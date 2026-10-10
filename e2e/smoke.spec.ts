@@ -83,6 +83,7 @@ test('Basic: search → maximum and minimum hours → pins → dates → shareab
   await expect(page.locator('#legend')).toContainText('Hours of direct sun a day');
   await expect(page.locator('#lot-notices')).toContainText('approximate, not a legal survey');
   await expect(page.locator('#lot-caveats')).toContainText('Trees count as solid all year');
+  await expect(page.locator('#lot-notes-heading')).toBeHidden(); // a box with a heading in Advanced only
   await expect(page.locator('.site-footer')).toContainText('Open Government Licence – Canada');
 
   // Pins mark the sunniest and shadiest square metre; the summary's direction highlights one.
@@ -258,6 +259,28 @@ test('Basic views: afternoon shade and one day, each with its own settings and l
   await expect(page.locator('#tl-play')).toBeVisible();
   await expect(page.locator('#legend')).toContainText('Hours of direct sun that day');
   await expect.poll(() => page.url()).toMatch(/m=day/);
+  // On the map, the time moves shadows of its own; + and −, the wheel and Reset view zoom it.
+  await page.locator('input[name="view"][value="map"]').check({ force: true });
+  const map = page.locator('#lot-canvas');
+  for (const [minute, label] of [['540', '09:00'], ['1020', '17:00']] as const) {
+    await page.locator('#tl-time').fill(minute);
+    await page.locator('#tl-time').dispatchEvent('input');
+    await expect(map).toHaveAttribute('data-shadows', label);
+  }
+  const pin = page.locator('.spot-pin[data-kind="sunniest"]');
+  const pinAt = () => pin.evaluate((el) => (el as HTMLElement).style.transform);
+  const before = await pinAt();
+  await page.locator('#map-zoom-in').click();
+  await expect(map).toHaveAttribute('data-zoom', '1.50');
+  await expect.poll(pinAt).not.toBe(before); // the pins follow
+  const box = (await map.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -300);
+  await expect.poll(async () => Number(await map.getAttribute('data-zoom'))).toBeGreaterThan(1.5);
+  await page.locator('#reset-view').click();
+  await expect(map).toHaveAttribute('data-zoom', '1.00');
+  await page.locator('input[name="view"][value="3d"]').check({ force: true });
+  await expect.poll(() => page.url()).not.toMatch(/[#&]v=map/);
   // The link opens the same view in Basic, on a fresh page.
   const shared = await context.newPage();
   await shared.goto(page.url());
@@ -280,6 +303,9 @@ test('Advanced: modes, time, 3D data, inspector and links', async ({ page, conte
   await expect(page.locator(RESULT)).toBeVisible();
   await expect(page.locator('html')).not.toHaveClass(/\bbasic\b/);
   await expect(page.locator('#lot-facts')).toContainText('City of Vancouver');
+  // The lot notes and accuracy caveats share a box of their own.
+  await expect(page.locator('#lot-notes-heading')).toHaveText('Good to know');
+  await expect(page.locator('#lot-notes')).toContainText('Trees count as solid all year');
   await page.locator('#tips-close').click();
 
   // "One moment" (now, or midday after dark) is Advanced's default view, and the link says so.
