@@ -5,9 +5,10 @@ import { copy } from './copy';
 import { nearestAddress, resolve, suggest, type GeocodeMatch } from './data/geocoder';
 import { isAbortError } from './data/http';
 import { embedSnippet, fullSiteUrl } from './embed';
-import { findParcels, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
+import { findLot, parcelNotices, ParcelAxisError, type ParcelLookup } from './data/parcels';
 import { displayJurisdiction, isInScope, isMetroParcel } from './data/scope';
 import { PRESETS, isoDate, nowMinuteInVancouver, parseIsoDate, todayInVancouver } from './engine/sun';
+import { LOT_SOURCES } from './data/municipalLots';
 import { IMAGERY_SOURCES, imageryFor } from './imagery/sources';
 import { initAbout, initDialog } from './ui/about';
 import { initAnalysisChat } from './ui/analysisChat';
@@ -150,6 +151,7 @@ analysis.onViewChange = () => writeUrl(false);
 analysis.onPhotoChange = () => writeUrl(false);
 analysis.onSourceChange = () => writeUrl(false);
 byId('about-imagery').textContent = copy.imagery.about(IMAGERY_SOURCES.map((s) => `${s.owner} ${s.year} (${s.licence})`));
+byId('about-lots').textContent = copy.lotSourcesAbout(LOT_SOURCES.map((s) => `${s.owner} (${s.licence})`));
 initAbout(byId<HTMLDialogElement>('about'));
 initDialog(byId<HTMLDialogElement>('numbers-info'), [byId('numbers-open')]);
 
@@ -501,7 +503,7 @@ async function lookup(req: LookupInput, opts: LookupOptions = {}) {
     stage = 'lot';
     steps.set('lot', 'active');
     analysis.prefetch(match.lonLat, signal);
-    const found = await findParcels(match.lonLat, { signal });
+    const found = await findLot({ lonLat: match.lonLat, approximate: match.approximate, jurisdiction: displayJurisdiction(null, match) }, { signal });
     if (signal.aborted) return;
     const best = found.candidates[0];
     if (!best) {

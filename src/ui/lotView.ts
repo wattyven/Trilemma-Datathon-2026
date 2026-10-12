@@ -39,7 +39,7 @@ export function renderLot(els: LotViewElements, model: LotViewModel) {
   els.notices.replaceChildren(
     ...model.notices.map((n) => {
       const li = document.createElement('li');
-      li.textContent = copy.notices[n];
+      li.textContent = n === 'approximate-lines' && parcel.sourceName ? copy.municipalLines(parcel.sourceName) : copy.notices[n];
       li.dataset.notice = n;
       return li;
     }),
@@ -113,7 +113,7 @@ function renderSwitcher(els: LotViewElements, model: LotViewModel) {
   els.switcher.hidden = false;
   els.switcherSummary.textContent = copy.switcherSummary(model.candidates.length - 1);
   // Open when the match was a guess (or another lot is chosen); otherwise most people never need it.
-  els.switcher.open = model.notices.includes('nearest-lot') || model.selected > 0;
+  els.switcher.open = model.notices.includes('nearest-lot') || model.notices.includes('estimated-lot') || model.selected > 0;
   els.options.replaceChildren(
     ...model.candidates.map((p, i) => {
       const label = document.createElement('label');

@@ -480,3 +480,23 @@ test('mobile: Basic stacks the summary over the view; Advanced uses a bottom she
   await page.locator('#sun-controls').scrollIntoViewIfNeeded();
   await expect(page.locator('#sun-controls')).toBeInViewport();
 });
+
+test("a lot missing from ParcelMap BC comes from the city's own map, or a labelled estimate, never the neighbour's", async ({ page, context }) => {
+  await stubChat(context);
+  await context.addInitScript(welcomeSeen);
+  // ParcelMap BC's public layer has had gaps; with every lot hidden, the exact address point falls in one.
+  const empty = { headers: { 'Access-Control-Allow-Origin': '*' }, contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: [] }) };
+  await context.route(/openmaps\.gov\.bc\.ca\/geo\/pub\/wfs/, (route) => route.fulfill(empty));
+  await page.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC');
+  await expect(page.locator(RESULT)).toBeVisible();
+  await expect(page.locator('#lot-notices')).toContainText("Lot lines come from the City of Vancouver's map");
+  await expect(page.locator('#lot-notices')).not.toContainText('we picked the nearest one');
+
+  // With the City's map down too, the outline is estimated from the neighbouring addresses, and says so.
+  await context.route(/services3\.arcgis\.com\/qrcTTRTwUoS8N47o\/arcgis\/rest\/services\/PropertyParcel/, (route) => route.fulfill({ status: 503, headers: { 'Access-Control-Allow-Origin': '*' }, body: 'down' }));
+  const fresh = await context.newPage(); // a new page, so nothing comes from the first lookup's cache
+  await fresh.goto('./#a=453+W+12th+Ave%2C+Vancouver%2C+BC');
+  await expect(fresh.locator(RESULT)).toBeVisible();
+  await expect(fresh.locator('#lot-notices')).toContainText("We couldn't find this lot's boundary, so the outline is our estimate");
+  await expect(fresh.locator('#lot-facts-more')).toContainText('Estimated outline');
+});

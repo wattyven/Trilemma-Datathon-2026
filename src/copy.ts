@@ -56,7 +56,10 @@ export const copy = {
     'approximate-lines': 'Lot lines come from ParcelMap BC. They\'re approximate, not a legal survey.',
     strata: 'This address is part of a strata or townhouse complex, so the outline covers the whole complex.',
     'nearest-lot': "We couldn't pin this address to a lot exactly, so we picked the nearest one. Check the outline looks right.",
+    'estimated-lot': "We couldn't find this lot's boundary, so the outline is our estimate from the neighbouring addresses. Check it looks right.",
   } satisfies Record<ParcelNotice, string>,
+  /** The lot-lines caveat when the outline came from a municipality's own map. */
+  municipalLines: (owner: string) => `Lot lines come from the ${owner}'s map. They're approximate, not a legal survey.`,
   facts: {
     jurisdiction: 'Municipality',
     area: 'Lot area',
@@ -73,7 +76,7 @@ export const copy = {
     newest: (year: string | null) => `Laser scans from ${year ?? 'a recent survey'}`,
   },
   /** ParcelMap BC's parcel classes in plain words (anything else is shown as published). */
-  parcelClass: { Subdivision: 'Lot', 'Building Strata': 'Strata building', 'Bare Land Strata': 'Bare-land strata lot', 'Common Property': 'Strata common area', Interest: 'Easement or other interest', 'Air Space': 'Air space' } as Record<string, string>,
+  parcelClass: { Subdivision: 'Lot', 'Building Strata': 'Strata building', 'Bare Land Strata': 'Bare-land strata lot', 'Common Property': 'Strata common area', Interest: 'Easement or other interest', 'Air Space': 'Air space', Estimate: 'Estimated outline' } as Record<string, string>,
   switcherSummary: (others: number) => `Not the right lot? Choose another (${others} nearby)`,
   timelineNote: {
     average: 'Move the time to preview shadows. The colours show the average, not this moment.',
@@ -122,6 +125,8 @@ export const copy = {
     failed: "The aerial photo didn't load; showing the 3D model. Reload the page to try again.",
     about: (items: string[]) => `Aerial photos come from each municipality's open data: ${items.join('; ')}.`,
   },
+  /** About panel: the municipal lot maps asked where ParcelMap BC has no lot. */
+  lotSourcesAbout: (items: string[]) => `Where ParcelMap BC has no lot at an address, lot lines come from the municipality's own map: ${items.join('; ')}.`,
   lidarFact: 'LiDAR from',
   lidarValue: (label: string, date: string) => `${date.slice(0, 4)} (${label})`,
   tipsLink: 'How to read this',

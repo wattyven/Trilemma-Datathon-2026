@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearHttpCache } from '../src/data/http';
 import {
+  ESTIMATE_LOT_ID,
   ParcelAxisError,
   bufferFilter,
+  findLot,
   findParcels,
   intersectsFilter,
   isStrata,
@@ -10,6 +12,7 @@ import {
   parcelNotices,
   type Parcel,
 } from '../src/data/parcels';
+import { localFrame } from '../src/geo/local';
 import type { Position } from '../src/geo/polygon';
 import coqBuffer from './fixtures/wfs-coq-buffer.json';
 import coqEmpty from './fixtures/wfs-coq-empty.json';
@@ -129,6 +132,110 @@ describe('findParcels', () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 503 }));
     await expect(findParcels(points.van)).rejects.toThrow(/503/);
     expect(jsonpViaSandbox).not.toHaveBeenCalled();
+  });
+});
+
+describe('findLot', () => {
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    clearHttpCache();
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  // A synthetic address point (no real home) and lots drawn in metres around it.
+  const point: Position = [-123.07, 49.335];
+  const frame = localFrame(point);
+  const rect = (x0: number, y0: number, x1: number, y1: number) => ({
+    type: 'Polygon',
+    coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map((p) => frame.toLonLat(p as Position))],
+  });
+  const wfsLot = (geometry: unknown, id: number) => ({
+    type: 'Feature', geometry,
+    properties: { PARCEL_FABRIC_POLY_ID: id, PARCEL_CLASS: 'Subdivision', MUNICIPALITY: 'North Vancouver, The Corporation of the District of', REGIONAL_DISTRICT: 'Metro Vancouver Regional District' },
+  });
+  const fc = (features: unknown[]) => ({ type: 'FeatureCollection', features });
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+  const exact = { lonLat: point, approximate: false, jurisdiction: 'District of North Vancouver' };
+  const neighbourLot = wfsLot(rect(8, -20, 23, 20), 7); // the lot next door, 8 m east
+  const hosts = () => fetchMock.mock.calls.map((c) => new URL(String(c[0])).host);
+
+  /** Routes each service: ParcelMap BC (intersects, then the buffer), the District's lot map, the geocoder's neighbours. */
+  function serve({ intersects = fc([]), buffer = fc([neighbourLot]), municipal = fc([{ type: 'Feature', id: 9, geometry: rect(-7, -18, 7, 18), properties: { OBJECTID: 9 } }]) as unknown, near = fc([]) } = {}) {
+    fetchMock.mockImplementation(async (url: string) => {
+      const u = new URL(url);
+      if (u.host === 'openmaps.gov.bc.ca') return json((u.searchParams.get('CQL_FILTER') ?? '').startsWith('DWITHIN') ? buffer : intersects);
+      if (u.host === 'geoweb.dnv.org') return municipal instanceof Response ? municipal : json(municipal);
+      if (u.pathname.endsWith('/sites/near.json')) return json(near);
+      throw new Error(`unexpected ${url}`);
+    });
+  }
+
+  it("keeps ParcelMap BC's lot when the point is in one", async () => {
+    serve({ intersects: fc([wfsLot(rect(-7, -18, 7, 18), 5)]) });
+    const r = await findLot(exact);
+    expect(r.method).toBe('intersects');
+    expect(r.candidates[0]!.origin).toBeUndefined();
+    expect(hosts()).toEqual(['openmaps.gov.bc.ca']);
+  });
+
+  it("asks the municipality's lot map when an exact point is in no ParcelMap lot, and still offers the neighbour", async () => {
+    serve();
+    const r = await findLot(exact);
+    expect(r.method).toBe('municipal');
+    const [own, next] = r.candidates;
+    expect(own).toMatchObject({ origin: 'municipal', sourceName: 'District of North Vancouver', containsPoint: true });
+    expect(own!.areaM2).toBeCloseTo(14 * 36, -1);
+    expect(next!.id).toBe(7);
+    expect(parcelNotices(own!, r, { approximateGeocode: false })).toEqual(['approximate-lines']);
+    expect(parcelNotices(next!, r, { approximateGeocode: false })).toContain('nearest-lot');
+  });
+
+  it('never asks the District for a City of North Vancouver address', async () => {
+    serve();
+    const r = await findLot({ ...exact, jurisdiction: 'City of North Vancouver' });
+    expect(r.method).toBe('estimate');
+    expect(hosts()).not.toContain('geoweb.dnv.org');
+  });
+
+  it('estimates the outline from the neighbouring addresses where no lot map has it', async () => {
+    serve({ buffer: fc([]), near: fc([{ geometry: { type: 'Point', coordinates: frame.toLonLat([12, 0]) } }]) });
+    const r = await findLot({ ...exact, jurisdiction: 'City of Surrey' });
+    expect(r.method).toBe('estimate');
+    expect(r.candidates).toHaveLength(1);
+    const est = r.candidates[0]!;
+    expect(est).toMatchObject({ origin: 'estimate', id: ESTIMATE_LOT_ID, containsPoint: true, regionalDistrict: 'Metro Vancouver Regional District' });
+    expect(est.areaM2).toBeCloseTo(40 * 26, -1); // the 40 m square, cut 6 m east of the point
+    expect(parcelNotices(est, r, { approximateGeocode: false })).toEqual(['estimated-lot']);
+  });
+
+  it("falls back to the estimate when the municipality's map fails", async () => {
+    serve({ municipal: new Response('down', { status: 503 }) });
+    const r = await findLot(exact);
+    expect(r.method).toBe('estimate');
+    expect(r.candidates.map((c) => c.id)).toEqual([ESTIMATE_LOT_ID, 7]);
+  });
+
+  it('still estimates when the neighbouring addresses are unavailable', async () => {
+    fetchMock.mockImplementation(async (url: string) => (new URL(url).host === 'openmaps.gov.bc.ca' ? json(fc([])) : new Response('down', { status: 503 })));
+    const r = await findLot({ ...exact, jurisdiction: 'City of Surrey' });
+    expect(r.candidates[0]!.areaM2).toBeCloseTo(1600, -1);
+  });
+
+  it('takes a lot the exact point sits on the edge of', async () => {
+    serve({ buffer: fc([wfsLot(rect(1, -18, 15, 18), 8)]) });
+    const r = await findLot(exact);
+    expect(r.method).toBe('buffer');
+    expect(r.candidates[0]!.id).toBe(8);
+  });
+
+  it('leaves block and street matches to the buffered search', async () => {
+    serve();
+    const r = await findLot({ ...exact, approximate: true });
+    expect(r.method).toBe('buffer');
+    expect(r.candidates[0]!.id).toBe(7);
+    expect(hosts()).toEqual(['openmaps.gov.bc.ca', 'openmaps.gov.bc.ca']);
   });
 });
 

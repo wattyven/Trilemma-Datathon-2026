@@ -301,7 +301,8 @@
 
     <footer class="site-footer">
       <p>
-        Addresses: BC Address Geocoder. Lot lines: ParcelMap BC (approximate, not a legal survey). Both under the
+        Addresses: BC Address Geocoder. Lot lines: ParcelMap BC (approximate, not a legal survey), or the municipality's own
+        map where ParcelMap BC has a gap (see About). Both provincial sources are under the
         <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.
         Elevation: NRCan High Resolution Digital Elevation Model and LiDAR point clouds, under the
         <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>;
@@ -351,7 +352,7 @@
       </dl>
       <h3>What to keep in mind</h3>
       <ul>
-        <li><strong>Lot lines are approximate.</strong> They come from ParcelMap BC, which is not a legal survey.</li>
+        <li><strong>Lot lines are approximate.</strong> They come from ParcelMap BC, which is not a legal survey, or from the municipality's own map where ParcelMap BC has a gap. Where neither has the lot, the outline is an estimate from the neighbouring addresses, and the lot panel says so.</li>
         <li><strong>The LiDAR has a date.</strong> <span id="about-lidar">Most of Metro Vancouver was flown in 2016.</span> New buildings, removed trees and years of growth since then aren't in it.</li>
         <li><strong>Trees are treated as solid all year.</strong> Deciduous trees let much more winter light through than shown.</li>
         <li><strong>The main numbers are potential direct sun.</strong> They assume clear skies; bright shade and reflected light aren't counted. "With typical weather" lines scale them by how often the sun shone in an average year; that's an average, not a forecast, and fog and mountain cloud vary more than it shows.</li>
@@ -365,6 +366,7 @@
         <li>BC Address Geocoder and ParcelMap BC: Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
         <li>High Resolution Digital Elevation Model (HRDEM) and LiDAR point clouds (CanElevation): Natural Resources Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>.</li>
         <li>Newer LiDAR surface and ground models (LidarBC, 2024 and 2025): Province of British Columbia, <a href="https://www2.gov.bc.ca/gov/content?id=A519A56BC2BF44E4A008B33FCF527F61">Open Government Licence – British Columbia</a>.</li>
+        <li id="about-lots">Where ParcelMap BC has no lot at an address, lot lines come from the municipality's own map.</li>
         <li id="about-imagery">Aerial photos come from each municipality's open data.</li>
         <li>Typical weather: sunshine normals for Vancouver and Abbotsford airports from Environment and Climate Change Canada, <a href="https://open.canada.ca/en/open-government-licence-canada">Open Government Licence – Canada</a>; local cloud from <a href="https://open-meteo.com/">Open-Meteo.com</a> historical weather (ECMWF and Copernicus ERA5), <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.</li>
         <li>Analysis answers are written by <a href="https://ai.google.dev/gemini-api">Google's Gemini</a>, from the lot's numbers shown here.</li>

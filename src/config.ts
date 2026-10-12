@@ -36,6 +36,14 @@ export const MIN_CONFIDENT_SCORE = 70;
 /** Buffered parcel search radius (EPSG:3005 metres) when the point hits no lot. 15 m worked in Phase 0. */
 export const PARCEL_BUFFER_M = 15;
 
+/** Every address point near a position: the neighbours an estimated outline is cut against. */
+export const GEOCODER_NEAR_URL = 'https://geocoder.api.gov.bc.ca/sites/near.json';
+/**
+ * The outline drawn when no lot map has an exact address point's lot: a square this far each way from the point,
+ * cut halfway to each neighbouring address. 20 m matched real lots best (about 70% overlap on a test street).
+ */
+export const LOT_ESTIMATE = { halfSizeM: 20, neighbourRadiusM: 60, maxNeighbours: 60, sameSiteM: 1 } as const;
+
 export const REQUEST_TIMEOUT_MS = 15_000;
 
 // ── Elevation and shading (Phase 2) ───────────────────────────────────────────

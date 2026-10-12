@@ -202,6 +202,63 @@ Responses took 30–100 ms.
 - Not a legal survey boundary.
 - The full province is also downloadable as a file geodatabase, which isn't needed here.
 
+### 3.1 Gaps in the public layer, and the fallbacks
+
+**Observed 2026-10-12:** the public layer held 866,803 features province-wide, against the catalogue's "over two million parcels".
+- Lots captured in `tests/fixtures` on 7–9 October were gone: the Surrey City Hall pair and the 30-unit Burnaby strata.
+- Civic sites with no lot: Surrey, City of North Vancouver, West Vancouver, City of Langley and Delta halls. Vancouver, Burnaby, Richmond, DNV, Township of Langley and Maple Ridge halls still had theirs.
+- In 300 m boxes across 14 neighbourhoods, only 13–46% of the geocoder's `parcelPoint`s fell inside a lot.
+- `PMBC_PARCEL_POLY_SV`, the WMS and the ArcGIS copy at `maps.gov.bc.ca/arcgis/rest/services/whse/bcgw_pub_whse_cadastre/MapServer/0` all have the same holes.
+
+**What went wrong in the app:**
+- An exact address point (`CIVIC_NUMBER`, `parcelPoint`) in a hole found no lot by intersection.
+- The 15 m buffer then found the lot next door, or nothing.
+- So the app showed a neighbour's lot with the "nearest lot" notice, and no alternatives.
+
+**What `findLot` (`data/parcels.ts`) now does for an exact point in no lot (more than 2 m from one):**
+1. Asks the municipality's own lot map (`data/municipalLots.ts`), matched by jurisdiction like the aerial photos.
+2. Failing that, estimates the outline (`data/lotEstimate.ts`):
+   - a 40 m square around the point, cut halfway to each neighbouring address point from the geocoder's `sites/near.json`;
+   - this is the Voronoi cell of the address points;
+   - on a DNV street where the District's map had every lot, it overlapped the real lots by 0.68 on average (intersection over union; 0.60 at a 30 m square, 0.61 at 60 m).
+3. ParcelMap's buffered lots stay on offer in the lot switcher after either.
+
+Block and street matches keep the buffered search.
+
+**Municipal lot maps (`LOT_SOURCES`), verified 2026-10-12:**
+- Each is an ArcGIS layer that answers `geometryType=esriGeometryPoint&inSR=4326&outSR=4326&f=geojson` with `outFields=OBJECTID`.
+- CORS is `*` or echoes the origin; checked for `https://vanshade.ca` and `http://localhost:5180`, with no Referer needed.
+- Each returned a lot containing a civic site's `parcelPoint`.
+- Run in a residential area, each returned a lot for addresses ParcelMap BC was missing.
+- ArcGIS reports query errors with HTTP 200 and an `error` object, so the client treats that as a failure.
+
+| Jurisdiction | Layer | `where` (and strata flag) | Licence |
+|---|---|---|---|
+| City of Vancouver | `services3.arcgis.com/qrcTTRTwUoS8N47o/…/PropertyParcel/FeatureServer/0` | `PropertyType = 'Surface'` | CC BY (the item's licence). No lots at UBC. |
+| City of Burnaby | `gis.burnaby.ca/…/OpenData/OpenData4/MapServer/7` | not `AIR_SPACE = 'Y'` (strata: `STRATA = 'Y'`) | OGL – Burnaby |
+| City of Surrey | `gisservices.surrey.ca/…/OpenData/MapServer/148` | no roads or foreshore (strata: `LOT_TYPE2 = 'Standard Strata'`) | OGL – Surrey |
+| City of Coquitlam | `geodata.coquitlam.ca/…/DynamicServices/Cadastral/MapServer/16` | none | OGL – Coquitlam |
+| City of Port Coquitlam | `services9.arcgis.com/nz97KciUs5nOw64q/…/Cadastral/FeatureServer/0` | none | OGL – City of Port Coquitlam |
+| City of Port Moody | `services9.arcgis.com/XMHGoEc3tdJ8TphG/…/Parcels_WGS/FeatureServer/0` | none | OGL – Port Moody |
+| City of New Westminster | `services3.arcgis.com/A7O8YnTNtzRPIn7T/…/Parcel_Site/FeatureServer/0` | none | OGL – City of New Westminster |
+| District of North Vancouver | `geoweb.dnv.org/…/Data_ParcelLayer/MapServer/0` | none | OGL – North Vancouver |
+| City of Delta | `maps.delta.ca/…/DeltaMap/Property/MapServer/8` | not roads, water, TFN lands or `S` (strata units, mostly about 67 m² each) | OGL – Delta |
+| City of Maple Ridge | `geoservices.mapleridge.ca/…/DataCatalog/Property/MapServer/3` | not `ParcelType` 5 or 9 (water, road; strata: 6, common property) | OGL – Maple Ridge |
+| City of Langley | `maps.langleycity.ca/…/Maps/Open_Data/MapServer/181` (not the FeatureServer, which allows edits) | none | OGL – City of Langley |
+| Township of Langley | `mapsvr.tol.ca/…/GeoSource/DynamicServices/MapServer/3` | not `LEGAL_TYPE = 'STRATA'`: unit footprints with no lot around them | OGL – Township of Langley |
+| City of White Rock | `maps.whiterockcity.ca/…/opendata/Parcel/MapServer/0` | none | OGL – White Rock |
+
+**Left out:**
+- City of North Vancouver: a working layer, but no open licence found.
+- Richmond: only an internal asset service, which needs the City's permission.
+- West Vancouver: its map server blocks scripted requests.
+- Pitt Meadows: only inside a crime-map service.
+- Anmore: no licence stated.
+- Belcarra, Lions Bay and Bowen Island: only old ParcelMap or third-party copies.
+- UBC / Electoral Area A: only a personal upload.
+
+Never show a PID field from any of these (e.g. `PID`, `LTO_PID`, `PRCL_KEY`); the client asks for `OBJECTID` and the strata field only.
+
 ## 4. NRCan HRDEM 1 m mosaic
 
 ### 4.1 STAC

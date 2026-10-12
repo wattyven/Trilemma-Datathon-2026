@@ -6,6 +6,7 @@ describe('lot choices in plain words', () => {
     expect(plainParcelClass('Building Strata')).toBe('Strata building');
     expect(plainParcelClass('Subdivision')).toBe('Lot');
     expect(plainParcelClass('Something New')).toBe('Something New');
+    expect(plainParcelClass('Estimate')).toBe('Estimated outline');
   });
 
   it('labels each candidate lot', () => {

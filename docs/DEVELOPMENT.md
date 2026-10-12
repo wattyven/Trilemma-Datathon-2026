@@ -38,7 +38,7 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 |---|---|
 | `src/config.ts` | endpoints, layer names, limits |
 | `src/copy.ts` | every user-facing string (write for gardeners, not GIS analysts) |
-| `src/data/` | network clients and domain rules: `http`, `geocoder`, `scope`, `parcels`, `jsonp`. Pure where possible, and tested. |
+| `src/data/` | network clients and domain rules: `http`, `geocoder`, `scope`, `parcels` (`findLot`), `municipalLots` (each municipality's own lot map, for gaps in ParcelMap BC), `lotEstimate` (an outline from the neighbouring addresses), `jsonp`. Pure where possible, and tested. |
 | `src/geo/` | polygons, the local metric frame (x = east, y = **true** north), proj4 definitions, the grid → local affine |
 | `src/elevation/` | STAC lookup, the pixel window, COG reads (worker side), the LiDAR vintage lookup (`vintage.json` is built by `spike/09-build-vintage.ts`). Sharper surfaces: `hires.ts` chooses one (main thread, with `hires-index.json` from `spike/12-hires-index.ts`), `build.ts` builds it (worker side) from `copc.ts` (point clouds) or LidarBC GeoTIFFs, on HRDEM resampled by `resample.ts`. `rangeFetch.ts` makes every byte-range read. |
 | `src/imagery/` | municipal aerial photos: `sources.ts` (one per municipality), `fetch.ts` (export or tiles into a canvas), `georef.ts` (grid → photo and photo → local affines) |
@@ -123,6 +123,9 @@ CI (`.github/workflows/deploy.yml`) runs typecheck, tests (both TZs) and build o
 8. Never commit elevation data (`*.tif` is gitignored).
 9. The DataBC WFS only sends CORS headers when the request has a `Referer`. Never use `no-referrer` (`tests/html.test.ts` guards this). A sandboxed JSONP fallback exists.
 10. The parcel layer is `PMBC_PARCEL_FABRIC_POLY_SVW`; the `…_FA_SVW` one is restricted. Strata come back as stacked identical polygons, so deduplicate them.
+    - The public layer can have large gaps: in October 2026 it lost more than half its lots (`DATA_SOURCES.md` §3.1).
+    - So `findLot` treats an exact address point in no lot as a gap. It asks the municipality's lot map (`LOT_SOURCES`), then estimates the outline, and never hands over the neighbour's lot as the address's.
+    - Municipal and estimated lots carry `origin` and ids from `MUNICIPAL_ID_BASE` up, so `lot=` links can't collide with ParcelMap's.
 11. The District of North Vancouver and the City of North Vancouver are distinct, as are the City of Langley and the Township of Langley. Never merge them. A `MUNICIPALITY: "Rural"` parcel is Electoral Area A or Tsawwassen First Nation.
 12. Pixel coordinates: `px = X − x0`, `py = y0 − Y`, and pixel (c, r) is centred at (c + 0.5, r + 0.5). Grid north is −py. Bilinear sampling treats NaN (nodata) as "no obstruction".
 13. Read tile geometry from the COG header (`tileGrid`), not STAC `proj:transform` (its element order isn't the STAC standard for these items).

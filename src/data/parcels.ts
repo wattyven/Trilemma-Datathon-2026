@@ -1,10 +1,12 @@
 // ParcelMap BC lot lookup (docs/DATA_SOURCES.md §3).
-import { PARCEL_BUFFER_M, PARCEL_LAYER, PARCEL_PROPERTIES, WFS_URL } from '../config';
+import { METRO_REGIONAL_DISTRICT, PARCEL_BUFFER_M, PARCEL_LAYER, PARCEL_PROPERTIES, WFS_URL } from '../config';
 import { localFrame } from '../geo/local';
 import { distanceToGeometry, geometryArea, geometryKey, mapGeometry, type AreaGeometry, type Position } from '../geo/polygon';
 import { toBcAlbers } from '../geo/proj';
 import { getJson, isAbortError } from './http';
 import { jsonpViaSandbox } from './jsonp';
+import { estimateLot, neighbourPoints } from './lotEstimate';
+import { MUNICIPAL_ID_BASE, findMunicipalLots, lotSourceFor } from './municipalLots';
 
 export interface Parcel {
   id: number;
@@ -22,9 +24,13 @@ export interface Parcel {
   distanceM: number;
   /** How many identical polygons were folded into this one (strata stack one per unit). */
   duplicates: number;
+  /** Where the outline came from when it isn't ParcelMap BC: a municipality's lot map, or our estimate. */
+  origin?: 'municipal' | 'estimate';
+  /** The municipal lot map's publisher, for the notice. */
+  sourceName?: string;
 }
 
-export type LookupMethod = 'intersects' | 'buffer';
+export type LookupMethod = 'intersects' | 'buffer' | 'municipal' | 'estimate';
 
 export interface ParcelLookup {
   method: LookupMethod;
@@ -32,7 +38,7 @@ export interface ParcelLookup {
   candidates: Parcel[];
 }
 
-export type ParcelNotice = 'approximate-lines' | 'strata' | 'nearest-lot';
+export type ParcelNotice = 'approximate-lines' | 'strata' | 'nearest-lot' | 'estimated-lot';
 
 /** Thrown when lots come back but none contains the point: almost certainly an axis-order bug. */
 export class ParcelAxisError extends Error {
@@ -44,6 +50,10 @@ export class ParcelAxisError extends Error {
 
 const DEPRIORITISED_CLASSES = new Set(['interest', 'road', 'right of way', 'air space']);
 const CONTAINS_TOLERANCE_M = 0.5;
+/** An exact address point this close to a lot is on its edge: that lot is the address's, not a neighbour's. */
+const ON_EDGE_M = 2;
+/** The estimated outline's id, clear of ParcelMap BC's and the municipal ones. */
+export const ESTIMATE_LOT_ID = MUNICIPAL_ID_BASE - 1;
 
 function wfsUrl(cqlFilter: string, count: number, format: 'json' | { callback: string }): string {
   const u = new URL(WFS_URL);
@@ -157,6 +167,56 @@ export async function findParcels(lonLat: Position, { signal }: { signal?: Abort
   return { method: 'buffer', candidates: normaliseParcels(near.features ?? [], lonLat, 'buffer') };
 }
 
+export interface LotQuery {
+  lonLat: Position;
+  /** The geocoder's point may not be on the lot (a block or street match). */
+  approximate: boolean;
+  /** The address's display jurisdiction, which picks the municipal lot map. */
+  jurisdiction: string;
+}
+
+const isLotLike = (p: Parcel) => classRank(p) === 0;
+
+/**
+ * The lot for an address. ParcelMap BC first. Its public layer has gaps, so when an exact address point is in
+ * no lot there, the municipality's own lot map is asked, and failing that the outline is estimated from the
+ * neighbouring addresses. ParcelMap's nearby lots stay on offer after either.
+ */
+export async function findLot(q: LotQuery, { signal }: { signal?: AbortSignal } = {}): Promise<ParcelLookup> {
+  const found = await findParcels(q.lonLat, { signal });
+  if (q.approximate || found.candidates.some((p) => isLotLike(p) && p.distanceM <= ON_EDGE_M)) return found;
+  const others = found.candidates;
+  const source = lotSourceFor(q.jurisdiction);
+  if (source) {
+    try {
+      const lots = normaliseParcels(await findMunicipalLots(source, q.lonLat, signal), q.lonLat, 'intersects').filter((p) => p.containsPoint);
+      if (lots.length > 0) {
+        const tagged = lots.map((p): Parcel => ({ ...p, origin: 'municipal', sourceName: source.owner }));
+        return { method: 'municipal', candidates: [...tagged, ...others] };
+      }
+    } catch (e) {
+      if (isAbortError(e)) throw e;
+      console.warn(e); // the estimate still gives an answer
+    }
+  }
+  let neighbours: Position[] = [];
+  try {
+    neighbours = await neighbourPoints(q.lonLat, signal);
+  } catch (e) {
+    if (isAbortError(e)) throw e;
+    console.warn(e); // without neighbours the estimate is just the square
+  }
+  return { method: 'estimate', candidates: [estimatedParcel(q.lonLat, neighbours), ...others] };
+}
+
+function estimatedParcel(lonLat: Position, neighbours: Position[]): Parcel {
+  const feature = {
+    geometry: estimateLot(lonLat, neighbours),
+    properties: { PARCEL_FABRIC_POLY_ID: ESTIMATE_LOT_ID, PARCEL_CLASS: 'Estimate', REGIONAL_DISTRICT: METRO_REGIONAL_DISTRICT },
+  };
+  return { ...normaliseParcels([feature], lonLat, 'intersects')[0]!, origin: 'estimate' };
+}
+
 const STRATA_PLAN = /^[A-Z]{2}S\d+$/;
 
 export function isStrata(p: Parcel): boolean {
@@ -164,8 +224,9 @@ export function isStrata(p: Parcel): boolean {
 }
 
 export function parcelNotices(p: Parcel, lookup: ParcelLookup, opts: { approximateGeocode: boolean }): ParcelNotice[] {
+  if (p.origin === 'estimate') return ['estimated-lot'];
   const notices: ParcelNotice[] = [];
-  if (lookup.method === 'buffer' || (opts.approximateGeocode && !p.containsPoint)) notices.push('nearest-lot');
+  if (!p.containsPoint && (lookup.method !== 'intersects' || opts.approximateGeocode)) notices.push('nearest-lot');
   if (isStrata(p)) notices.push('strata');
   notices.push('approximate-lines');
   return notices;

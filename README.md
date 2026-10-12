@@ -172,7 +172,7 @@ The app's **About accuracy** panel has the details.
 | Data | Source | Licence |
 |---|---|---|
 | Addresses | BC Address Geocoder | Open Government Licence – British Columbia |
-| Lot lines | ParcelMap BC (DataBC WFS) | Open Government Licence – British Columbia |
+| Lot lines | ParcelMap BC (DataBC WFS); where it has no lot at an address, the municipality's own lot map (13 municipalities, listed in the app's About panel) | Open Government Licence – British Columbia; each municipality's Open Government Licence (CC BY for Vancouver) |
 | Elevation | NRCan High Resolution Digital Elevation Model (HRDEM) 1 m mosaic, and CanElevation LiDAR point clouds | Open Government Licence – Canada |
 | Newer elevation | LidarBC 1 m surface and ground models (2024, 2025), read through [a small CORS proxy](proxy/lidarbc) | Open Government Licence – British Columbia |
 | Aerial photos | Each municipality's orthophoto service (list in the app's About panel) | Each municipality's Open Government Licence |
